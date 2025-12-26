@@ -1,0 +1,38 @@
+{
+  "name": "@gravyty/design-system",
+  "version": "0.1.0",
+  "description": "Gravyty Design System - MUI theme and component overrides",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "keywords": [
+    "mui",
+    "design-system",
+    "theme"
+  ],
+  "author": "",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@mui/material": "^5.15.0",
+    "@mui/system": "^5.15.0",
+    "@emotion/react": "^11.11.0",
+    "@emotion/styled": "^11.11.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.0",
+    "@types/react": "^18.2.0"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0"
+  }
+}
+
