@@ -8,8 +8,23 @@
   ],
   "scripts": {
     "dev": "npm run dev --workspace=apps/web",
-    "build": "npm run build --workspace=packages/design-system && npm run build --workspace=apps/web",
-    "typecheck": "npm run typecheck --workspaces --if-present"
+    "dev:api": "npm run dev --workspace=apps/api",
+    "dev:web": "npm run dev --workspace=apps/web",
+    "build": "npm run build --workspace=packages/domain && npm run build --workspace=packages/jobs && npm run build --workspace=packages/design-system && npm run build --workspace=apps/api && npm run build --workspace=apps/web",
+    "build:api:lambda": "./infra/scripts/build-api-for-lambda.sh",
+    "deploy:api": "npm run build:api:lambda && npm run cdk:deploy",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "cdk:bootstrap": "cd infra && cdk bootstrap",
+    "cdk:deploy": "cd infra && npm run deploy",
+    "cdk:diff": "cd infra && cdk diff",
+    "cdk:synth": "cd infra && cdk synth",
+    "cdk:destroy": "cd infra && cdk destroy",
+    "smoke-test": "./infra/scripts/smoke-test.sh",
+    "get-api-url": "./infra/scripts/get-api-url.sh"
+  },
+  "dependencies": {
+    "pdf-parse": "^1.1.1",
+    "html-to-text": "^9.0.5"
   },
   "devDependencies": {
     "typescript": "^5.3.0"

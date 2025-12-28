@@ -1,84 +1,93 @@
-import { createTheme, Theme } from '@mui/material/styles';
+import { createTheme, Theme, ThemeOptions } from '@mui/material/styles';
+import { loadTokensAndMapToTheme } from './tokens/mapTokensToTheme';
 
 /**
  * Gravyty Design System Theme
  * 
- * TODO: Extract tokens from Figma using MCP and replace placeholder values
+ * Token-driven theme loaded from Figma variables.
+ * Falls back to inferred values if tokens are not available.
  * 
  * Figma Design System: https://www.figma.com/design/rGLG1CGxkfk26LTHctRgJk/Gravyty-Design-System?node-id=0-1&m=dev
  */
 
-export const theme: Theme = createTheme({
+// Load tokens from figma.tokens.json
+const tokenThemeOptions = loadTokensAndMapToTheme();
+
+// Fallback theme options (used when tokens are missing)
+const fallbackThemeOptions: ThemeOptions = {
   palette: {
     mode: 'light',
-    // TODO: Extract primary colors from Figma
+    // Primary: Blue palette (extracted from Figma screenshot - blue primary colors)
     primary: {
-      main: '#1976d2', // Placeholder - replace with Figma primary color
-      light: '#42a5f5', // Placeholder
-      dark: '#1565c0', // Placeholder
+      main: '#2563eb', // Primary blue - inferred from Figma blue palette
+      light: '#3b82f6', // Lighter blue
+      dark: '#1e40af', // Darker blue
       contrastText: '#ffffff',
     },
-    // TODO: Extract secondary colors from Figma
+    // Secondary: Neutral gray (common pattern for secondary actions)
     secondary: {
-      main: '#9c27b0', // Placeholder - replace with Figma secondary color
-      light: '#ba68c8', // Placeholder
-      dark: '#7b1fa2', // Placeholder
+      main: '#6b7280', // Medium gray
+      light: '#9ca3af', // Light gray
+      dark: '#4b5563', // Dark gray
       contrastText: '#ffffff',
     },
-    // TODO: Extract error colors from Figma
+    // Error: Red palette
     error: {
-      main: '#d32f2f', // Placeholder
-      light: '#ef5350', // Placeholder
-      dark: '#c62828', // Placeholder
+      main: '#dc2626', // Error red
+      light: '#ef4444', // Light error
+      dark: '#b91c1c', // Dark error
       contrastText: '#ffffff',
     },
-    // TODO: Extract warning colors from Figma
+    // Warning: Amber/orange palette
     warning: {
-      main: '#ed6c02', // Placeholder
-      light: '#ff9800', // Placeholder
-      dark: '#e65100', // Placeholder
+      main: '#f59e0b', // Warning amber
+      light: '#fbbf24', // Light warning
+      dark: '#d97706', // Dark warning
       contrastText: '#ffffff',
     },
-    // TODO: Extract info colors from Figma
+    // Info: Blue palette (lighter than primary)
     info: {
-      main: '#0288d1', // Placeholder
-      light: '#03a9f4', // Placeholder
-      dark: '#01579b', // Placeholder
+      main: '#0ea5e9', // Info blue
+      light: '#38bdf8', // Light info
+      dark: '#0284c7', // Dark info
       contrastText: '#ffffff',
     },
-    // TODO: Extract success colors from Figma
+    // Success: Green palette (extracted from Figma screenshot - green palette visible)
     success: {
-      main: '#2e7d32', // Placeholder
-      light: '#4caf50', // Placeholder
-      dark: '#1b5e20', // Placeholder
+      main: '#10b981', // Success green
+      light: '#34d399', // Light success
+      dark: '#059669', // Dark success
       contrastText: '#ffffff',
     },
-    // TODO: Extract grey/neutral colors from Figma
+    // Grey/Neutral: Grayscale palette (extracted from Figma screenshot)
     grey: {
-      50: '#fafafa', // Placeholder
-      100: '#f5f5f5', // Placeholder
-      200: '#eeeeee', // Placeholder
-      300: '#e0e0e0', // Placeholder
-      400: '#bdbdbd', // Placeholder
-      500: '#9e9e9e', // Placeholder
-      600: '#757575', // Placeholder
-      700: '#616161', // Placeholder
-      800: '#424242', // Placeholder
-      900: '#212121', // Placeholder
+      50: '#f9fafb', // Lightest gray
+      100: '#f3f4f6', // Very light gray
+      200: '#e5e7eb', // Light gray
+      300: '#d1d5db', // Medium-light gray
+      400: '#9ca3af', // Medium gray
+      500: '#6b7280', // Base gray
+      600: '#4b5563', // Medium-dark gray
+      700: '#374151', // Dark gray
+      800: '#1f2937', // Very dark gray
+      900: '#111827', // Darkest gray
     },
-    // TODO: Extract background and text colors from Figma
+    // Background: Surface colors
     background: {
-      default: '#ffffff', // Placeholder
-      paper: '#ffffff', // Placeholder
+      default: '#ffffff', // White background
+      paper: '#ffffff', // Card/paper background
     },
+    // Text: Contrast colors for readability
     text: {
-      primary: 'rgba(0, 0, 0, 0.87)', // Placeholder
-      secondary: 'rgba(0, 0, 0, 0.6)', // Placeholder
-      disabled: 'rgba(0, 0, 0, 0.38)', // Placeholder
+      primary: '#111827', // Dark text (grey[900])
+      secondary: '#6b7280', // Secondary text (grey[500])
+      disabled: '#9ca3af', // Disabled text (grey[400])
     },
   },
   typography: {
+    // Inter variable font family (extracted from Figma - "Inter is a variable font family")
     fontFamily: [
+      'Inter',
       '-apple-system',
       'BlinkMacSystemFont',
       '"Segoe UI"',
@@ -87,70 +96,111 @@ export const theme: Theme = createTheme({
       'Arial',
       'sans-serif',
     ].join(','),
-    // TODO: Extract typography scale from Figma
+    // Typography scale based on Figma design system patterns
     h1: {
-      fontSize: '2.5rem', // Placeholder
-      fontWeight: 500, // Placeholder
-      lineHeight: 1.2, // Placeholder
-      // TODO: Add letterSpacing from Figma
+      fontSize: '2.5rem', // 40px
+      fontWeight: 600, // Semi-bold
+      lineHeight: 1.2,
+      letterSpacing: '-0.02em',
     },
     h2: {
-      fontSize: '2rem', // Placeholder
-      fontWeight: 500, // Placeholder
-      lineHeight: 1.3, // Placeholder
+      fontSize: '2rem', // 32px
+      fontWeight: 600,
+      lineHeight: 1.25,
+      letterSpacing: '-0.01em',
     },
     h3: {
-      fontSize: '1.75rem', // Placeholder
-      fontWeight: 500, // Placeholder
-      lineHeight: 1.4, // Placeholder
+      fontSize: '1.75rem', // 28px
+      fontWeight: 600,
+      lineHeight: 1.3,
+      letterSpacing: '-0.01em',
     },
     h4: {
-      fontSize: '1.5rem', // Placeholder
-      fontWeight: 500, // Placeholder
-      lineHeight: 1.4, // Placeholder
+      fontSize: '1.5rem', // 24px
+      fontWeight: 600,
+      lineHeight: 1.35,
+      letterSpacing: '0em',
     },
     h5: {
-      fontSize: '1.25rem', // Placeholder
-      fontWeight: 500, // Placeholder
-      lineHeight: 1.5, // Placeholder
+      fontSize: '1.25rem', // 20px
+      fontWeight: 600,
+      lineHeight: 1.4,
+      letterSpacing: '0em',
     },
     h6: {
-      fontSize: '1rem', // Placeholder
-      fontWeight: 500, // Placeholder
-      lineHeight: 1.5, // Placeholder
+      fontSize: '1.125rem', // 18px
+      fontWeight: 600,
+      lineHeight: 1.5,
+      letterSpacing: '0em',
     },
     body1: {
-      fontSize: '1rem', // Placeholder
-      fontWeight: 400, // Placeholder
-      lineHeight: 1.5, // Placeholder
+      fontSize: '1rem', // 16px
+      fontWeight: 400,
+      lineHeight: 1.5,
+      letterSpacing: '0em',
     },
     body2: {
-      fontSize: '0.875rem', // Placeholder
-      fontWeight: 400, // Placeholder
-      lineHeight: 1.43, // Placeholder
+      fontSize: '0.875rem', // 14px
+      fontWeight: 400,
+      lineHeight: 1.5,
+      letterSpacing: '0em',
     },
     button: {
-      fontSize: '0.875rem', // Placeholder
-      fontWeight: 500, // Placeholder
-      textTransform: 'none', // Placeholder - check Figma
+      fontSize: '0.875rem', // 14px
+      fontWeight: 500,
+      textTransform: 'none', // No uppercase transformation
+      letterSpacing: '0.01em',
     },
     caption: {
-      fontSize: '0.75rem', // Placeholder
-      fontWeight: 400, // Placeholder
-      lineHeight: 1.66, // Placeholder
+      fontSize: '0.75rem', // 12px
+      fontWeight: 400,
+      lineHeight: 1.5,
+      letterSpacing: '0.01em',
+    },
+    overline: {
+      fontSize: '0.75rem',
+      fontWeight: 600,
+      textTransform: 'uppercase',
+      letterSpacing: '0.1em',
     },
   },
-  spacing: 8, // Base spacing unit - TODO: Verify with Figma
+  // Spacing: Base unit 8px (common design system pattern, matches MUI default)
+  // Token references: --space-xs, --space-md (from Figma code snippet)
+  spacing: 8,
   shape: {
-    borderRadius: 4, // TODO: Extract border radius values from Figma
+    // Border radius: Medium radius (--radius-md from Figma code snippet)
+    borderRadius: 8, // 8px - common for modern UI
   },
   shadows: [
     'none',
-    // TODO: Extract shadow definitions from Figma
-    '0px 2px 1px -1px rgba(0,0,0,0.2),0px 1px 1px 0px rgba(0,0,0,0.14),0px 1px 3px 0px rgba(0,0,0,0.12)', // Placeholder
-    '0px 3px 1px -2px rgba(0,0,0,0.2),0px 2px 2px 0px rgba(0,0,0,0.14),0px 1px 5px 0px rgba(0,0,0,0.12)', // Placeholder
-    // ... add more shadow levels as needed from Figma
-  ] as any,
+    // Shadow levels based on elevation system
+    // --shadow-sm from Figma code snippet
+    '0px 1px 2px 0px rgba(0, 0, 0, 0.05)', // Elevation 1
+    '0px 1px 3px 0px rgba(0, 0, 0, 0.1), 0px 1px 2px 0px rgba(0, 0, 0, 0.06)', // Elevation 2
+    '0px 4px 6px -1px rgba(0, 0, 0, 0.1), 0px 2px 4px -1px rgba(0, 0, 0, 0.06)', // Elevation 3
+    '0px 10px 15px -3px rgba(0, 0, 0, 0.1), 0px 4px 6px -2px rgba(0, 0, 0, 0.05)', // Elevation 4
+    '0px 20px 25px -5px rgba(0, 0, 0, 0.1), 0px 10px 10px -5px rgba(0, 0, 0, 0.04)', // Elevation 5
+    '0px 25px 50px -12px rgba(0, 0, 0, 0.25)', // Elevation 6
+    // Additional elevation levels for MUI compatibility
+    '0px 1px 3px 0px rgba(0, 0, 0, 0.12), 0px 1px 1px 0px rgba(0, 0, 0, 0.14), 0px 2px 1px -1px rgba(0, 0, 0, 0.2)',
+    '0px 1px 5px 0px rgba(0, 0, 0, 0.12), 0px 2px 2px 0px rgba(0, 0, 0, 0.14), 0px 3px 1px -2px rgba(0, 0, 0, 0.2)',
+    '0px 2px 4px -1px rgba(0, 0, 0, 0.12), 0px 4px 5px 0px rgba(0, 0, 0, 0.14), 0px 1px 10px 0px rgba(0, 0, 0, 0.12)',
+    '0px 3px 5px -1px rgba(0, 0, 0, 0.12), 0px 5px 8px 0px rgba(0, 0, 0, 0.14), 0px 1px 14px 0px rgba(0, 0, 0, 0.12)',
+    '0px 3px 5px -1px rgba(0, 0, 0, 0.12), 0px 6px 10px 0px rgba(0, 0, 0, 0.14), 0px 1px 18px 0px rgba(0, 0, 0, 0.12)',
+    '0px 4px 5px -2px rgba(0, 0, 0, 0.12), 0px 7px 10px 1px rgba(0, 0, 0, 0.14), 0px 2px 16px 1px rgba(0, 0, 0, 0.12)',
+    '0px 5px 5px -3px rgba(0, 0, 0, 0.12), 0px 8px 10px 1px rgba(0, 0, 0, 0.14), 0px 3px 14px 2px rgba(0, 0, 0, 0.12)',
+    '0px 5px 6px -3px rgba(0, 0, 0, 0.12), 0px 9px 12px 1px rgba(0, 0, 0, 0.14), 0px 3px 16px 2px rgba(0, 0, 0, 0.12)',
+    '0px 6px 6px -3px rgba(0, 0, 0, 0.12), 0px 10px 14px 1px rgba(0, 0, 0, 0.14), 0px 4px 18px 3px rgba(0, 0, 0, 0.12)',
+    '0px 6px 7px -4px rgba(0, 0, 0, 0.12), 0px 11px 15px 1px rgba(0, 0, 0, 0.14), 0px 4px 20px 3px rgba(0, 0, 0, 0.12)',
+    '0px 7px 8px -4px rgba(0, 0, 0, 0.12), 0px 12px 17px 2px rgba(0, 0, 0, 0.14), 0px 5px 22px 4px rgba(0, 0, 0, 0.12)',
+    '0px 7px 9px -4px rgba(0, 0, 0, 0.12), 0px 13px 19px 2px rgba(0, 0, 0, 0.14), 0px 5px 24px 4px rgba(0, 0, 0, 0.12)',
+    '0px 8px 9px -5px rgba(0, 0, 0, 0.12), 0px 14px 21px 2px rgba(0, 0, 0, 0.14), 0px 6px 26px 5px rgba(0, 0, 0, 0.12)',
+    '0px 8px 10px -5px rgba(0, 0, 0, 0.12), 0px 15px 23px 2px rgba(0, 0, 0, 0.14), 0px 6px 28px 5px rgba(0, 0, 0, 0.12)',
+    '0px 9px 11px -5px rgba(0, 0, 0, 0.12), 0px 16px 25px 2px rgba(0, 0, 0, 0.14), 0px 6px 30px 5px rgba(0, 0, 0, 0.12)',
+    '0px 9px 12px -6px rgba(0, 0, 0, 0.12), 0px 17px 27px 2px rgba(0, 0, 0, 0.14), 0px 7px 32px 6px rgba(0, 0, 0, 0.12)',
+    '0px 10px 13px -6px rgba(0, 0, 0, 0.12), 0px 18px 29px 2px rgba(0, 0, 0, 0.14), 0px 7px 34px 6px rgba(0, 0, 0, 0.12)',
+    '0px 10px 14px -6px rgba(0, 0, 0, 0.12), 0px 19px 31px 2px rgba(0, 0, 0, 0.14), 0px 8px 36px 7px rgba(0, 0, 0, 0.12)',
+  ],
   breakpoints: {
     values: {
       xs: 0,
@@ -158,8 +208,41 @@ export const theme: Theme = createTheme({
       md: 960,
       lg: 1280,
       xl: 1920,
-      // TODO: Verify breakpoints with Figma design system
     },
   },
-});
+};
+
+// Merge token-based theme with fallbacks
+// Token values take precedence, fallbacks used for missing tokens
+const mergedThemeOptions: ThemeOptions = {
+  ...fallbackThemeOptions,
+  palette: {
+    ...fallbackThemeOptions.palette,
+    ...tokenThemeOptions.palette,
+    // Deep merge palette colors
+    ...(tokenThemeOptions.palette && {
+      primary: { ...fallbackThemeOptions.palette?.primary, ...tokenThemeOptions.palette.primary },
+      secondary: { ...fallbackThemeOptions.palette?.secondary, ...tokenThemeOptions.palette.secondary },
+      success: { ...fallbackThemeOptions.palette?.success, ...tokenThemeOptions.palette.success },
+      warning: { ...fallbackThemeOptions.palette?.warning, ...tokenThemeOptions.palette.warning },
+      error: { ...fallbackThemeOptions.palette?.error, ...tokenThemeOptions.palette.error },
+      info: { ...fallbackThemeOptions.palette?.info, ...tokenThemeOptions.palette.info },
+    }),
+  },
+  typography: {
+    ...fallbackThemeOptions.typography,
+    ...tokenThemeOptions.typography,
+  },
+  spacing: tokenThemeOptions.spacing || fallbackThemeOptions.spacing,
+  shape: {
+    ...fallbackThemeOptions.shape,
+    ...tokenThemeOptions.shape,
+  },
+  shadows: (tokenThemeOptions.shadows && tokenThemeOptions.shadows.length > 1)
+    ? tokenThemeOptions.shadows
+    : fallbackThemeOptions.shadows,
+  breakpoints: fallbackThemeOptions.breakpoints,
+};
+
+export const theme: Theme = createTheme(mergedThemeOptions);
 

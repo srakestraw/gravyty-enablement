@@ -3,6 +3,7 @@ import { Box } from '@mui/material';
 import { Header } from './Header';
 import { SideNav } from './SideNav';
 import { PageLayout } from './PageLayout';
+import { ShellLayoutProvider } from '../../contexts/ShellLayoutContext';
 
 interface AppShellProps {
   children: ReactNode;
@@ -10,13 +11,17 @@ interface AppShellProps {
 
 export function AppShell({ children }: AppShellProps) {
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-      <Header />
-      <Box sx={{ display: 'flex', flex: 1 }}>
-        <SideNav />
-        <PageLayout>{children}</PageLayout>
+    <ShellLayoutProvider>
+      <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+        <Header />
+        <Box sx={{ display: 'flex', flex: 1 }}>
+          <SideNav />
+          <PageLayout>{children}</PageLayout>
+        </Box>
       </Box>
-    </Box>
+    </ShellLayoutProvider>
   );
 }
+
+
 

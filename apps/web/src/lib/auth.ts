@@ -27,14 +27,41 @@ const userPoolClientId = import.meta.env.VITE_COGNITO_USER_POOL_CLIENT_ID || '';
 const userPoolDomainInput = import.meta.env.VITE_COGNITO_DOMAIN || import.meta.env.VITE_COGNITO_USER_POOL_DOMAIN || '';
 // Get region from env or default to us-east-1
 const cognitoRegion = import.meta.env.VITE_COGNITO_REGION || 'us-east-1';
+
 // Determine if it's a custom domain or Cognito domain prefix
 // Custom domains contain dots (e.g., enablement.gravytylabs.com)
 // Cognito prefixes don't (e.g., enablement-portal-75874255)
-const userPoolDomain = userPoolDomainInput
-  ? (userPoolDomainInput.includes('.') 
-      ? userPoolDomainInput // Custom domain - use as-is
-      : `${userPoolDomainInput}.auth.${cognitoRegion}.amazoncognito.com`) // Cognito domain - add suffix
-  : '';
+let userPoolDomain = '';
+if (userPoolDomainInput) {
+  const trimmedInput = String(userPoolDomainInput).trim();
+  if (trimmedInput.includes('.')) {
+    // Custom domain - use as-is
+    userPoolDomain = trimmedInput;
+  } else if (trimmedInput) {
+    // Cognito domain prefix - construct full domain
+    userPoolDomain = `${trimmedInput}.auth.${cognitoRegion}.amazoncognito.com`;
+  }
+}
+
+// Debug logging for domain construction (only in browser, not during build)
+// This will help troubleshoot domain issues in production
+if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+  try {
+    console.log('[Auth] Domain configuration:', {
+      userPoolDomainInput,
+      cognitoRegion,
+      constructedDomain: userPoolDomain,
+      hasDomain: !!userPoolDomain,
+      envVars: {
+        VITE_COGNITO_DOMAIN: import.meta.env.VITE_COGNITO_DOMAIN,
+        VITE_COGNITO_REGION: import.meta.env.VITE_COGNITO_REGION,
+        VITE_COGNITO_USER_POOL_ID: import.meta.env.VITE_COGNITO_USER_POOL_ID ? '***' : undefined,
+      },
+    });
+  } catch (e) {
+    // Silently fail if logging causes issues
+  }
+}
 
 // Build redirect URLs based on environment
 // In production, use production domain; in dev, use current origin and localhost variants
@@ -76,8 +103,28 @@ const redirectSignOut = getRedirectUrls();
 
 let isConfigured = false;
 
+// Validate domain configuration before configuring Amplify
+if (!userPoolDomain) {
+  console.error('[Auth] CRITICAL: userPoolDomain is empty!', {
+    userPoolDomainInput,
+    cognitoRegion,
+    userPoolId,
+    userPoolClientId,
+    envVars: {
+      VITE_COGNITO_DOMAIN: import.meta.env.VITE_COGNITO_DOMAIN,
+      VITE_COGNITO_REGION: import.meta.env.VITE_COGNITO_REGION,
+    },
+  });
+}
+
 if (userPoolId && userPoolClientId && userPoolDomain) {
   try {
+    // Ensure domain is a valid string (not null/undefined)
+    const validatedDomain = String(userPoolDomain).trim();
+    if (!validatedDomain) {
+      throw new Error(`Invalid Cognito domain: "${userPoolDomain}" (type: ${typeof userPoolDomain})`);
+    }
+
     Amplify.configure({
       Auth: {
         Cognito: {
@@ -85,7 +132,7 @@ if (userPoolId && userPoolClientId && userPoolDomain) {
           userPoolClientId,
           loginWith: {
             oauth: {
-              domain: userPoolDomain,
+              domain: validatedDomain,
               scopes: ['openid', 'email', 'profile'],
               redirectSignIn,
               redirectSignOut,
@@ -97,32 +144,61 @@ if (userPoolId && userPoolClientId && userPoolDomain) {
       },
     });
     isConfigured = true;
-    if (isDevelopment) {
-      console.log('[Auth] Amplify configured successfully', {
-        environment: isProduction ? 'production' : 'development',
-        userPoolId,
-        userPoolClientId,
-        domain: userPoolDomain,
-        currentOrigin,
-        redirectSignIn,
-      });
-    }
+    
+    // Log configuration in both dev and production for debugging
+    console.log('[Auth] Amplify configured successfully', {
+      environment: isProduction ? 'production' : 'development',
+      userPoolId,
+      userPoolClientId,
+      domain: validatedDomain,
+      domainInput: userPoolDomainInput,
+      cognitoRegion,
+      currentOrigin,
+      redirectSignIn: redirectSignIn.slice(0, 2), // Log first 2 URLs only
+    });
   } catch (error) {
-    console.error('[Auth] Failed to configure Amplify:', error);
+    console.error('[Auth] Failed to configure Amplify:', error, {
+      userPoolId,
+      userPoolClientId,
+      userPoolDomain,
+      userPoolDomainInput,
+      cognitoRegion,
+    });
   }
 } else {
-  console.warn('[Auth] Amplify not configured - missing environment variables', {
-    hasUserPoolId: !!userPoolId,
-    hasClientId: !!userPoolClientId,
-    hasDomain: !!userPoolDomain,
-    environment: isProduction ? 'production' : 'development',
-  });
+  const missingVars: string[] = [];
+  if (!userPoolId) missingVars.push('VITE_COGNITO_USER_POOL_ID');
+  if (!userPoolClientId) missingVars.push('VITE_COGNITO_USER_POOL_CLIENT_ID');
+  if (!userPoolDomain) missingVars.push('VITE_COGNITO_DOMAIN');
+  
+  const errorMsg = `[Auth] Amplify not configured - missing environment variables: ${missingVars.join(', ')}`;
+  
+  if (isProduction) {
+    // In production, this is a critical error - log as error
+    console.error(errorMsg, {
+      hasUserPoolId: !!userPoolId,
+      hasClientId: !!userPoolClientId,
+      hasDomain: !!userPoolDomain,
+      userPoolDomainInput,
+      environment: 'production',
+      message: 'Cognito authentication will not work. Please set VITE_COGNITO_DOMAIN in Amplify environment variables.',
+    });
+  } else {
+    console.warn(errorMsg, {
+      hasUserPoolId: !!userPoolId,
+      hasClientId: !!userPoolClientId,
+      hasDomain: !!userPoolDomain,
+      userPoolDomainInput,
+      environment: 'development',
+    });
+  }
 }
 
 export interface AuthUser {
   userId: string;
   email?: string;
   role?: string;
+  authMode?: 'cognito' | 'dev';
 }
 
 /**
@@ -176,6 +252,26 @@ export async function signOutUser(): Promise<void> {
 }
 
 /**
+ * Decode JWT token payload (without verification - token is already verified by Amplify)
+ */
+function decodeJwtPayload(token: string): any {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    return JSON.parse(jsonPayload);
+  } catch (error) {
+    console.error('Error decoding JWT:', error);
+    return null;
+  }
+}
+
+/**
  * Get current authenticated user
  */
 export async function getCurrentAuthUser(): Promise<AuthUser | null> {
@@ -183,10 +279,47 @@ export async function getCurrentAuthUser(): Promise<AuthUser | null> {
     const user = await getCurrentUser();
     const session = await fetchAuthSession();
     
+    // Try to get email from ID token claims
+    let email: string | undefined;
+    let groups: string[] | undefined;
+    
+    if (session.tokens?.idToken) {
+      const idTokenString = session.tokens.idToken.toString();
+      const payload = decodeJwtPayload(idTokenString);
+      if (payload) {
+        // Email can be in 'email' claim or 'email_verified' claim
+        email = payload.email || payload['cognito:username'] || user.signInDetails?.loginId;
+        // Extract Cognito groups from token claims
+        groups = payload['cognito:groups'] || payload.groups;
+        
+        // Debug logging in dev mode
+        if (import.meta.env.DEV) {
+          console.log('[Auth] ID Token claims:', {
+            email,
+            groups,
+            hasCognitoGroups: !!payload['cognito:groups'],
+            allClaims: Object.keys(payload),
+            cognitoGroupsValue: payload['cognito:groups'],
+          });
+        }
+      }
+    }
+    
+    // Fallback to loginId if email not found in token
+    if (!email) {
+      email = user.signInDetails?.loginId;
+    }
+    
+    // Store groups as comma-separated string for easier parsing
+    const groupsString = groups && groups.length > 0 ? groups.join(',') : undefined;
+    
     return {
       userId: user.userId,
-      email: user.signInDetails?.loginId,
-      // Role will be extracted from JWT token groups claim
+      email,
+      // Role will be extracted from JWT token groups claim in AuthContext
+      // Store raw groups string for role extraction
+      role: groupsString,
+      authMode: 'cognito',
     };
   } catch (error) {
     console.error('Error getting current user:', error);
@@ -196,10 +329,11 @@ export async function getCurrentAuthUser(): Promise<AuthUser | null> {
 
 /**
  * Get ID token for API requests
+ * Optionally force refresh to get latest groups/claims
  */
-export async function getIdToken(): Promise<string | null> {
+export async function getIdToken(forceRefresh: boolean = false): Promise<string | null> {
   try {
-    const session = await fetchAuthSession();
+    const session = await fetchAuthSession({ forceRefresh });
     return session.tokens?.idToken?.toString() || null;
   } catch (error) {
     console.error('Error getting ID token:', error);
@@ -237,8 +371,9 @@ export async function handleOAuthRedirect(): Promise<boolean> {
   const hasState = urlParams.has('state') || hashParams.has('state');
   const hasError = urlParams.has('error') || hashParams.has('error');
 
-  // Log current URL for debugging
-  if (isDevelopment) {
+  // Only log if there's an actual OAuth redirect (code, state, or error)
+  // This prevents console spam on normal page loads
+  if (isDevelopment && (hasCode || hasState || hasError)) {
     console.log('[Auth] Checking OAuth redirect:', {
       url: window.location.href,
       search: window.location.search,

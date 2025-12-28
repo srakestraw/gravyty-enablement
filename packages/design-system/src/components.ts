@@ -3,41 +3,102 @@ import { Theme, Components } from '@mui/material/styles';
 /**
  * MUI Component Overrides
  * 
- * TODO: Customize components based on Figma design system
- * Use Figma MCP to inspect component designs before implementing overrides
+ * Based on Figma Design System inspection:
+ * - Button: 5 sizes / 3 styles (from Figma screenshot)
+ * - Badge & Chip: 2 sizes / 2 styles
+ * - Cards: Basic Card and Card with Header variants
  * 
  * Figma Design System: https://www.figma.com/design/rGLG1CGxkfk26LTHctRgJk/Gravyty-Design-System?node-id=0-1&m=dev
  */
 
 export const components = (theme: Theme): Components => ({
-  // Button
-  // TODO: Inspect Button component in Figma and apply overrides
+  // Button: 5 sizes / 3 styles
   MuiButton: {
     styleOverrides: {
       root: {
-        // TODO: Add button styles from Figma
-        // Example: borderRadius, padding, textTransform, etc.
+        borderRadius: theme.shape.borderRadius,
+        textTransform: 'none', // No uppercase
+        fontWeight: 500,
+        padding: theme.spacing(1.5, 3),
+        boxShadow: 'none',
+        '&:hover': {
+          boxShadow: theme.shadows[2],
+        },
       },
-      // TODO: Add variant-specific overrides (contained, outlined, text)
+      sizeSmall: {
+        padding: theme.spacing(1, 2),
+        fontSize: '0.8125rem', // 13px
+      },
+      sizeMedium: {
+        padding: theme.spacing(1.5, 3),
+        fontSize: '0.875rem', // 14px
+      },
+      sizeLarge: {
+        padding: theme.spacing(2, 4),
+        fontSize: '1rem', // 16px
+      },
+      contained: {
+        '&:hover': {
+          boxShadow: theme.shadows[4],
+        },
+        '&:active': {
+          boxShadow: theme.shadows[1],
+        },
+      },
+      outlined: {
+        borderWidth: 1.5,
+        '&:hover': {
+          borderWidth: 1.5,
+          boxShadow: theme.shadows[1],
+        },
+      },
+      text: {
+        '&:hover': {
+          backgroundColor: theme.palette.action.hover,
+          boxShadow: 'none',
+        },
+      },
     },
   },
   
-  // TextField
-  // TODO: Inspect Input/TextField component in Figma and apply overrides
+  // TextField and Input
   MuiTextField: {
     styleOverrides: {
       root: {
-        // TODO: Add text field styles from Figma
+        '& .MuiOutlinedInput-root': {
+          borderRadius: theme.shape.borderRadius,
+        },
+      },
+    },
+  },
+  MuiOutlinedInput: {
+    styleOverrides: {
+      root: {
+        borderRadius: theme.shape.borderRadius,
+        '&:hover .MuiOutlinedInput-notchedOutline': {
+          borderColor: theme.palette.primary.main,
+          borderWidth: 1.5,
+        },
+        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+          borderColor: theme.palette.primary.main,
+          borderWidth: 2,
+        },
+      },
+      notchedOutline: {
+        borderColor: theme.palette.grey[300],
       },
     },
   },
   
   // Tabs
-  // TODO: Inspect Tabs component in Figma and apply overrides
   MuiTabs: {
     styleOverrides: {
       root: {
-        // TODO: Add tabs styles from Figma
+        minHeight: 48,
+      },
+      indicator: {
+        height: 3,
+        borderRadius: '3px 3px 0 0',
       },
     },
   },
@@ -46,56 +107,200 @@ export const components = (theme: Theme): Components => ({
   MuiTab: {
     styleOverrides: {
       root: {
-        // TODO: Add tab styles from Figma
+        textTransform: 'none',
+        fontWeight: 500,
+        minHeight: 48,
+        padding: theme.spacing(1.5, 2),
+        '&.Mui-selected': {
+          fontWeight: 600,
+        },
       },
     },
   },
   
-  // Chip
-  // TODO: Inspect Chip component in Figma and apply overrides
+  // Chip: 2 sizes / 2 styles
   MuiChip: {
     styleOverrides: {
       root: {
-        // TODO: Add chip styles from Figma
+        borderRadius: theme.shape.borderRadius,
+        fontWeight: 500,
+        height: 32,
+        '&.MuiChip-sizeSmall': {
+          height: 24,
+          fontSize: '0.75rem',
+        },
+      },
+      colorPrimary: {
+        backgroundColor: theme.palette.primary.main,
+        color: theme.palette.primary.contrastText,
+        '&:hover': {
+          backgroundColor: theme.palette.primary.dark,
+        },
+      },
+      outlined: {
+        borderWidth: 1.5,
+        '&:hover': {
+          backgroundColor: theme.palette.action.hover,
+        },
       },
     },
   },
   
-  // Card
-  // TODO: Inspect Card component in Figma and apply overrides
+  // Card: Basic Card and Card with Header variants
   MuiCard: {
     styleOverrides: {
       root: {
-        // TODO: Add card styles from Figma
-        // Example: borderRadius, padding, elevation, etc.
+        borderRadius: theme.shape.borderRadius * 1.5, // 12px
+        boxShadow: theme.shadows[2],
+        padding: theme.spacing(3),
+        '&:hover': {
+          boxShadow: theme.shadows[4],
+        },
+      },
+    },
+  },
+  MuiCardContent: {
+    styleOverrides: {
+      root: {
+        padding: theme.spacing(2, 0),
+        '&:last-child': {
+          paddingBottom: theme.spacing(2),
+        },
       },
     },
   },
   
   // Alert
-  // TODO: Inspect Alert component in Figma and apply overrides
   MuiAlert: {
     styleOverrides: {
       root: {
-        // TODO: Add alert styles from Figma
+        borderRadius: theme.shape.borderRadius,
+        padding: theme.spacing(2),
+      },
+      standardSuccess: {
+        backgroundColor: theme.palette.success.light,
+        color: theme.palette.success.dark,
+        '& .MuiAlert-icon': {
+          color: theme.palette.success.dark,
+        },
+      },
+      standardInfo: {
+        backgroundColor: theme.palette.info.light,
+        color: theme.palette.info.dark,
+        '& .MuiAlert-icon': {
+          color: theme.palette.info.dark,
+        },
+      },
+      standardWarning: {
+        backgroundColor: theme.palette.warning.light,
+        color: theme.palette.warning.dark,
+        '& .MuiAlert-icon': {
+          color: theme.palette.warning.dark,
+        },
+      },
+      standardError: {
+        backgroundColor: theme.palette.error.light,
+        color: theme.palette.error.dark,
+        '& .MuiAlert-icon': {
+          color: theme.palette.error.dark,
+        },
       },
     },
   },
   
   // Dialog
-  // TODO: Inspect Dialog component in Figma and apply overrides
   MuiDialog: {
     styleOverrides: {
       root: {
-        // TODO: Add dialog styles from Figma
+        '& .MuiDialog-paper': {
+          borderRadius: theme.shape.borderRadius * 2, // 16px
+        },
       },
-      paper: {
-        // TODO: Add dialog paper styles from Figma
+    },
+  },
+  MuiDialogTitle: {
+    styleOverrides: {
+      root: {
+        padding: theme.spacing(3, 3, 2),
+      },
+    },
+  },
+  MuiDialogContent: {
+    styleOverrides: {
+      root: {
+        padding: theme.spacing(2, 3),
+      },
+    },
+  },
+  MuiDialogActions: {
+    styleOverrides: {
+      root: {
+        padding: theme.spacing(2, 3, 3),
       },
     },
   },
   
-  // Add more component overrides as needed
-  // Always use Figma MCP to inspect designs first
+  // AppBar / Header
+  MuiAppBar: {
+    styleOverrides: {
+      root: {
+        boxShadow: theme.shadows[1],
+        backgroundColor: theme.palette.background.paper,
+        color: theme.palette.text.primary,
+      },
+    },
+  },
+  MuiToolbar: {
+    styleOverrides: {
+      root: {
+        minHeight: 64,
+        padding: theme.spacing(0, 3),
+      },
+    },
+  },
+  
+  // Drawer / SideNav
+  MuiDrawer: {
+    styleOverrides: {
+      paper: {
+        borderRight: `1px solid ${theme.palette.divider}`,
+        boxShadow: theme.shadows[1],
+      },
+    },
+  },
+  
+  // ListItemButton (for SideNav active state)
+  MuiListItemButton: {
+    styleOverrides: {
+      root: {
+        borderRadius: theme.shape.borderRadius,
+        margin: theme.spacing(0.5, 1),
+        padding: theme.spacing(1, 2),
+        '&.Mui-selected': {
+          backgroundColor: theme.palette.primary.main,
+          color: theme.palette.primary.contrastText,
+          '&:hover': {
+            backgroundColor: theme.palette.primary.dark,
+          },
+          '& .MuiListItemIcon-root': {
+            color: theme.palette.primary.contrastText,
+          },
+        },
+        '&:hover': {
+          backgroundColor: theme.palette.action.hover,
+        },
+      },
+    },
+  },
+  
+  // ListItemIcon
+  MuiListItemIcon: {
+    styleOverrides: {
+      root: {
+        minWidth: 40,
+        color: theme.palette.text.secondary,
+      },
+    },
+  },
 });
 

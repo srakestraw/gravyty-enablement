@@ -1,0 +1,54 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "DynamoDBTableAccess",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:GetItem",
+        "dynamodb:PutItem",
+        "dynamodb:UpdateItem",
+        "dynamodb:DeleteItem",
+        "dynamodb:Query",
+        "dynamodb:Scan",
+        "dynamodb:BatchGetItem",
+        "dynamodb:BatchWriteItem",
+        "dynamodb:DescribeTable"
+      ],
+      "Resource": [
+        "arn:aws:dynamodb:*:*:table/content_registry",
+        "arn:aws:dynamodb:*:*:table/content_registry/index/*",
+        "arn:aws:dynamodb:*:*:table/notifications",
+        "arn:aws:dynamodb:*:*:table/notifications/index/*",
+        "arn:aws:dynamodb:*:*:table/subscriptions",
+        "arn:aws:dynamodb:*:*:table/subscriptions/index/*",
+        "arn:aws:dynamodb:*:*:table/events",
+        "arn:aws:dynamodb:*:*:table/events/index/*"
+      ]
+    },
+    {
+      "Sid": "S3ContentPrefixAccess",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject"
+      ],
+      "Resource": "arn:aws:s3:::${BUCKET}/content/*"
+    },
+    {
+      "Sid": "S3ListContentPrefix",
+      "Effect": "Allow",
+      "Action": "s3:ListBucket",
+      "Resource": "arn:aws:s3:::${BUCKET}",
+      "Condition": {
+        "StringLike": {
+          "s3:prefix": "content/*"
+        }
+      }
+    }
+  ]
+}
+
+
+
+

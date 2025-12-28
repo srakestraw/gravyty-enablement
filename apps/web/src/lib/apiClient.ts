@@ -40,7 +40,9 @@ async function getAuthHeaders(): Promise<HeadersInit> {
   // Try to get JWT token from Amplify
   try {
     const { getIdToken } = await import('./auth');
-    const token = await getIdToken();
+    // Force refresh token to ensure we have latest groups/claims
+    // This is important when user's group membership changes
+    const token = await getIdToken(true); // Force refresh
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
       return headers;
@@ -127,331 +129,6 @@ export async function apiFetch<T>(
 }
 
 /**
- * Content API
- */
-export const contentApi = {
-  list: async (params?: {
-    query?: string;
-    product_suite?: string;
-    product_concept?: string;
-    status?: string;
-    limit?: number;
-    cursor?: string;
-  }) => {
-    const searchParams = new URLSearchParams();
-    if (params) {
-      Object.entries(params).forEach(([key, value]) => {
-        if (value !== undefined) {
-          searchParams.append(key, String(value));
-        }
-      });
-    }
-    const queryString = searchParams.toString();
-    return apiFetch<{ items: any[]; next_cursor?: string }>(
-      `/v1/content${queryString ? `?${queryString}` : ''}`
-    );
-  },
-
-  get: async (id: string) => {
-    return apiFetch<any>(`/v1/content/${id}`);
-  },
-
-  create: async (data: any) => {
-    return apiFetch<any>('/v1/content', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  },
-
-  update: async (id: string, data: any) => {
-    return apiFetch<any>(`/v1/content/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
-  },
-
-  approve: async (id: string) => {
-    return apiFetch<any>(`/v1/content/${id}/approve`, {
-      method: 'POST',
-    });
-  },
-
-  deprecate: async (id: string) => {
-    return apiFetch<any>(`/v1/content/${id}/deprecate`, {
-      method: 'POST',
-    });
-  },
-
-  expire: async (id: string) => {
-    return apiFetch<any>(`/v1/content/${id}/expire`, {
-      method: 'POST',
-    });
-  },
-
-  attachFile: async (id: string, data: {
-    s3_bucket: string;
-    s3_key: string;
-    filename: string;
-    content_type: string;
-    size_bytes: number;
-  }) => {
-    return apiFetch<any>(`/v1/content/${id}/attach`, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  },
-
-  download: async (id: string) => {
-    return apiFetch<{
-      download_url: string;
-      expires_in_seconds: number;
-    }>(`/v1/content/${id}/download`);
-  },
-};
-
-/**
- * Uploads API
- */
-export const uploadsApi = {
-  presign: async (contentId: string, filename: string, contentType: string) => {
-    return apiFetch<{
-      upload_url: string;
-      s3_bucket: string;
-      s3_key: string;
-      expires_in_seconds: number;
-    }>('/v1/uploads/presign', {
-      method: 'POST',
-      body: JSON.stringify({
-        content_id: contentId,
-        filename,
-        content_type: contentType,
-      }),
-    });
-  },
-};
-
-/**
- * Assistant API
- */
-export const assistantApi = {
-  query: async (query: string, options?: {
-    product_suite?: string;
-    product_concept?: string;
-    tags?: string[];
-    topK?: number;
-    context?: Record<string, unknown>;
-  }) => {
-    return apiFetch<{
-      refused: boolean;
-      answer: string;
-      citations: Array<{
-        doc_id: string;
-        chunk_id: string;
-        title: string;
-        s3_key: string;
-        snippet: string;
-      }>;
-      retrieved_chunks_count?: number;
-      model?: string;
-    }>('/v1/assistant/query', {
-      method: 'POST',
-      body: JSON.stringify({
-        query,
-        product_suite: options?.product_suite,
-        product_concept: options?.product_concept,
-        tags: options?.tags,
-        topK: options?.topK,
-        context: options?.context,
-      }),
-    });
-  },
-
-  feedback: async (queryId: string, helpful: boolean, feedbackText?: string) => {
-    return apiFetch<{ received: boolean }>('/v1/assistant/feedback', {
-      method: 'POST',
-      body: JSON.stringify({
-        query_id: queryId,
-        helpful,
-        feedback_text: feedbackText,
-      }),
-    });
-  },
-};
-
-/**
- * Brain Document type (simplified for API client)
- */
-export interface BrainDocument {
-  id: string;
-  title: string;
-  source_type: string;
-  status: string;
-  created_at: string;
-  created_by: string;
-  product_suite?: string;
-  product_concept?: string;
-  tags: string[];
-  chunk_count?: number;
-  error_message?: string;
-  revision?: number;
-  expires_at?: string;
-  expired_at?: string;
-  expired_by?: string;
-  replaced_by_doc_id?: string;
-  last_ingest_at?: string;
-}
-
-/**
- * Brain API
- */
-export const brainApi = {
-  presignUpload: async (params: {
-    filename: string;
-    content_type?: string;
-    docId?: string;
-  }) => {
-    return apiFetch<{
-      doc_id: string;
-      presigned_url: string;
-      s3_key: string;
-    }>('/v1/brain/documents/presign', {
-      method: 'POST',
-      body: JSON.stringify({
-        filename: params.filename,
-        content_type: params.content_type || 'text/plain',
-      }),
-    });
-  },
-
-  createDocument: async (data: {
-    id?: string;
-    title: string;
-    source_type: 'text' | 'pdf' | 'markdown' | 'html';
-    s3_bucket?: string;
-    s3_key: string;
-    product_suite?: string;
-    product_concept?: string;
-    tags?: string[];
-    checksum?: string;
-  }) => {
-    return apiFetch<{
-      id: string;
-      title: string;
-      source_type: string;
-      s3_bucket: string;
-      s3_key: string;
-      status: string;
-      created_at: string;
-      created_by: string;
-      product_suite?: string;
-      product_concept?: string;
-      tags: string[];
-    }>('/v1/brain/documents', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  },
-
-  ingestDocument: async (docId: string) => {
-    return apiFetch<{ enqueued: boolean }>(`/v1/brain/documents/${docId}/ingest`, {
-      method: 'POST',
-    });
-  },
-
-  expireDocument: async (docId: string) => {
-    return apiFetch<BrainDocument>(`/v1/brain/documents/${docId}/expire`, {
-      method: 'POST',
-    });
-  },
-
-  reindexDocument: async (docId: string) => {
-    return apiFetch<{ enqueued: boolean }>(`/v1/brain/documents/${docId}/reindex`, {
-      method: 'POST',
-    });
-  },
-
-  replaceDocument: async (docId: string) => {
-    return apiFetch<BrainDocument>(`/v1/brain/documents/${docId}/replace`, {
-      method: 'POST',
-    });
-  },
-
-  updateDocument: async (docId: string, data: { expires_at?: string | null }) => {
-    return apiFetch<BrainDocument>(`/v1/brain/documents/${docId}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
-  },
-
-  listDocuments: async (params?: { status?: string; limit?: number }) => {
-    const searchParams = new URLSearchParams();
-    if (params?.status) searchParams.append('status', params.status);
-    if (params?.limit) searchParams.append('limit', String(params.limit));
-    const queryString = searchParams.toString();
-    return apiFetch<{
-      items: Array<{
-        id: string;
-        title: string;
-        source_type: string;
-        status: string;
-        created_at: string;
-        created_by: string;
-        product_suite?: string;
-        product_concept?: string;
-        tags: string[];
-        chunk_count?: number;
-        error_message?: string;
-      }>;
-    }>(`/v1/brain/documents${queryString ? `?${queryString}` : ''}`);
-  },
-
-  getDocument: async (docId: string) => {
-    return apiFetch<BrainDocument>(`/v1/brain/documents/${docId}`);
-  },
-};
-
-/**
- * Notifications API
- */
-export const notificationsApi = {
-  list: async () => {
-    return apiFetch<{ items: any[] }>('/v1/notifications');
-  },
-
-  markRead: async (id: string) => {
-    return apiFetch<any>(`/v1/notifications/${id}/read`, {
-      method: 'POST',
-    });
-  },
-};
-
-/**
- * Subscriptions API
- */
-export const subscriptionsApi = {
-  list: async () => {
-    return apiFetch<{ items: any[] }>('/v1/subscriptions');
-  },
-
-  create: async (subscription: {
-    product_suite?: string;
-    product_concept?: string;
-    tags?: string[];
-  }) => {
-    return apiFetch<any>('/v1/subscriptions', {
-      method: 'POST',
-      body: JSON.stringify(subscription),
-    });
-  },
-
-  delete: async (id: string) => {
-    return apiFetch<{ deleted: boolean }>(`/v1/subscriptions/${id}`, {
-      method: 'DELETE',
-    });
-  },
-};
-
-/**
  * Events API
  */
 export const eventsApi = {
@@ -475,6 +152,52 @@ export const eventsApi = {
       if (import.meta.env.DEV) {
         console.debug('[Telemetry] Failed to track event (non-critical)', event.event_name);
       }
+    });
+  },
+};
+
+/**
+ * Notification type
+ */
+export interface Notification {
+  id: string;
+  title: string;
+  message: string;
+  created_at: string;
+  read_at?: string | null;
+  type?: 'info' | 'warning' | 'success' | 'action';
+  target_url?: string | null;
+}
+
+/**
+ * Notifications API
+ * 
+ * TODO: Implement API endpoints for notifications
+ * - GET /v1/notifications (list)
+ * - PATCH /v1/notifications/:id/read (mark as read)
+ * - PATCH /v1/notifications/read-all (mark all as read)
+ */
+export const notificationsApi = {
+  list: async (limit: number = 20): Promise<ApiResponse<{ items: Notification[] }>> => {
+    // TODO: Replace with actual API endpoint when available
+    // For now, return empty array
+    return {
+      data: { items: [] },
+      request_id: 'stub',
+    };
+  },
+
+  markRead: async (id: string): Promise<ApiResponse<{ notification: Notification }>> => {
+    // TODO: Implement PATCH /v1/notifications/:id/read
+    return apiFetch<{ notification: Notification }>(`/v1/notifications/${id}/read`, {
+      method: 'PATCH',
+    });
+  },
+
+  markAllRead: async (): Promise<ApiResponse<{ count: number }>> => {
+    // TODO: Implement PATCH /v1/notifications/read-all
+    return apiFetch<{ count: number }>('/v1/notifications/read-all', {
+      method: 'PATCH',
     });
   },
 };

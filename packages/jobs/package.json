@@ -1,0 +1,30 @@
+{
+  "name": "@gravyty/jobs",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Shared job logic for Lambda functions (expiry, etc.)",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "echo 'Run tests manually: npm run build && node dist/expireContentJob.test.js'"
+  },
+  "keywords": [
+    "jobs",
+    "lambda",
+    "expiry"
+  ],
+  "author": "",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@gravyty/domain": "*",
+    "@aws-sdk/client-dynamodb": "^3.490.0",
+    "@aws-sdk/lib-dynamodb": "^3.490.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.0"
+  }
+}
+

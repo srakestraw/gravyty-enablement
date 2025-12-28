@@ -1,0 +1,30 @@
+version: 1
+frontend:
+  phases:
+    preBuild:
+      commands:
+        # Install dependencies from repo root (npm workspaces)
+        # Amplify builds from repo root, so we can use npm workspaces directly
+        - npm ci
+        # Verify environment variables are available (for debugging)
+        - echo "Environment variables check:"
+        - echo "VITE_COGNITO_DOMAIN=${VITE_COGNITO_DOMAIN}"
+        - echo "VITE_COGNITO_REGION=${VITE_COGNITO_REGION}"
+        - echo "VITE_COGNITO_USER_POOL_ID is set: ${VITE_COGNITO_USER_POOL_ID:+yes}"
+    build:
+      commands:
+        # Build packages needed by web app
+        - npm run build --workspace=packages/domain
+        - npm run build --workspace=packages/design-system
+        # Build the web app (Vite will automatically use environment variables prefixed with VITE_)
+        - npm run build --workspace=apps/web
+  artifacts:
+    baseDirectory: apps/web/dist
+    files:
+      - '**/*'
+  cache:
+    paths:
+      - node_modules/**/*
+      - packages/*/node_modules/**/*
+      - apps/*/node_modules/**/*
+

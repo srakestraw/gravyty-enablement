@@ -1,36 +1,110 @@
 import { useEffect } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, useNavigate } from 'react-router-dom';
 import { AppShell } from './components/shell/AppShell';
-import { ContentListPage } from './pages/ContentListPage';
-import { ContentDetailPage } from './pages/ContentDetailPage';
-import { AssistantPage } from './pages/AssistantPage';
-import { NotificationsPage } from './pages/NotificationsPage';
-import { SubscriptionsPage } from './pages/SubscriptionsPage';
 import { AnalyticsPage } from './pages/AnalyticsPage';
-import { BrainPage } from './pages/BrainPage';
-import { BrainDocumentPage } from './pages/BrainDocumentPage';
-import { DesignCheckPage } from './pages/DesignCheckPage';
+import { HomePage } from './pages/HomePage';
+import { LandingPage } from './pages/LandingPage';
+import { NotificationsPage } from './pages/NotificationsPage';
+import { RequireAuth } from './components/auth/RequireAuth';
+import { RequireAdmin } from './components/auth/RequireAdmin';
 import { useAuth } from './contexts/AuthContext';
 import { handleOAuthRedirect } from './lib/auth';
+import { track, TELEMETRY_EVENTS } from './lib/telemetry';
+
+// Hub pages
+import { LearnHubPage } from './pages/LearnHubPage';
+import { AssetsHubPage } from './pages/AssetsHubPage';
+import { AskAIHubPage } from './pages/AskAIHubPage';
+import { AdminHubPage } from './pages/AdminHubPage';
+
+// Learn pages
+import { CoursesPage } from './pages/learn/CoursesPage';
+import { LearningPathsPage } from './pages/learn/LearningPathsPage';
+import { CertificationsPage } from './pages/learn/CertificationsPage';
+import { AssignmentsPage } from './pages/learn/AssignmentsPage';
+
+// Assets pages
+import { AssetLibraryPage } from './pages/assets/AssetLibraryPage';
+import { KitsPage } from './pages/assets/KitsPage';
+import { BrandMessagingPage } from './pages/assets/BrandMessagingPage';
+import { UpdatesExpiringPage } from './pages/assets/UpdatesExpiringPage';
+
+// AI pages
+import { AskAIChatPage } from './pages/ai/AskAIChatPage';
+import { AskAISavedAnswersPage } from './pages/ai/AskAISavedAnswersPage';
+
+// Insights pages
+import { InsightsAdoptionPage } from './pages/insights/InsightsAdoptionPage';
+import { InsightsLearningPage } from './pages/insights/InsightsLearningPage';
+import { InsightsAssetPerformancePage } from './pages/insights/InsightsAssetPerformancePage';
+import { InsightsSearchAIPage } from './pages/insights/InsightsSearchAIPage';
+
+// Admin pages
+import { AdminGovernancePage } from './pages/admin/AdminGovernancePage';
+import { AdminUsersRolesPage } from './pages/admin/AdminUsersRolesPage';
+import { AdminIntegrationsPage } from './pages/admin/AdminIntegrationsPage';
+import { AdminSystemHealthPage } from './pages/admin/AdminSystemHealthPage';
+import { AdminAuditLogPage } from './pages/admin/AdminAuditLogPage';
+
+const RETURN_TO_KEY = 'enablement_return_to';
+
+/**
+ * Root route handler - redirects authenticated users to /enablement,
+ * shows LandingPage for unauthenticated users
+ */
+function RootRoute() {
+  const { isAuth, loading } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!loading) {
+      if (isAuth) {
+        navigate('/enablement', { replace: true });
+      }
+    }
+  }, [isAuth, loading, navigate]);
+
+  if (loading) {
+    return null; // LandingPage will handle loading state
+  }
+
+  return <LandingPage />;
+}
 
 function App() {
   const { checkAuth } = useAuth();
+  const navigate = useNavigate();
 
-  // Handle OAuth callback after redirect
+  // Handle OAuth callback after redirect (only once on mount)
   useEffect(() => {
+    let mounted = true;
+
     const handleRedirect = async () => {
       try {
         const wasRedirect = await handleOAuthRedirect();
+        if (!mounted) return;
+        
         if (wasRedirect) {
           // If we processed an OAuth redirect, check auth state
           console.log('[App] OAuth redirect handled, checking auth state...');
           await checkAuth();
+          
+          // After successful OAuth redirect, navigate to returnTo or default
+          if (mounted) {
+            const returnTo = sessionStorage.getItem(RETURN_TO_KEY) || '/enablement';
+            sessionStorage.removeItem(RETURN_TO_KEY); // Clean up
+            track(TELEMETRY_EVENTS.LOGIN_SUCCESS);
+            navigate(returnTo, { replace: true });
+          }
         } else {
           // Normal page load - just check current auth state
           await checkAuth();
         }
       } catch (error) {
+        if (!mounted) return;
         console.error('[App] Error handling OAuth redirect:', error);
+        const errorCode = error instanceof Error ? (error as any).code : 'unknown';
+        track(TELEMETRY_EVENTS.LOGIN_FAILED, { error_code: errorCode });
         // Still check auth state even if redirect handling failed
         try {
           await checkAuth();
@@ -41,26 +115,308 @@ function App() {
     };
 
     handleRedirect();
-  }, [checkAuth]);
+
+    return () => {
+      mounted = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount
 
   return (
-    <AppShell>
-      <Routes>
-        <Route path="/enablement" element={<ContentListPage />} />
-        <Route path="/enablement/content" element={<ContentListPage />} />
-        <Route path="/enablement/content/:id" element={<ContentDetailPage />} />
-        <Route path="/enablement/assistant" element={<AssistantPage />} />
-        <Route path="/enablement/subscriptions" element={<SubscriptionsPage />} />
-        <Route path="/enablement/notifications" element={<NotificationsPage />} />
-        <Route path="/enablement/analytics" element={<AnalyticsPage />} />
-        <Route path="/enablement/brain" element={<BrainPage />} />
-        <Route path="/enablement/brain/:id" element={<BrainDocumentPage />} />
-        <Route path="/enablement/_design-check" element={<DesignCheckPage />} />
-        <Route path="/" element={<ContentListPage />} />
-      </Routes>
-    </AppShell>
+    <Routes>
+      {/* Public routes - no AppShell */}
+      <Route path="/login" element={<LandingPage />} />
+      <Route path="/" element={<RootRoute />} />
+      
+      {/* Protected routes - wrapped in RequireAuth and AppShell */}
+      <Route
+        path="/enablement"
+        element={
+          <RequireAuth>
+            <AppShell>
+              <HomePage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+
+      {/* Hub routes */}
+      <Route
+        path="/enablement/learn"
+        element={
+          <RequireAuth>
+            <AppShell>
+              <LearnHubPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/enablement/assets"
+        element={
+          <RequireAuth>
+            <AppShell>
+              <AssetsHubPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/enablement/ask-ai"
+        element={
+          <RequireAuth>
+            <AppShell>
+              <AskAIHubPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/enablement/admin"
+        element={
+          <RequireAuth>
+            <RequireAdmin>
+              <AppShell>
+                <AdminHubPage />
+              </AppShell>
+            </RequireAdmin>
+          </RequireAuth>
+        }
+      />
+
+      {/* Learn routes */}
+      <Route
+        path="/enablement/learn/courses"
+        element={
+          <RequireAuth>
+            <AppShell>
+              <CoursesPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/enablement/learn/paths"
+        element={
+          <RequireAuth>
+            <AppShell>
+              <LearningPathsPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/enablement/learn/certifications"
+        element={
+          <RequireAuth>
+            <AppShell>
+              <CertificationsPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/enablement/learn/assignments"
+        element={
+          <RequireAuth>
+            <AppShell>
+              <AssignmentsPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+
+      {/* Assets routes */}
+      <Route
+        path="/enablement/assets/library"
+        element={
+          <RequireAuth>
+            <AppShell>
+              <AssetLibraryPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/enablement/assets/kits"
+        element={
+          <RequireAuth>
+            <AppShell>
+              <KitsPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/enablement/assets/brand"
+        element={
+          <RequireAuth>
+            <AppShell>
+              <BrandMessagingPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/enablement/assets/updates"
+        element={
+          <RequireAuth>
+            <AppShell>
+              <UpdatesExpiringPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+
+      {/* AI routes */}
+      <Route
+        path="/enablement/ai/chat"
+        element={
+          <RequireAuth>
+            <AppShell>
+              <AskAIChatPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/enablement/ai/saved"
+        element={
+          <RequireAuth>
+            <AppShell>
+              <AskAISavedAnswersPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+
+      {/* Insights routes */}
+      <Route
+        path="/enablement/analytics"
+        element={
+          <RequireAuth>
+            <AppShell>
+              <AnalyticsPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/enablement/insights/adoption"
+        element={
+          <RequireAuth>
+            <AppShell>
+              <InsightsAdoptionPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/enablement/insights/learning"
+        element={
+          <RequireAuth>
+            <AppShell>
+              <InsightsLearningPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/enablement/insights/asset-performance"
+        element={
+          <RequireAuth>
+            <AppShell>
+              <InsightsAssetPerformancePage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/enablement/insights/search-ai"
+        element={
+          <RequireAuth>
+            <AppShell>
+              <InsightsSearchAIPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+
+      {/* Admin routes (Admin only) */}
+      <Route
+        path="/enablement/admin/users"
+        element={
+          <RequireAuth>
+            <RequireAdmin>
+              <AppShell>
+                <AdminUsersRolesPage />
+              </AppShell>
+            </RequireAdmin>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/enablement/admin/governance"
+        element={
+          <RequireAuth>
+            <RequireAdmin>
+              <AppShell>
+                <AdminGovernancePage />
+              </AppShell>
+            </RequireAdmin>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/enablement/admin/integrations"
+        element={
+          <RequireAuth>
+            <RequireAdmin>
+              <AppShell>
+                <AdminIntegrationsPage />
+              </AppShell>
+            </RequireAdmin>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/enablement/admin/health"
+        element={
+          <RequireAuth>
+            <RequireAdmin>
+              <AppShell>
+                <AdminSystemHealthPage />
+              </AppShell>
+            </RequireAdmin>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/enablement/admin/audit"
+        element={
+          <RequireAuth>
+            <RequireAdmin>
+              <AppShell>
+                <AdminAuditLogPage />
+              </AppShell>
+            </RequireAdmin>
+          </RequireAuth>
+        }
+      />
+
+      {/* Notifications route */}
+      <Route
+        path="/enablement/notifications"
+        element={
+          <RequireAuth>
+            <AppShell>
+              <NotificationsPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+    </Routes>
   );
 }
 
 export default App;
-

@@ -46,3 +46,4 @@ echo ""
 echo "   Ensure Authorized redirect URIs includes:"
 echo "   https://enable.gravytylabs.com/oauth2/idpresponse"
 
+

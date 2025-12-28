@@ -1,0 +1,24 @@
+{
+  "name": "enablement-portal-infra",
+  "version": "0.1.0",
+  "description": "CDK infrastructure for Gravyty Enablement Portal",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "cdk": "npx cdk",
+    "deploy": "npx cdk deploy",
+    "diff": "npx cdk diff",
+    "synth": "npx cdk synth"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "^2.120.0",
+    "constructs": "^10.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.6",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.0",
+    "aws-cdk": "^2.120.0"
+  }
+}
+

@@ -1,0 +1,36 @@
+{
+  "source": {
+    "fileKey": "rGLG1CGxkfk26LTHctRgJk",
+    "varSets": ["5581-17964", "5673-21417", "5406-15081"],
+    "updatedAt": "2024-01-XXT00:00:00.000Z",
+    "note": "Placeholder - requires Figma MCP export. Multiple variable sets merged. Includes foundational and component-level tokens."
+  },
+  "raw": {
+    "varSets": {
+      "5581-17964": {
+        "id": "5581-17964",
+        "name": "PLACEHOLDER - Load via Figma MCP",
+        "variables": []
+      },
+      "5673-21417": {
+        "id": "5673-21417",
+        "name": "PLACEHOLDER - Load via Figma MCP",
+        "variables": []
+      },
+      "5406-15081": {
+        "id": "5406-15081",
+        "name": "Input Label",
+        "hidden": true,
+        "variables": []
+      }
+    }
+  },
+  "normalized": {
+    "palette": {},
+    "typography": {},
+    "spacing": {},
+    "radius": {},
+    "shadows": {}
+  }
+}
+

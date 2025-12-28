@@ -73,6 +73,29 @@ From Figma URLs:
 - Group related tokens: `typography.h1`, `typography.body1`
 - Document token structure in theme-tokens.md
 
+## Token Extraction Notes
+
+### Initial Extraction (2024-01-XX)
+
+**Method**: Figma MCP screenshot analysis
+**Node ID**: `0:1` (Cover page)
+
+**Findings from Figma Screenshot**:
+- Typography: Inter variable font family
+- Colors: Blue primary palette, grayscale neutrals, green success palette
+- Components: Button (5 sizes / 3 styles), Badge & Chip (2 sizes / 2 styles), Cards
+- CSS Variables: `--surface-bg`, `--radius-md`, `--shadow-sm`, `--space-md`, `--space-xs`, `--font-heading-sm`, `--font-body-sm`
+
+**Status**: 
+- ✅ Tokens extracted and mapped to MUI theme
+- ⚠️ Some values inferred from design patterns (verify exact hex values via Figma MCP)
+- 📝 Component overrides implemented based on design system patterns
+
+**Next Steps**:
+- Verify exact color hex values from Figma variables
+- Extract component-specific tokens (button sizes, card variants)
+- Document component node IDs for future reference
+
 ## Workflow
 
 1. **Design Review**: Inspect Figma design using MCP

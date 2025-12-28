@@ -95,3 +95,6 @@ This document outlines the target AWS architecture for the Enablement Portal. **
 6. Configure OpenSearch
 7. Set up EventBridge and Step Functions
 
+
+
+

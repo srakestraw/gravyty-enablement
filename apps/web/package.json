@@ -10,14 +10,17 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "react-router-dom": "^6.21.0",
-    "@mui/material": "^5.15.0",
-    "@mui/icons-material": "^5.15.0",
     "@emotion/react": "^11.11.0",
     "@emotion/styled": "^11.11.0",
-    "@gravyty/design-system": "*"
+    "@gravyty/design-system": "*",
+    "@gravyty/domain": "*",
+    "@mui/icons-material": "^5.15.0",
+    "@mui/material": "^5.15.0",
+    "aws-amplify": "^6.15.9",
+    "lucide-react": "^0.562.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.21.0"
   },
   "devDependencies": {
     "@types/react": "^18.2.0",
@@ -32,4 +35,3 @@
     "vite": "^5.0.8"
   }
 }
-
