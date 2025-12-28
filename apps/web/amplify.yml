@@ -11,13 +11,18 @@ frontend:
         - echo "VITE_COGNITO_DOMAIN=${VITE_COGNITO_DOMAIN}"
         - echo "VITE_COGNITO_REGION=${VITE_COGNITO_REGION}"
         - echo "VITE_COGNITO_USER_POOL_ID is set: ${VITE_COGNITO_USER_POOL_ID:+yes}"
+        # Verify TypeScript is available
+        - npx tsc --version || echo "TypeScript check failed"
     build:
       commands:
         # Build packages needed by web app
-        - npm run build --workspace=packages/domain
-        - npm run build --workspace=packages/design-system
+        - echo "Building domain package..."
+        - npm run build --workspace=packages/domain || (echo "Domain build failed" && exit 1)
+        - echo "Building design-system package..."
+        - npm run build --workspace=packages/design-system || (echo "Design-system build failed" && exit 1)
+        - echo "Building web app..."
         # Build the web app (Vite will automatically use environment variables prefixed with VITE_)
-        - npm run build --workspace=apps/web
+        - npm run build --workspace=apps/web || (echo "Web app build failed" && exit 1)
   artifacts:
     baseDirectory: apps/web/dist
     files:
