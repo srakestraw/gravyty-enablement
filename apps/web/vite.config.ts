@@ -13,6 +13,10 @@ export default defineConfig({
     port: 3000,
     open: true,
   },
+  // Optimize workspace package resolution
+  optimizeDeps: {
+    include: ['@gravyty/design-system', '@gravyty/domain'],
+  },
 });
 
 
