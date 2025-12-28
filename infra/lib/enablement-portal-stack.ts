@@ -42,6 +42,8 @@ export class EnablementPortalStack extends cdk.Stack {
       ];
     };
 
+    const allowedOrigins = getAllowedOrigins();
+
     // DynamoDB Tables
 
     // events table
@@ -267,7 +269,7 @@ export class EnablementPortalStack extends cdk.Stack {
       this.httpApi = new apigatewayv2.HttpApi(this, 'HttpApi', {
         description: 'Enablement Portal API',
         corsPreflight: {
-          allowOrigins,
+          allowOrigins: allowedOrigins,
           allowMethods: [apigatewayv2.CorsHttpMethod.ANY],
           allowHeaders: [
             'Content-Type',
