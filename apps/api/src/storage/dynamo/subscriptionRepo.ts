@@ -38,7 +38,7 @@ export class DynamoSubscriptionRepo implements SubscriptionRepo {
       TableName: TABLE_NAME,
       Item: {
         user_id: subscription.user_id,
-        subscription_id: subscription.id,
+        subscription_id: subscription.subscription_id,
         product_suite: subscription.product_suite,
         product_concept: subscription.product_concept,
         tags: subscription.tags,

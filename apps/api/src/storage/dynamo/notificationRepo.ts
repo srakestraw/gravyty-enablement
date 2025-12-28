@@ -25,7 +25,7 @@ export class DynamoNotificationRepo implements NotificationRepo {
     // For efficiency, we could add a GSI with notification_id as PK
     // For now, we'll query user_id and filter
     const notifications = await this.list(userId);
-    return notifications.find(n => n.id === id) || null;
+    return notifications.find(n => n.notification_id === id) || null;
   }
 
   async create(notification: Notification): Promise<Notification> {
@@ -33,8 +33,8 @@ export class DynamoNotificationRepo implements NotificationRepo {
       TableName: TABLE_NAME,
       Item: {
         user_id: notification.user_id,
-        'created_at#notification_id': `${notification.created_at}#${notification.id}`,
-        notification_id: notification.id,
+        'created_at#notification_id': `${notification.created_at}#${notification.notification_id}`,
+        notification_id: notification.notification_id,
         type: notification.type,
         title: notification.title,
         message: notification.message,

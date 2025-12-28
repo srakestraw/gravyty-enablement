@@ -27,7 +27,7 @@ export const apiRateLimiter = rateLimit({
       return forwarded.split(',')[0].trim();
     }
     // Use express-rate-limit's helper for IPv6 support
-    return ipKeyGenerator(req);
+    return ipKeyGenerator(req as any);
   },
 });
 
@@ -48,7 +48,7 @@ export const writeRateLimiter = rateLimit({
     if (forwarded) {
       return forwarded.split(',')[0].trim();
     }
-    return ipKeyGenerator(req);
+    return ipKeyGenerator(req as any);
   },
 });
 
@@ -70,7 +70,7 @@ export const telemetryRateLimiter = rateLimit({
     if (forwarded) {
       return forwarded.split(',')[0].trim();
     }
-    return ipKeyGenerator(req);
+    return ipKeyGenerator(req as any);
   },
 });
 

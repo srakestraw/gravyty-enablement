@@ -37,7 +37,7 @@ async function expireContentItem(item: ContentItem): Promise<void> {
   const updateCommand = new UpdateCommand({
     TableName: CONTENT_TABLE,
     Key: {
-      content_id: item.id,
+      content_id: item.content_id,
     },
     UpdateExpression: 'SET #status = :status, last_updated = :lastUpdated, expiry_date = :expiryDate, #status_last_updated = :statusLastUpdated, #last_updated_content_id = :lastUpdatedContentId',
     ExpressionAttributeNames: {
@@ -49,18 +49,15 @@ async function expireContentItem(item: ContentItem): Promise<void> {
       ':status': 'Expired',
       ':lastUpdated': nowISO,
       ':expiryDate': nowISO,
-      ':statusLastUpdated': `Expired#${nowISO}#${item.id}`,
-      ':lastUpdatedContentId': `${nowISO}#${item.id}`,
+      ':statusLastUpdated': `Expired#${nowISO}#${item.content_id}`,
+      ':lastUpdatedContentId': `${nowISO}#${item.content_id}`,
     },
     ReturnValues: 'ALL_NEW',
   });
 
   const { Attributes } = await dynamoDocClient.send(updateCommand);
-  // Map DynamoDB item back to ContentItem format (content_id -> id)
-  const updatedItem: ContentItem = {
-    ...Attributes,
-    id: Attributes?.content_id || item.id,
-  } as ContentItem;
+  // Map DynamoDB item back to ContentItem format
+  const updatedItem: ContentItem = Attributes as ContentItem;
 
   // Trigger notifications
   try {
@@ -68,7 +65,7 @@ async function expireContentItem(item: ContentItem): Promise<void> {
     const matchingUserIds = await matchSubscriptionsForContent(updatedItem);
     
     // Find users who downloaded this content
-    const downloaderIds = await findDownloadersForContent(updatedItem.id);
+    const downloaderIds = await findDownloadersForContent(updatedItem.content_id);
     
     // Combine and deduplicate user IDs
     const allUserIds = new Set([...matchingUserIds, ...downloaderIds]);
@@ -80,15 +77,15 @@ async function expireContentItem(item: ContentItem): Promise<void> {
         type: 'warning',
         title: 'Content expired',
         message: `The content "${updatedItem.title}" has expired. Please check for updated versions.`,
-        contentId: updatedItem.id,
-        notificationId: `expired:${updatedItem.id}:${userId}`, // Deterministic ID for idempotency
+        contentId: updatedItem.content_id,
+        notificationId: `expired:${updatedItem.content_id}:${userId}`, // Deterministic ID for idempotency
       });
     });
     
     // Create notifications in parallel
     await Promise.all(notificationPromises);
   } catch (error) {
-    console.error(`Error creating expiry notifications for content ${item.id}:`, error);
+    console.error(`Error creating expiry notifications for content ${item.content_id}:`, error);
     // Don't throw - continue processing other items
   }
 }
@@ -125,11 +122,8 @@ export async function runExpiryJob(options: { now?: Date } = {}): Promise<Expiry
       });
 
       const { Items = [], LastEvaluatedKey } = await dynamoDocClient.send(command);
-      // Map DynamoDB items (content_id) to ContentItem format (id)
-      const items = Items.map((item: any) => ({
-        ...item,
-        id: item.content_id || item.id,
-      })) as ContentItem[];
+      // Map DynamoDB items to ContentItem format
+      const items = Items as ContentItem[];
 
       result.scanned += items.length;
 
@@ -160,7 +154,7 @@ export async function runExpiryJob(options: { now?: Date } = {}): Promise<Expiry
           result.expired++;
         } catch (error) {
           result.errors++;
-          const errorMsg = `Failed to expire content ${item.id}: ${error instanceof Error ? error.message : String(error)}`;
+          const errorMsg = `Failed to expire content ${item.content_id}: ${error instanceof Error ? error.message : String(error)}`;
           result.errorDetails?.push(errorMsg);
           console.error(errorMsg);
         }

@@ -254,7 +254,6 @@ export class EnablementPortalStack extends cdk.Stack {
         timeout: cdk.Duration.seconds(30),
         memorySize: 512,
         environment: {
-          AWS_REGION: this.region,
           STORAGE_BACKEND: 'aws',
           DDB_TABLE_EVENTS: this.eventsTable.tableName,
           PRESIGNED_UPLOAD_EXPIRY_SECONDS: '300',

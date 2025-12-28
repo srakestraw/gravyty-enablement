@@ -56,7 +56,7 @@ export class StubContentRepo implements ContentRepo {
   }
 
   async create(item: ContentItem): Promise<ContentItem> {
-    contentStore.set(item.id, item);
+    contentStore.set(item.content_id, item);
     return item;
   }
 
@@ -66,7 +66,7 @@ export class StubContentRepo implements ContentRepo {
       throw new Error(`Content item ${id} not found`);
     }
 
-    const updated = { ...existing, ...updates, id, last_updated: new Date().toISOString() };
+    const updated = { ...existing, ...updates, content_id: id, last_updated: new Date().toISOString() };
     contentStore.set(id, updated);
     return updated;
   }
@@ -81,7 +81,7 @@ export function initializeStubContent() {
   const now = new Date().toISOString();
   
   contentStore.set('1', {
-    id: '1',
+    content_id: '1',
     title: 'Product Overview: Gravyty AI',
     summary: 'Introduction to Gravyty AI capabilities and use cases',
     status: 'Approved',
@@ -89,14 +89,14 @@ export function initializeStubContent() {
     product_concept: 'Product',
     audience_role: 'AE',
     lifecycle_stage: 'Active',
-    owner: 'product-team',
+    owner_user_id: 'product-team',
     last_updated: now,
     tags: ['AI', 'Product'],
     version: '1.0.0',
-  });
+  } as ContentItem);
 
   contentStore.set('2', {
-    id: '2',
+    content_id: '2',
     title: 'Sales Playbook: Enterprise Deals',
     summary: 'Step-by-step guide for closing enterprise deals',
     status: 'Approved',
@@ -104,14 +104,14 @@ export function initializeStubContent() {
     product_concept: 'Playbook',
     audience_role: 'AE',
     lifecycle_stage: 'Active',
-    owner: 'sales-team',
+    owner_user_id: 'sales-team',
     last_updated: now,
     tags: ['Sales', 'Playbook'],
     version: '1.0.0',
-  });
+  } as ContentItem);
 
   contentStore.set('3', {
-    id: '3',
+    content_id: '3',
     title: 'Customer Success: Onboarding Best Practices',
     summary: 'Best practices for onboarding new customers',
     status: 'Draft',
@@ -119,11 +119,11 @@ export function initializeStubContent() {
     product_concept: 'Onboarding',
     audience_role: 'CSM',
     lifecycle_stage: 'Draft',
-    owner: 'cs-team',
+    owner_user_id: 'cs-team',
     last_updated: now,
     tags: ['CSM', 'Onboarding'],
     version: '1.0.0',
-  });
+  } as ContentItem);
 }
 
 

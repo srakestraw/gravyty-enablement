@@ -2,6 +2,8 @@
  * API Response Types
  */
 
+import type { Request } from 'express';
+
 export interface ApiSuccessResponse<T> {
   data: T;
   request_id: string;
@@ -20,7 +22,7 @@ export type ApiResponse<T> = ApiSuccessResponse<T> | ApiErrorResponse;
 /**
  * Request with user context
  */
-export interface AuthenticatedRequest extends Express.Request {
+export interface AuthenticatedRequest extends Request {
   user?: {
     role: string;
     user_id?: string;

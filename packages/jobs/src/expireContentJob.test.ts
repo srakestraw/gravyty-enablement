@@ -11,25 +11,25 @@ import type { ContentItem, Subscription } from '@gravyty/domain';
 // Test data helpers
 function createContentItem(overrides: Partial<ContentItem> = {}): ContentItem {
   return {
-    id: 'content_1',
+    content_id: 'content_1',
     title: 'Test Content',
     summary: 'Test summary',
     status: 'Approved',
-    owner: 'user1',
+    owner_user_id: 'user1',
     last_updated: new Date().toISOString(),
     tags: [],
     version: '1.0.0',
     ...overrides,
-  };
+  } as ContentItem;
 }
 
 function createSubscription(overrides: Partial<Subscription> = {}): Subscription {
   return {
-    id: 'sub_1',
+    subscription_id: 'sub_1',
     user_id: 'user1',
     created_at: new Date().toISOString(),
     ...overrides,
-  };
+  } as Subscription;
 }
 
 // Test cases

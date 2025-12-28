@@ -85,4 +85,14 @@ export function isAdmin(input?: string | null): boolean {
   return normalizeRole(input) === 'Admin';
 }
 
+/**
+ * Check if a role has Contributor level or higher (Contributor, Approver, Admin).
+ * Case-insensitive check using normalizeRole.
+ * TODO: Expand Learning Admin section visibility to Contributor+ when ready.
+ */
+export function isContributorOrHigher(input?: string | null): boolean {
+  const role = normalizeRole(input);
+  return role === 'Contributor' || role === 'Approver' || role === 'Admin';
+}
+
 

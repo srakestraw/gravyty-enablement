@@ -4,10 +4,10 @@ import { ComingSoon } from '../../components/shared/ComingSoon';
 export function CertificationsPage() {
   return (
     <PlaceholderPage
-      title="Certifications"
-      description="Track and manage certifications"
+      title="My Certificates"
+      description="View and manage your earned certificates and certifications."
     >
-      <ComingSoon description="Certifications coming soon" />
+      <ComingSoon description="My Certificates coming soon" />
     </PlaceholderPage>
   );
 }

@@ -139,7 +139,7 @@ export class DynamoContentRepo implements ContentRepo {
     const command = new PutCommand({
       TableName: TABLE_NAME,
       Item: {
-        content_id: item.id,
+        content_id: item.content_id,
         status: item.status,
         title: item.title,
         summary: item.summary,
@@ -147,7 +147,7 @@ export class DynamoContentRepo implements ContentRepo {
         product_concept: item.product_concept,
         audience_role: item.audience_role,
         lifecycle_stage: item.lifecycle_stage,
-        owner_user_id: item.owner,
+        owner_user_id: item.owner_user_id,
         tags: item.tags,
         version: item.version,
         last_updated: item.last_updated,
@@ -164,11 +164,11 @@ export class DynamoContentRepo implements ContentRepo {
       s3_key: item.s3_key,
       uploaded_at: item.uploaded_at,
       // GSI keys
-        'status#last_updated': `${item.status}#${item.last_updated}#${item.id}`,
+        'status#last_updated': `${item.status}#${item.last_updated}#${item.content_id}`,
         'product_suite#product_concept': item.product_suite && item.product_concept
           ? `${item.product_suite}#${item.product_concept}`
           : null,
-        'last_updated#content_id': `${item.last_updated}#${item.id}`,
+        'last_updated#content_id': `${item.last_updated}#${item.content_id}`,
       },
     });
 
@@ -185,7 +185,7 @@ export class DynamoContentRepo implements ContentRepo {
     const updated: ContentItem = {
       ...existing,
       ...updates,
-      id,
+      content_id: id,
       last_updated: new Date().toISOString(),
     };
 
@@ -194,7 +194,7 @@ export class DynamoContentRepo implements ContentRepo {
     const expressionAttributeValues: Record<string, any> = {};
 
     Object.entries(updates).forEach(([key, value]) => {
-      if (key !== 'id' && value !== undefined) {
+      if (key !== 'content_id' && value !== undefined) {
         const attrName = `#${key}`;
         const attrValue = `:${key}`;
         updateExpressions.push(`${attrName} = ${attrValue}`);
@@ -212,13 +212,13 @@ export class DynamoContentRepo implements ContentRepo {
     if (updates.status) {
       updateExpressions.push('#status_last_updated = :status_last_updated');
       expressionAttributeNames['#status_last_updated'] = 'status#last_updated';
-      expressionAttributeValues[':status_last_updated'] = `${updated.status}#${updated.last_updated}#${updated.id}`;
+      expressionAttributeValues[':status_last_updated'] = `${updated.status}#${updated.last_updated}#${updated.content_id}`;
     }
 
     // Update last_updated#content_id for GSI2
     updateExpressions.push('#last_updated_content_id = :last_updated_content_id');
     expressionAttributeNames['#last_updated_content_id'] = 'last_updated#content_id';
-    expressionAttributeValues[':last_updated_content_id'] = `${updated.last_updated}#${updated.id}`;
+    expressionAttributeValues[':last_updated_content_id'] = `${updated.last_updated}#${updated.content_id}`;
 
     const command = new UpdateCommand({
       TableName: TABLE_NAME,

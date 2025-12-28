@@ -19,7 +19,7 @@ export class StubSubscriptionRepo implements SubscriptionRepo {
   }
 
   async create(subscription: Subscription): Promise<Subscription> {
-    subscriptionStore.set(subscription.id, subscription);
+    subscriptionStore.set(subscription.subscription_id, subscription);
     return subscription;
   }
 

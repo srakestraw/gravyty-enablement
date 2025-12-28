@@ -63,7 +63,7 @@ export async function createNotification(params: CreateNotificationParams): Prom
   }
 
   const notification: Notification = {
-    id,
+    notification_id: id,
     user_id: userId,
     type,
     title,
@@ -79,8 +79,8 @@ export async function createNotification(params: CreateNotificationParams): Prom
     TableName: TABLE_NAME,
     Item: {
       user_id: notification.user_id,
-      'created_at#notification_id': `${notification.created_at}#${notification.id}`,
-      notification_id: notification.id,
+      'created_at#notification_id': `${notification.created_at}#${notification.notification_id}`,
+      notification_id: notification.notification_id,
       type: notification.type,
       title: notification.title,
       message: notification.message,

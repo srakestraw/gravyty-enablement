@@ -22,29 +22,35 @@ import { CoursesPage } from './pages/learn/CoursesPage';
 import { LearningPathsPage } from './pages/learn/LearningPathsPage';
 import { CertificationsPage } from './pages/learn/CertificationsPage';
 import { AssignmentsPage } from './pages/learn/AssignmentsPage';
+import { PracticePage } from './pages/PracticePage';
+import { MyLearningPage } from './pages/learn/MyLearningPage';
 
 // Assets pages
 import { AssetLibraryPage } from './pages/assets/AssetLibraryPage';
 import { KitsPage } from './pages/assets/KitsPage';
 import { BrandMessagingPage } from './pages/assets/BrandMessagingPage';
 import { UpdatesExpiringPage } from './pages/assets/UpdatesExpiringPage';
+import { ResourcesLibraryPage } from './pages/ResourcesLibraryPage';
 
 // AI pages
-import { AskAIChatPage } from './pages/ai/AskAIChatPage';
-import { AskAISavedAnswersPage } from './pages/ai/AskAISavedAnswersPage';
+import { AiAssistantPage } from './pages/AiAssistantPage';
 
 // Insights pages
 import { InsightsAdoptionPage } from './pages/insights/InsightsAdoptionPage';
 import { InsightsLearningPage } from './pages/insights/InsightsLearningPage';
 import { InsightsAssetPerformancePage } from './pages/insights/InsightsAssetPerformancePage';
 import { InsightsSearchAIPage } from './pages/insights/InsightsSearchAIPage';
+import { InsightsResourcesPage } from './pages/InsightsResourcesPage';
 
 // Admin pages
-import { AdminGovernancePage } from './pages/admin/AdminGovernancePage';
 import { AdminUsersRolesPage } from './pages/admin/AdminUsersRolesPage';
-import { AdminIntegrationsPage } from './pages/admin/AdminIntegrationsPage';
-import { AdminSystemHealthPage } from './pages/admin/AdminSystemHealthPage';
-import { AdminAuditLogPage } from './pages/admin/AdminAuditLogPage';
+import { AdminLearningPage } from './pages/admin/AdminLearningPage';
+// Admin Learning pages
+import { AdminLearningCoursesPage } from './pages/admin/learning/AdminLearningCoursesPage';
+import { AdminLearningPathsPage } from './pages/admin/learning/AdminLearningPathsPage';
+import { AdminLearningAssignmentsPage } from './pages/admin/learning/AdminLearningAssignmentsPage';
+import { AdminLearningCertificatesPage } from './pages/admin/learning/AdminLearningCertificatesPage';
+import { AdminLearningMediaPage } from './pages/admin/learning/AdminLearningMediaPage';
 
 const RETURN_TO_KEY = 'enablement_return_to';
 
@@ -186,6 +192,16 @@ function App() {
 
       {/* Learn routes */}
       <Route
+        path="/enablement/learn/me"
+        element={
+          <RequireAuth>
+            <AppShell>
+              <MyLearningPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
         path="/enablement/learn/courses"
         element={
           <RequireAuth>
@@ -206,7 +222,59 @@ function App() {
         }
       />
       <Route
-        path="/enablement/learn/certifications"
+        path="/enablement/learn/role-playing"
+        element={
+          <RequireAuth>
+            <AppShell>
+              <PracticePage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/enablement/learn/certificates"
+        element={
+          <RequireAuth>
+            <AppShell>
+              <CertificationsPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+
+      {/* Learn routes - legacy paths (for backward compatibility) */}
+      <Route
+        path="/enablement/courses"
+        element={
+          <RequireAuth>
+            <AppShell>
+              <CoursesPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/enablement/learning-paths"
+        element={
+          <RequireAuth>
+            <AppShell>
+              <LearningPathsPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/enablement/practice"
+        element={
+          <RequireAuth>
+            <AppShell>
+              <PracticePage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/enablement/certificates"
         element={
           <RequireAuth>
             <AppShell>
@@ -226,7 +294,39 @@ function App() {
         }
       />
 
-      {/* Assets routes */}
+      {/* Resources routes - new structure */}
+      <Route
+        path="/enablement/resources"
+        element={
+          <RequireAuth>
+            <AppShell>
+              <ResourcesLibraryPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/enablement/kits"
+        element={
+          <RequireAuth>
+            <AppShell>
+              <KitsPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/enablement/updates"
+        element={
+          <RequireAuth>
+            <AppShell>
+              <UpdatesExpiringPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+
+      {/* Assets routes - legacy paths (for backward compatibility) */}
       <Route
         path="/enablement/assets/library"
         element={
@@ -270,21 +370,11 @@ function App() {
 
       {/* AI routes */}
       <Route
-        path="/enablement/ai/chat"
+        path="/enablement/ai"
         element={
           <RequireAuth>
             <AppShell>
-              <AskAIChatPage />
-            </AppShell>
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/enablement/ai/saved"
-        element={
-          <RequireAuth>
-            <AppShell>
-              <AskAISavedAnswersPage />
+              <AiAssistantPage />
             </AppShell>
           </RequireAuth>
         }
@@ -322,11 +412,11 @@ function App() {
         }
       />
       <Route
-        path="/enablement/insights/asset-performance"
+        path="/enablement/insights/resources"
         element={
           <RequireAuth>
             <AppShell>
-              <InsightsAssetPerformancePage />
+              <InsightsResourcesPage />
             </AppShell>
           </RequireAuth>
         }
@@ -337,6 +427,17 @@ function App() {
           <RequireAuth>
             <AppShell>
               <InsightsSearchAIPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      {/* Legacy insights route */}
+      <Route
+        path="/enablement/insights/asset-performance"
+        element={
+          <RequireAuth>
+            <AppShell>
+              <InsightsAssetPerformancePage />
             </AppShell>
           </RequireAuth>
         }
@@ -356,48 +457,73 @@ function App() {
         }
       />
       <Route
-        path="/enablement/admin/governance"
+        path="/enablement/admin/learning"
         element={
           <RequireAuth>
             <RequireAdmin>
               <AppShell>
-                <AdminGovernancePage />
+                <AdminLearningPage />
+              </AppShell>
+            </RequireAdmin>
+          </RequireAuth>
+        }
+      />
+      {/* Admin Learning routes (Admin only) */}
+      <Route
+        path="/enablement/admin/learning/courses"
+        element={
+          <RequireAuth>
+            <RequireAdmin>
+              <AppShell>
+                <AdminLearningCoursesPage />
               </AppShell>
             </RequireAdmin>
           </RequireAuth>
         }
       />
       <Route
-        path="/enablement/admin/integrations"
+        path="/enablement/admin/learning/paths"
         element={
           <RequireAuth>
             <RequireAdmin>
               <AppShell>
-                <AdminIntegrationsPage />
+                <AdminLearningPathsPage />
               </AppShell>
             </RequireAdmin>
           </RequireAuth>
         }
       />
       <Route
-        path="/enablement/admin/health"
+        path="/enablement/admin/learning/assignments"
         element={
           <RequireAuth>
             <RequireAdmin>
               <AppShell>
-                <AdminSystemHealthPage />
+                <AdminLearningAssignmentsPage />
               </AppShell>
             </RequireAdmin>
           </RequireAuth>
         }
       />
       <Route
-        path="/enablement/admin/audit"
+        path="/enablement/admin/learning/certificates"
         element={
           <RequireAuth>
             <RequireAdmin>
               <AppShell>
-                <AdminAuditLogPage />
+                <AdminLearningCertificatesPage />
+              </AppShell>
+            </RequireAdmin>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/enablement/admin/learning/media"
+        element={
+          <RequireAuth>
+            <RequireAdmin>
+              <AppShell>
+                <AdminLearningMediaPage />
               </AppShell>
             </RequireAdmin>
           </RequireAuth>

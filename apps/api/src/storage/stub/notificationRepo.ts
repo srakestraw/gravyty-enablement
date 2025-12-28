@@ -19,7 +19,7 @@ export class StubNotificationRepo implements NotificationRepo {
   }
 
   async create(notification: Notification): Promise<Notification> {
-    notificationStore.set(notification.id, notification);
+    notificationStore.set(notification.notification_id, notification);
     return notification;
   }
 
@@ -45,7 +45,7 @@ export function initializeStubNotifications() {
   const now = new Date().toISOString();
   
   notificationStore.set('1', {
-    id: '1',
+    notification_id: '1',
     user_id: 'dev-user',
     type: 'info',
     title: 'New Content Available',
@@ -53,10 +53,10 @@ export function initializeStubNotifications() {
     read: false,
     created_at: now,
     content_id: '1',
-  });
+  } as Notification);
 
   notificationStore.set('2', {
-    id: '2',
+    notification_id: '2',
     user_id: 'dev-user',
     type: 'success',
     title: 'Content Updated',
@@ -64,7 +64,7 @@ export function initializeStubNotifications() {
     read: false,
     created_at: now,
     content_id: '2',
-  });
+  } as Notification);
 }
 
 
