@@ -1,18 +1,14 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "composite": true,
+    "composite": false,
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
-    }
+    },
+    "noEmit": true
   },
-  "include": ["src", "src/vite-env.d.ts"],
-  "references": [
-    {
-      "path": "../../packages/design-system"
-    }
-  ]
+  "include": ["src", "src/vite-env.d.ts"]
 }
 
 
