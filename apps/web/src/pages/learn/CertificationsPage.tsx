@@ -5,7 +5,7 @@ export function CertificationsPage() {
   return (
     <PlaceholderPage
       title="My Certificates"
-      description="View and manage your earned certificates and certifications."
+      description="View and manage your earned certificates and certifications"
     >
       <ComingSoon description="My Certificates coming soon" />
     </PlaceholderPage>

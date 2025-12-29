@@ -18,8 +18,9 @@ import {
 import {
   MenuBookOutlined,
   WorkspacePremiumOutlined,
-  AssignmentOutlined,
-  SchoolOutlined,
+  PlaylistPlayOutlined,
+  AltRouteOutlined,
+  RecordVoiceOverOutlined,
   ArrowForwardOutlined,
 } from '@mui/icons-material';
 import { PlaceholderPage } from '../components/shared/PlaceholderPage';
@@ -124,43 +125,47 @@ export function LearnHubPage() {
   return (
     <PlaceholderPage
       title="Learn"
-      description="Access courses, certifications, learning paths, and assignments"
+      description="Access courses, learning paths, role playing, and certificates"
     >
       <Grid container spacing={3}>
+        <Grid item xs={12} sm={6} md={4}>
+          <HubTile
+            title="My Learning"
+            description="Track required, in-progress, and completed learning"
+            icon={<PlaylistPlayOutlined />}
+            path="/enablement/learn/my"
+          />
+        </Grid>
         <Grid item xs={12} sm={6} md={4}>
           <HubTile
             title="Courses"
             description="Browse and access enablement courses"
             icon={<MenuBookOutlined />}
             path="/enablement/learn/courses"
-            comingSoon
           />
         </Grid>
         <Grid item xs={12} sm={6} md={4}>
           <HubTile
-            title="Certifications"
-            description="View available certifications and track your progress"
+            title="Learning Paths"
+            description="Structured learning journeys and curricula"
+            icon={<AltRouteOutlined />}
+            path="/enablement/learn/paths"
+          />
+        </Grid>
+        <Grid item xs={12} sm={6} md={4}>
+          <HubTile
+            title="Role Playing"
+            description="Practice scenarios and coaching workflows"
+            icon={<RecordVoiceOverOutlined />}
+            path="/enablement/learn/role-playing"
+          />
+        </Grid>
+        <Grid item xs={12} sm={6} md={4}>
+          <HubTile
+            title="My Certificates"
+            description="View and manage your earned certificates and certifications"
             icon={<WorkspacePremiumOutlined />}
-            path="/enablement/learn/certifications"
-            comingSoon
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={4}>
-          <HubTile
-            title="Assignments"
-            description="View and complete assigned learning tasks"
-            icon={<AssignmentOutlined />}
-            path="/enablement/learn/assignments"
-            comingSoon
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={4}>
-          <HubTile
-            title="My Learning"
-            description="Track your learning progress and achievements"
-            icon={<SchoolOutlined />}
-            path="/enablement/learn/my"
-            comingSoon
+            path="/enablement/learn/certificates"
           />
         </Grid>
       </Grid>

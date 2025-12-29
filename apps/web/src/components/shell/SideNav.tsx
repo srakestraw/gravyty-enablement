@@ -98,7 +98,7 @@ export function SideNav() {
       label: 'Learn',
       icon: <SchoolOutlined fontSize="small" />,
       items: [
-        { label: 'My Learning', path: '/enablement/learn/me', icon: <PlaylistPlayOutlined fontSize="small" /> },
+        { label: 'My Learning', path: '/enablement/learn/my', icon: <PlaylistPlayOutlined fontSize="small" /> },
         { label: 'Courses', path: '/enablement/learn/courses', icon: <MenuBookOutlined fontSize="small" /> },
         { label: 'Learning Paths', path: '/enablement/learn/paths', icon: <AltRouteOutlined fontSize="small" /> },
         { label: 'Role Playing', path: '/enablement/learn/role-playing', icon: <RecordVoiceOverOutlined fontSize="small" /> },

@@ -22,7 +22,7 @@ import { CoursesPage } from './pages/learn/CoursesPage';
 import { LearningPathsPage } from './pages/learn/LearningPathsPage';
 import { CertificationsPage } from './pages/learn/CertificationsPage';
 import { AssignmentsPage } from './pages/learn/AssignmentsPage';
-import { PracticePage } from './pages/PracticePage';
+import { RolePlayingPage } from './pages/learn/RolePlayingPage';
 import { MyLearningPage } from './pages/learn/MyLearningPage';
 
 // Assets pages
@@ -192,6 +192,17 @@ function App() {
 
       {/* Learn routes */}
       <Route
+        path="/enablement/learn/my"
+        element={
+          <RequireAuth>
+            <AppShell>
+              <MyLearningPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      {/* Legacy route for backward compatibility */}
+      <Route
         path="/enablement/learn/me"
         element={
           <RequireAuth>
@@ -226,13 +237,24 @@ function App() {
         element={
           <RequireAuth>
             <AppShell>
-              <PracticePage />
+              <RolePlayingPage />
             </AppShell>
           </RequireAuth>
         }
       />
       <Route
         path="/enablement/learn/certificates"
+        element={
+          <RequireAuth>
+            <AppShell>
+              <CertificationsPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      {/* Legacy route for backward compatibility */}
+      <Route
+        path="/enablement/learn/certifications"
         element={
           <RequireAuth>
             <AppShell>
