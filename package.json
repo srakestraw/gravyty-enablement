@@ -20,14 +20,19 @@
     "cdk:synth": "cd infra && cdk synth",
     "cdk:destroy": "cd infra && cdk destroy",
     "smoke-test": "./infra/scripts/smoke-test.sh",
-    "get-api-url": "./infra/scripts/get-api-url.sh"
+    "get-api-url": "./infra/scripts/get-api-url.sh",
+    "dynamo:local": "tsx scripts/lms/start_local_dynamo.ts",
+    "phase9:setup": "DYNAMODB_ENDPOINT=http://localhost:8000 tsx scripts/lms/local_dynamo_setup.ts && DYNAMODB_ENDPOINT=http://localhost:8000 tsx scripts/lms/seed_phase9_certificates.ts",
+    "phase9:e2e": "echo 'Phase 9 E2E Test Steps:' && echo '' && echo '1. Start local DynamoDB: npm run dynamo:local' && echo '2. In another terminal, setup tables and seed: npm run phase9:setup' && echo '3. Start API: cd apps/api && DYNAMODB_ENDPOINT=http://localhost:8000 npm run dev' && echo '4. Follow: scripts/lms/PHASE9_E2E_RUNBOOK.md'",
+    "phase10:setup": "DYNAMODB_ENDPOINT=http://localhost:8000 tsx scripts/lms/local_dynamo_setup.ts && DYNAMODB_ENDPOINT=http://localhost:8000 tsx scripts/lms/seed_phase10_paths.ts",
+    "check:no-scan": "./scripts/lms/check_no_scan.sh"
   },
   "dependencies": {
-    "pdf-parse": "^1.1.1",
-    "html-to-text": "^9.0.5"
+    "html-to-text": "^9.0.5",
+    "pdf-parse": "^1.1.1"
   },
   "devDependencies": {
+    "dynalite": "^4.0.0",
     "typescript": "^5.3.0"
   }
 }
-

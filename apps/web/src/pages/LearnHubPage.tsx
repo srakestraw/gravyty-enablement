@@ -23,7 +23,6 @@ import {
   RecordVoiceOverOutlined,
   ArrowForwardOutlined,
 } from '@mui/icons-material';
-import { PlaceholderPage } from '../components/shared/PlaceholderPage';
 import { track } from '../lib/telemetry';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -123,10 +122,13 @@ export function LearnHubPage() {
   }, [user]);
 
   return (
-    <PlaceholderPage
-      title="Learn"
-      description="Access courses, learning paths, role playing, and certificates"
-    >
+    <Box sx={{ p: 3 }}>
+      <Typography variant="h4" gutterBottom>
+        Learn
+      </Typography>
+      <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
+        Access courses, learning paths, role playing, and certificates
+      </Typography>
       <Grid container spacing={3}>
         <Grid item xs={12} sm={6} md={4}>
           <HubTile
@@ -158,6 +160,7 @@ export function LearnHubPage() {
             description="Practice scenarios and coaching workflows"
             icon={<RecordVoiceOverOutlined />}
             path="/enablement/learn/role-playing"
+            comingSoon={true}
           />
         </Grid>
         <Grid item xs={12} sm={6} md={4}>
@@ -169,7 +172,7 @@ export function LearnHubPage() {
           />
         </Grid>
       </Grid>
-    </PlaceholderPage>
+    </Box>
   );
 }
 

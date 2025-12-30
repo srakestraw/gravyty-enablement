@@ -7,6 +7,7 @@ import { apiRateLimiter, telemetryRateLimiter } from './middleware/rateLimit';
 import * as eventHandlers from './handlers/events';
 import * as analyticsHandlers from './handlers/analytics';
 import { createStorageRepos } from './storage/factory';
+import lmsRoutes from './routes/lms';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -36,6 +37,13 @@ v1.post('/events', telemetryRateLimiter, eventHandlers.createEvent);
 v1.get('/analytics/overview', requireRole('Admin'), analyticsHandlers.getAnalyticsOverview);
 v1.get('/analytics/content', requireRole('Admin'), analyticsHandlers.getContentAnalytics);
 v1.get('/analytics/users', requireRole('Admin'), analyticsHandlers.getUserAnalytics);
+
+// LMS routes (Viewer+)
+v1.use('/lms', lmsRoutes);
+
+// LMS Admin routes (Contributor+)
+import lmsAdminRoutes from './routes/lmsAdmin';
+v1.use('/lms/admin', lmsAdminRoutes);
 
 app.use('/v1', v1);
 

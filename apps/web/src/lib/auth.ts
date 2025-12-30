@@ -229,6 +229,11 @@ export async function signInWithGoogle(): Promise<void> {
     console.log('[Auth] Primary redirect URI:', primaryRedirectUri);
     console.log('[Auth] All configured redirect URIs:', redirectSignIn);
     
+    // Construct the expected Cognito OAuth URL to verify what will be sent
+    const expectedCognitoUrl = `https://${userPoolDomain}/oauth2/authorize?redirect_uri=${encodeURIComponent(primaryRedirectUri)}&response_type=code&client_id=${userPoolClientId}&identity_provider=Google&scope=openid+email+profile`;
+    console.log('[Auth] Expected Cognito OAuth URL (first 200 chars):', expectedCognitoUrl.substring(0, 200) + '...');
+    console.log('[Auth] Full redirect_uri parameter:', encodeURIComponent(primaryRedirectUri));
+    
     // signInWithRedirect will immediately redirect the browser to Cognito hosted UI
     // The browser will then redirect to Google, then back to Cognito, then back to our app
     await signInWithRedirect({
@@ -389,20 +394,35 @@ export async function handleOAuthRedirect(): Promise<boolean> {
     const error = urlParams.get('error') || hashParams.get('error');
     const errorDescription = urlParams.get('error_description') || hashParams.get('error_description');
     
-    console.error('[Auth] OAuth error received:', { 
-      error, 
-      errorDescription,
-      currentUrl: window.location.href,
-      configuredRedirectUrls: redirectSignIn,
-    });
+    // Log error details in a way that's easy to read in console
+    console.error('========================================');
+    console.error('[Auth] OAuth Error Detected');
+    console.error('========================================');
+    console.error('Error Code:', error);
+    console.error('Error Description:', errorDescription);
+    console.error('Current URL:', window.location.href);
+    console.error('Current Origin:', currentOrigin);
+    console.error('Cognito Domain:', userPoolDomain);
+    console.error('Configured Redirect URLs:', redirectSignIn);
+    console.error('========================================');
     
     // Show user-friendly error message for common errors
     if (error === 'unauthorized_client') {
-      console.error('[Auth] Redirect URI mismatch!', {
-        currentOrigin,
-        configuredUrls: redirectSignIn,
-        message: 'The redirect URI does not match what is configured in Cognito. Ensure http://localhost:3000 is in Cognito callback URLs.',
-      });
+      console.error('');
+      console.error('🔴 REDIRECT URI MISMATCH DETECTED');
+      console.error('');
+      console.error('The redirect URI does not match what is configured in Cognito.');
+      console.error('');
+      console.error('Current origin:', currentOrigin);
+      console.error('Primary redirect URI (what Amplify sends):', redirectSignIn[0]);
+      console.error('');
+      console.error('To fix this, ensure these URLs are in Cognito callback URLs:');
+      console.error(`  - ${currentOrigin}`);
+      console.error(`  - ${currentOrigin}/`);
+      console.error('');
+      console.error('Run this command to update Cognito:');
+      console.error('  cd infra/scripts && ./update-cognito-callback-urls.sh');
+      console.error('');
     }
     
     // Clean up URL

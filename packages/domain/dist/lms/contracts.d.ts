@@ -1,0 +1,1411 @@
+/**
+ * LMS API Contracts
+ *
+ * Canonical request/response shapes for LMS API endpoints.
+ * These types are used by both API and web UI for type safety.
+ */
+import { z } from 'zod';
+/**
+ * Course Summary
+ *
+ * Lightweight course representation for catalog and related courses.
+ */
+export declare const CourseSummarySchema: z.ZodObject<{
+    course_id: z.ZodString;
+    title: z.ZodString;
+    short_description: z.ZodOptional<z.ZodString>;
+    cover_image_url: z.ZodOptional<z.ZodString>;
+    product_suite: z.ZodOptional<z.ZodString>;
+    product_concept: z.ZodOptional<z.ZodString>;
+    topic_tags: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
+    estimated_duration_minutes: z.ZodOptional<z.ZodNumber>;
+    difficulty_level: z.ZodOptional<z.ZodEnum<["beginner", "intermediate", "advanced"]>>;
+    status: z.ZodEnum<["draft", "published", "archived"]>;
+    published_at: z.ZodOptional<z.ZodString>;
+}, "strip", z.ZodTypeAny, {
+    status: "draft" | "published" | "archived";
+    title: string;
+    course_id: string;
+    topic_tags: string[];
+    product_suite?: string | undefined;
+    product_concept?: string | undefined;
+    short_description?: string | undefined;
+    published_at?: string | undefined;
+    estimated_duration_minutes?: number | undefined;
+    difficulty_level?: "beginner" | "intermediate" | "advanced" | undefined;
+    cover_image_url?: string | undefined;
+}, {
+    status: "draft" | "published" | "archived";
+    title: string;
+    course_id: string;
+    product_suite?: string | undefined;
+    product_concept?: string | undefined;
+    short_description?: string | undefined;
+    topic_tags?: string[] | undefined;
+    published_at?: string | undefined;
+    estimated_duration_minutes?: number | undefined;
+    difficulty_level?: "beginner" | "intermediate" | "advanced" | undefined;
+    cover_image_url?: string | undefined;
+}>;
+export type CourseSummary = z.infer<typeof CourseSummarySchema>;
+/**
+ * Course Detail
+ *
+ * Full course metadata with outline (sections and lessons).
+ */
+export declare const CourseDetailSchema: z.ZodObject<{
+    course_id: z.ZodString;
+    title: z.ZodString;
+    description: z.ZodOptional<z.ZodString>;
+    short_description: z.ZodOptional<z.ZodString>;
+    product_suite: z.ZodOptional<z.ZodString>;
+    product_concept: z.ZodOptional<z.ZodString>;
+    topic_tags: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
+    related_course_ids: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
+    cover_image: z.ZodOptional<z.ZodObject<{
+        media_id: z.ZodString;
+        type: z.ZodEnum<["image", "video", "document", "audio", "other"]>;
+        url: z.ZodString;
+        s3_bucket: z.ZodOptional<z.ZodString>;
+        s3_key: z.ZodOptional<z.ZodString>;
+        filename: z.ZodOptional<z.ZodString>;
+        content_type: z.ZodOptional<z.ZodString>;
+        size_bytes: z.ZodOptional<z.ZodNumber>;
+        width: z.ZodOptional<z.ZodNumber>;
+        height: z.ZodOptional<z.ZodNumber>;
+        duration_ms: z.ZodOptional<z.ZodNumber>;
+        thumbnail_url: z.ZodOptional<z.ZodString>;
+        created_at: z.ZodString;
+        created_by: z.ZodString;
+    }, "strip", z.ZodTypeAny, {
+        type: "image" | "video" | "document" | "audio" | "other";
+        created_at: string;
+        media_id: string;
+        url: string;
+        created_by: string;
+        content_type?: string | undefined;
+        size_bytes?: number | undefined;
+        s3_bucket?: string | undefined;
+        s3_key?: string | undefined;
+        filename?: string | undefined;
+        width?: number | undefined;
+        height?: number | undefined;
+        duration_ms?: number | undefined;
+        thumbnail_url?: string | undefined;
+    }, {
+        type: "image" | "video" | "document" | "audio" | "other";
+        created_at: string;
+        media_id: string;
+        url: string;
+        created_by: string;
+        content_type?: string | undefined;
+        size_bytes?: number | undefined;
+        s3_bucket?: string | undefined;
+        s3_key?: string | undefined;
+        filename?: string | undefined;
+        width?: number | undefined;
+        height?: number | undefined;
+        duration_ms?: number | undefined;
+        thumbnail_url?: string | undefined;
+    }>>;
+    badges: z.ZodDefault<z.ZodArray<z.ZodObject<{
+        badge_id: z.ZodString;
+        name: z.ZodString;
+        description: z.ZodOptional<z.ZodString>;
+        icon_url: z.ZodOptional<z.ZodString>;
+    }, "strip", z.ZodTypeAny, {
+        badge_id: string;
+        name: string;
+        description?: string | undefined;
+        icon_url?: string | undefined;
+    }, {
+        badge_id: string;
+        name: string;
+        description?: string | undefined;
+        icon_url?: string | undefined;
+    }>, "many">>;
+    status: z.ZodEnum<["draft", "published", "archived"]>;
+    version: z.ZodDefault<z.ZodNumber>;
+    published_version: z.ZodOptional<z.ZodNumber>;
+    published_at: z.ZodOptional<z.ZodString>;
+    published_by: z.ZodOptional<z.ZodString>;
+    estimated_duration_minutes: z.ZodOptional<z.ZodNumber>;
+    difficulty_level: z.ZodOptional<z.ZodEnum<["beginner", "intermediate", "advanced"]>>;
+    created_at: z.ZodString;
+    created_by: z.ZodString;
+    updated_at: z.ZodString;
+    updated_by: z.ZodString;
+} & {
+    sections: z.ZodArray<z.ZodObject<{
+        section_id: z.ZodString;
+        title: z.ZodString;
+        description: z.ZodOptional<z.ZodString>;
+        order: z.ZodNumber;
+        lesson_ids: z.ZodArray<z.ZodString, "many">;
+    } & {
+        lessons: z.ZodArray<z.ZodObject<{
+            lesson_id: z.ZodString;
+            title: z.ZodString;
+            type: z.ZodEnum<["video", "reading", "quiz", "assignment", "interactive"]>;
+            order: z.ZodNumber;
+            estimated_duration_minutes: z.ZodOptional<z.ZodNumber>;
+            required: z.ZodDefault<z.ZodBoolean>;
+        }, "strip", z.ZodTypeAny, {
+            type: "video" | "reading" | "quiz" | "assignment" | "interactive";
+            title: string;
+            order: number;
+            lesson_id: string;
+            required: boolean;
+            estimated_duration_minutes?: number | undefined;
+        }, {
+            type: "video" | "reading" | "quiz" | "assignment" | "interactive";
+            title: string;
+            order: number;
+            lesson_id: string;
+            estimated_duration_minutes?: number | undefined;
+            required?: boolean | undefined;
+        }>, "many">;
+    }, "strip", z.ZodTypeAny, {
+        title: string;
+        section_id: string;
+        order: number;
+        lesson_ids: string[];
+        lessons: {
+            type: "video" | "reading" | "quiz" | "assignment" | "interactive";
+            title: string;
+            order: number;
+            lesson_id: string;
+            required: boolean;
+            estimated_duration_minutes?: number | undefined;
+        }[];
+        description?: string | undefined;
+    }, {
+        title: string;
+        section_id: string;
+        order: number;
+        lesson_ids: string[];
+        lessons: {
+            type: "video" | "reading" | "quiz" | "assignment" | "interactive";
+            title: string;
+            order: number;
+            lesson_id: string;
+            estimated_duration_minutes?: number | undefined;
+            required?: boolean | undefined;
+        }[];
+        description?: string | undefined;
+    }>, "many">;
+}, "strip", z.ZodTypeAny, {
+    status: "draft" | "published" | "archived";
+    title: string;
+    version: number;
+    created_at: string;
+    created_by: string;
+    course_id: string;
+    topic_tags: string[];
+    related_course_ids: string[];
+    badges: {
+        badge_id: string;
+        name: string;
+        description?: string | undefined;
+        icon_url?: string | undefined;
+    }[];
+    sections: {
+        title: string;
+        section_id: string;
+        order: number;
+        lesson_ids: string[];
+        lessons: {
+            type: "video" | "reading" | "quiz" | "assignment" | "interactive";
+            title: string;
+            order: number;
+            lesson_id: string;
+            required: boolean;
+            estimated_duration_minutes?: number | undefined;
+        }[];
+        description?: string | undefined;
+    }[];
+    updated_at: string;
+    updated_by: string;
+    product_suite?: string | undefined;
+    product_concept?: string | undefined;
+    description?: string | undefined;
+    short_description?: string | undefined;
+    cover_image?: {
+        type: "image" | "video" | "document" | "audio" | "other";
+        created_at: string;
+        media_id: string;
+        url: string;
+        created_by: string;
+        content_type?: string | undefined;
+        size_bytes?: number | undefined;
+        s3_bucket?: string | undefined;
+        s3_key?: string | undefined;
+        filename?: string | undefined;
+        width?: number | undefined;
+        height?: number | undefined;
+        duration_ms?: number | undefined;
+        thumbnail_url?: string | undefined;
+    } | undefined;
+    published_version?: number | undefined;
+    published_at?: string | undefined;
+    published_by?: string | undefined;
+    estimated_duration_minutes?: number | undefined;
+    difficulty_level?: "beginner" | "intermediate" | "advanced" | undefined;
+}, {
+    status: "draft" | "published" | "archived";
+    title: string;
+    created_at: string;
+    created_by: string;
+    course_id: string;
+    sections: {
+        title: string;
+        section_id: string;
+        order: number;
+        lesson_ids: string[];
+        lessons: {
+            type: "video" | "reading" | "quiz" | "assignment" | "interactive";
+            title: string;
+            order: number;
+            lesson_id: string;
+            estimated_duration_minutes?: number | undefined;
+            required?: boolean | undefined;
+        }[];
+        description?: string | undefined;
+    }[];
+    updated_at: string;
+    updated_by: string;
+    product_suite?: string | undefined;
+    product_concept?: string | undefined;
+    version?: number | undefined;
+    description?: string | undefined;
+    short_description?: string | undefined;
+    topic_tags?: string[] | undefined;
+    related_course_ids?: string[] | undefined;
+    cover_image?: {
+        type: "image" | "video" | "document" | "audio" | "other";
+        created_at: string;
+        media_id: string;
+        url: string;
+        created_by: string;
+        content_type?: string | undefined;
+        size_bytes?: number | undefined;
+        s3_bucket?: string | undefined;
+        s3_key?: string | undefined;
+        filename?: string | undefined;
+        width?: number | undefined;
+        height?: number | undefined;
+        duration_ms?: number | undefined;
+        thumbnail_url?: string | undefined;
+    } | undefined;
+    badges?: {
+        badge_id: string;
+        name: string;
+        description?: string | undefined;
+        icon_url?: string | undefined;
+    }[] | undefined;
+    published_version?: number | undefined;
+    published_at?: string | undefined;
+    published_by?: string | undefined;
+    estimated_duration_minutes?: number | undefined;
+    difficulty_level?: "beginner" | "intermediate" | "advanced" | undefined;
+}>;
+export type CourseDetail = z.infer<typeof CourseDetailSchema>;
+/**
+ * Lesson Detail
+ *
+ * Full lesson content including video media, transcript segments, and resources.
+ */
+export declare const LessonDetailSchema: z.ZodObject<{
+    lesson_id: z.ZodString;
+    course_id: z.ZodString;
+    section_id: z.ZodString;
+    title: z.ZodString;
+    description: z.ZodOptional<z.ZodString>;
+    type: z.ZodEnum<["video", "reading", "quiz", "assignment", "interactive"]>;
+    order: z.ZodNumber;
+    transcript_ref: z.ZodOptional<z.ZodString>;
+    resource_refs: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
+    estimated_duration_minutes: z.ZodOptional<z.ZodNumber>;
+    required: z.ZodDefault<z.ZodBoolean>;
+    created_at: z.ZodString;
+    created_by: z.ZodString;
+    updated_at: z.ZodString;
+    updated_by: z.ZodString;
+} & {
+    video_media: z.ZodOptional<z.ZodObject<{
+        media_id: z.ZodString;
+        type: z.ZodEnum<["image", "video", "document", "audio", "other"]>;
+        url: z.ZodString;
+        s3_bucket: z.ZodOptional<z.ZodString>;
+        s3_key: z.ZodOptional<z.ZodString>;
+        filename: z.ZodOptional<z.ZodString>;
+        content_type: z.ZodOptional<z.ZodString>;
+        size_bytes: z.ZodOptional<z.ZodNumber>;
+        width: z.ZodOptional<z.ZodNumber>;
+        height: z.ZodOptional<z.ZodNumber>;
+        duration_ms: z.ZodOptional<z.ZodNumber>;
+        thumbnail_url: z.ZodOptional<z.ZodString>;
+        created_at: z.ZodString;
+        created_by: z.ZodString;
+    }, "strip", z.ZodTypeAny, {
+        type: "image" | "video" | "document" | "audio" | "other";
+        created_at: string;
+        media_id: string;
+        url: string;
+        created_by: string;
+        content_type?: string | undefined;
+        size_bytes?: number | undefined;
+        s3_bucket?: string | undefined;
+        s3_key?: string | undefined;
+        filename?: string | undefined;
+        width?: number | undefined;
+        height?: number | undefined;
+        duration_ms?: number | undefined;
+        thumbnail_url?: string | undefined;
+    }, {
+        type: "image" | "video" | "document" | "audio" | "other";
+        created_at: string;
+        media_id: string;
+        url: string;
+        created_by: string;
+        content_type?: string | undefined;
+        size_bytes?: number | undefined;
+        s3_bucket?: string | undefined;
+        s3_key?: string | undefined;
+        filename?: string | undefined;
+        width?: number | undefined;
+        height?: number | undefined;
+        duration_ms?: number | undefined;
+        thumbnail_url?: string | undefined;
+    }>>;
+    transcript: z.ZodOptional<z.ZodObject<{
+        transcript_id: z.ZodString;
+        lesson_id: z.ZodString;
+        video_media_id: z.ZodOptional<z.ZodString>;
+        full_text: z.ZodOptional<z.ZodString>;
+        language: z.ZodDefault<z.ZodString>;
+        created_at: z.ZodString;
+        created_by: z.ZodString;
+        updated_at: z.ZodString;
+    } & {
+        segments: z.ZodOptional<z.ZodArray<z.ZodObject<{
+            segment_id: z.ZodString;
+            start_ms: z.ZodNumber;
+            end_ms: z.ZodNumber;
+            text: z.ZodString;
+            speaker: z.ZodOptional<z.ZodString>;
+        }, "strip", z.ZodTypeAny, {
+            segment_id: string;
+            start_ms: number;
+            end_ms: number;
+            text: string;
+            speaker?: string | undefined;
+        }, {
+            segment_id: string;
+            start_ms: number;
+            end_ms: number;
+            text: string;
+            speaker?: string | undefined;
+        }>, "many">>;
+    }, "strip", z.ZodTypeAny, {
+        created_at: string;
+        created_by: string;
+        updated_at: string;
+        transcript_id: string;
+        lesson_id: string;
+        language: string;
+        video_media_id?: string | undefined;
+        segments?: {
+            segment_id: string;
+            start_ms: number;
+            end_ms: number;
+            text: string;
+            speaker?: string | undefined;
+        }[] | undefined;
+        full_text?: string | undefined;
+    }, {
+        created_at: string;
+        created_by: string;
+        updated_at: string;
+        transcript_id: string;
+        lesson_id: string;
+        video_media_id?: string | undefined;
+        segments?: {
+            segment_id: string;
+            start_ms: number;
+            end_ms: number;
+            text: string;
+            speaker?: string | undefined;
+        }[] | undefined;
+        full_text?: string | undefined;
+        language?: string | undefined;
+    }>>;
+    resources: z.ZodDefault<z.ZodArray<z.ZodObject<{
+        media_id: z.ZodString;
+        type: z.ZodEnum<["image", "video", "document", "audio", "other"]>;
+        url: z.ZodString;
+        s3_bucket: z.ZodOptional<z.ZodString>;
+        s3_key: z.ZodOptional<z.ZodString>;
+        filename: z.ZodOptional<z.ZodString>;
+        content_type: z.ZodOptional<z.ZodString>;
+        size_bytes: z.ZodOptional<z.ZodNumber>;
+        width: z.ZodOptional<z.ZodNumber>;
+        height: z.ZodOptional<z.ZodNumber>;
+        duration_ms: z.ZodOptional<z.ZodNumber>;
+        thumbnail_url: z.ZodOptional<z.ZodString>;
+        created_at: z.ZodString;
+        created_by: z.ZodString;
+    }, "strip", z.ZodTypeAny, {
+        type: "image" | "video" | "document" | "audio" | "other";
+        created_at: string;
+        media_id: string;
+        url: string;
+        created_by: string;
+        content_type?: string | undefined;
+        size_bytes?: number | undefined;
+        s3_bucket?: string | undefined;
+        s3_key?: string | undefined;
+        filename?: string | undefined;
+        width?: number | undefined;
+        height?: number | undefined;
+        duration_ms?: number | undefined;
+        thumbnail_url?: string | undefined;
+    }, {
+        type: "image" | "video" | "document" | "audio" | "other";
+        created_at: string;
+        media_id: string;
+        url: string;
+        created_by: string;
+        content_type?: string | undefined;
+        size_bytes?: number | undefined;
+        s3_bucket?: string | undefined;
+        s3_key?: string | undefined;
+        filename?: string | undefined;
+        width?: number | undefined;
+        height?: number | undefined;
+        duration_ms?: number | undefined;
+        thumbnail_url?: string | undefined;
+    }>, "many">>;
+}, "strip", z.ZodTypeAny, {
+    type: "video" | "reading" | "quiz" | "assignment" | "interactive";
+    title: string;
+    created_at: string;
+    created_by: string;
+    section_id: string;
+    order: number;
+    course_id: string;
+    updated_at: string;
+    updated_by: string;
+    lesson_id: string;
+    resource_refs: string[];
+    required: boolean;
+    resources: {
+        type: "image" | "video" | "document" | "audio" | "other";
+        created_at: string;
+        media_id: string;
+        url: string;
+        created_by: string;
+        content_type?: string | undefined;
+        size_bytes?: number | undefined;
+        s3_bucket?: string | undefined;
+        s3_key?: string | undefined;
+        filename?: string | undefined;
+        width?: number | undefined;
+        height?: number | undefined;
+        duration_ms?: number | undefined;
+        thumbnail_url?: string | undefined;
+    }[];
+    description?: string | undefined;
+    estimated_duration_minutes?: number | undefined;
+    video_media?: {
+        type: "image" | "video" | "document" | "audio" | "other";
+        created_at: string;
+        media_id: string;
+        url: string;
+        created_by: string;
+        content_type?: string | undefined;
+        size_bytes?: number | undefined;
+        s3_bucket?: string | undefined;
+        s3_key?: string | undefined;
+        filename?: string | undefined;
+        width?: number | undefined;
+        height?: number | undefined;
+        duration_ms?: number | undefined;
+        thumbnail_url?: string | undefined;
+    } | undefined;
+    transcript_ref?: string | undefined;
+    transcript?: {
+        created_at: string;
+        created_by: string;
+        updated_at: string;
+        transcript_id: string;
+        lesson_id: string;
+        language: string;
+        video_media_id?: string | undefined;
+        segments?: {
+            segment_id: string;
+            start_ms: number;
+            end_ms: number;
+            text: string;
+            speaker?: string | undefined;
+        }[] | undefined;
+        full_text?: string | undefined;
+    } | undefined;
+}, {
+    type: "video" | "reading" | "quiz" | "assignment" | "interactive";
+    title: string;
+    created_at: string;
+    created_by: string;
+    section_id: string;
+    order: number;
+    course_id: string;
+    updated_at: string;
+    updated_by: string;
+    lesson_id: string;
+    description?: string | undefined;
+    estimated_duration_minutes?: number | undefined;
+    video_media?: {
+        type: "image" | "video" | "document" | "audio" | "other";
+        created_at: string;
+        media_id: string;
+        url: string;
+        created_by: string;
+        content_type?: string | undefined;
+        size_bytes?: number | undefined;
+        s3_bucket?: string | undefined;
+        s3_key?: string | undefined;
+        filename?: string | undefined;
+        width?: number | undefined;
+        height?: number | undefined;
+        duration_ms?: number | undefined;
+        thumbnail_url?: string | undefined;
+    } | undefined;
+    transcript_ref?: string | undefined;
+    transcript?: {
+        created_at: string;
+        created_by: string;
+        updated_at: string;
+        transcript_id: string;
+        lesson_id: string;
+        video_media_id?: string | undefined;
+        segments?: {
+            segment_id: string;
+            start_ms: number;
+            end_ms: number;
+            text: string;
+            speaker?: string | undefined;
+        }[] | undefined;
+        full_text?: string | undefined;
+        language?: string | undefined;
+    } | undefined;
+    resource_refs?: string[] | undefined;
+    required?: boolean | undefined;
+    resources?: {
+        type: "image" | "video" | "document" | "audio" | "other";
+        created_at: string;
+        media_id: string;
+        url: string;
+        created_by: string;
+        content_type?: string | undefined;
+        size_bytes?: number | undefined;
+        s3_bucket?: string | undefined;
+        s3_key?: string | undefined;
+        filename?: string | undefined;
+        width?: number | undefined;
+        height?: number | undefined;
+        duration_ms?: number | undefined;
+        thumbnail_url?: string | undefined;
+    }[] | undefined;
+}>;
+export type LessonDetail = z.infer<typeof LessonDetailSchema>;
+/**
+ * Learning Path Summary
+ *
+ * Lightweight path representation for catalog.
+ */
+export declare const LearningPathSummarySchema: z.ZodObject<{
+    path_id: z.ZodString;
+    title: z.ZodString;
+    short_description: z.ZodOptional<z.ZodString>;
+    product_suite: z.ZodOptional<z.ZodString>;
+    product_concept: z.ZodOptional<z.ZodString>;
+    topic_tags: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
+    estimated_duration_minutes: z.ZodOptional<z.ZodNumber>;
+    course_count: z.ZodDefault<z.ZodNumber>;
+    status: z.ZodEnum<["draft", "published", "archived"]>;
+    published_at: z.ZodOptional<z.ZodString>;
+}, "strip", z.ZodTypeAny, {
+    status: "draft" | "published" | "archived";
+    title: string;
+    topic_tags: string[];
+    path_id: string;
+    course_count: number;
+    product_suite?: string | undefined;
+    product_concept?: string | undefined;
+    short_description?: string | undefined;
+    published_at?: string | undefined;
+    estimated_duration_minutes?: number | undefined;
+}, {
+    status: "draft" | "published" | "archived";
+    title: string;
+    path_id: string;
+    product_suite?: string | undefined;
+    product_concept?: string | undefined;
+    short_description?: string | undefined;
+    topic_tags?: string[] | undefined;
+    published_at?: string | undefined;
+    estimated_duration_minutes?: number | undefined;
+    course_count?: number | undefined;
+}>;
+export type LearningPathSummary = z.infer<typeof LearningPathSummarySchema>;
+/**
+ * Path Summary with Rollup Progress (Learner View)
+ *
+ * Path summary enriched with user's progress rollup.
+ */
+export declare const PathSummarySchema: z.ZodObject<{
+    path_id: z.ZodString;
+    title: z.ZodString;
+    short_description: z.ZodOptional<z.ZodString>;
+    product_suite: z.ZodOptional<z.ZodString>;
+    product_concept: z.ZodOptional<z.ZodString>;
+    topic_tags: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
+    estimated_duration_minutes: z.ZodOptional<z.ZodNumber>;
+    course_count: z.ZodDefault<z.ZodNumber>;
+    status: z.ZodEnum<["draft", "published", "archived"]>;
+    published_at: z.ZodOptional<z.ZodString>;
+} & {
+    progress: z.ZodOptional<z.ZodObject<{
+        total_courses: z.ZodNumber;
+        completed_courses: z.ZodNumber;
+        percent_complete: z.ZodNumber;
+        status: z.ZodEnum<["not_started", "in_progress", "completed"]>;
+        next_course_id: z.ZodOptional<z.ZodString>;
+        started_at: z.ZodOptional<z.ZodString>;
+        completed_at: z.ZodOptional<z.ZodString>;
+        last_activity_at: z.ZodOptional<z.ZodString>;
+    }, "strip", z.ZodTypeAny, {
+        status: "completed" | "not_started" | "in_progress";
+        percent_complete: number;
+        total_courses: number;
+        completed_courses: number;
+        completed_at?: string | undefined;
+        started_at?: string | undefined;
+        next_course_id?: string | undefined;
+        last_activity_at?: string | undefined;
+    }, {
+        status: "completed" | "not_started" | "in_progress";
+        percent_complete: number;
+        total_courses: number;
+        completed_courses: number;
+        completed_at?: string | undefined;
+        started_at?: string | undefined;
+        next_course_id?: string | undefined;
+        last_activity_at?: string | undefined;
+    }>>;
+}, "strip", z.ZodTypeAny, {
+    status: "draft" | "published" | "archived";
+    title: string;
+    topic_tags: string[];
+    path_id: string;
+    course_count: number;
+    product_suite?: string | undefined;
+    product_concept?: string | undefined;
+    short_description?: string | undefined;
+    published_at?: string | undefined;
+    estimated_duration_minutes?: number | undefined;
+    progress?: {
+        status: "completed" | "not_started" | "in_progress";
+        percent_complete: number;
+        total_courses: number;
+        completed_courses: number;
+        completed_at?: string | undefined;
+        started_at?: string | undefined;
+        next_course_id?: string | undefined;
+        last_activity_at?: string | undefined;
+    } | undefined;
+}, {
+    status: "draft" | "published" | "archived";
+    title: string;
+    path_id: string;
+    product_suite?: string | undefined;
+    product_concept?: string | undefined;
+    short_description?: string | undefined;
+    topic_tags?: string[] | undefined;
+    published_at?: string | undefined;
+    estimated_duration_minutes?: number | undefined;
+    course_count?: number | undefined;
+    progress?: {
+        status: "completed" | "not_started" | "in_progress";
+        percent_complete: number;
+        total_courses: number;
+        completed_courses: number;
+        completed_at?: string | undefined;
+        started_at?: string | undefined;
+        next_course_id?: string | undefined;
+        last_activity_at?: string | undefined;
+    } | undefined;
+}>;
+export type PathSummary = z.infer<typeof PathSummarySchema>;
+/**
+ * Learning Path Detail
+ *
+ * Full path metadata with hydrated course summaries.
+ */
+export declare const LearningPathDetailSchema: z.ZodObject<{
+    path_id: z.ZodString;
+    title: z.ZodString;
+    description: z.ZodOptional<z.ZodString>;
+    short_description: z.ZodOptional<z.ZodString>;
+    product_suite: z.ZodOptional<z.ZodString>;
+    product_concept: z.ZodOptional<z.ZodString>;
+    topic_tags: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
+    badges: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
+    status: z.ZodEnum<["draft", "published", "archived"]>;
+    version: z.ZodDefault<z.ZodNumber>;
+    published_version: z.ZodOptional<z.ZodNumber>;
+    published_at: z.ZodOptional<z.ZodString>;
+    published_by: z.ZodOptional<z.ZodString>;
+    estimated_duration_minutes: z.ZodOptional<z.ZodNumber>;
+    created_at: z.ZodString;
+    created_by: z.ZodString;
+    updated_at: z.ZodString;
+    updated_by: z.ZodString;
+} & {
+    courses: z.ZodArray<z.ZodObject<{
+        course_id: z.ZodString;
+        order: z.ZodNumber;
+        required: z.ZodDefault<z.ZodBoolean>;
+        title_override: z.ZodOptional<z.ZodString>;
+    } & {
+        course: z.ZodOptional<z.ZodObject<{
+            course_id: z.ZodString;
+            title: z.ZodString;
+            short_description: z.ZodOptional<z.ZodString>;
+            cover_image_url: z.ZodOptional<z.ZodString>;
+            product_suite: z.ZodOptional<z.ZodString>;
+            product_concept: z.ZodOptional<z.ZodString>;
+            topic_tags: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
+            estimated_duration_minutes: z.ZodOptional<z.ZodNumber>;
+            difficulty_level: z.ZodOptional<z.ZodEnum<["beginner", "intermediate", "advanced"]>>;
+            status: z.ZodEnum<["draft", "published", "archived"]>;
+            published_at: z.ZodOptional<z.ZodString>;
+        }, "strip", z.ZodTypeAny, {
+            status: "draft" | "published" | "archived";
+            title: string;
+            course_id: string;
+            topic_tags: string[];
+            product_suite?: string | undefined;
+            product_concept?: string | undefined;
+            short_description?: string | undefined;
+            published_at?: string | undefined;
+            estimated_duration_minutes?: number | undefined;
+            difficulty_level?: "beginner" | "intermediate" | "advanced" | undefined;
+            cover_image_url?: string | undefined;
+        }, {
+            status: "draft" | "published" | "archived";
+            title: string;
+            course_id: string;
+            product_suite?: string | undefined;
+            product_concept?: string | undefined;
+            short_description?: string | undefined;
+            topic_tags?: string[] | undefined;
+            published_at?: string | undefined;
+            estimated_duration_minutes?: number | undefined;
+            difficulty_level?: "beginner" | "intermediate" | "advanced" | undefined;
+            cover_image_url?: string | undefined;
+        }>>;
+    }, "strip", z.ZodTypeAny, {
+        order: number;
+        course_id: string;
+        required: boolean;
+        title_override?: string | undefined;
+        course?: {
+            status: "draft" | "published" | "archived";
+            title: string;
+            course_id: string;
+            topic_tags: string[];
+            product_suite?: string | undefined;
+            product_concept?: string | undefined;
+            short_description?: string | undefined;
+            published_at?: string | undefined;
+            estimated_duration_minutes?: number | undefined;
+            difficulty_level?: "beginner" | "intermediate" | "advanced" | undefined;
+            cover_image_url?: string | undefined;
+        } | undefined;
+    }, {
+        order: number;
+        course_id: string;
+        required?: boolean | undefined;
+        title_override?: string | undefined;
+        course?: {
+            status: "draft" | "published" | "archived";
+            title: string;
+            course_id: string;
+            product_suite?: string | undefined;
+            product_concept?: string | undefined;
+            short_description?: string | undefined;
+            topic_tags?: string[] | undefined;
+            published_at?: string | undefined;
+            estimated_duration_minutes?: number | undefined;
+            difficulty_level?: "beginner" | "intermediate" | "advanced" | undefined;
+            cover_image_url?: string | undefined;
+        } | undefined;
+    }>, "many">;
+}, "strip", z.ZodTypeAny, {
+    status: "draft" | "published" | "archived";
+    title: string;
+    version: number;
+    created_at: string;
+    created_by: string;
+    topic_tags: string[];
+    badges: string[];
+    updated_at: string;
+    updated_by: string;
+    path_id: string;
+    courses: {
+        order: number;
+        course_id: string;
+        required: boolean;
+        title_override?: string | undefined;
+        course?: {
+            status: "draft" | "published" | "archived";
+            title: string;
+            course_id: string;
+            topic_tags: string[];
+            product_suite?: string | undefined;
+            product_concept?: string | undefined;
+            short_description?: string | undefined;
+            published_at?: string | undefined;
+            estimated_duration_minutes?: number | undefined;
+            difficulty_level?: "beginner" | "intermediate" | "advanced" | undefined;
+            cover_image_url?: string | undefined;
+        } | undefined;
+    }[];
+    product_suite?: string | undefined;
+    product_concept?: string | undefined;
+    description?: string | undefined;
+    short_description?: string | undefined;
+    published_version?: number | undefined;
+    published_at?: string | undefined;
+    published_by?: string | undefined;
+    estimated_duration_minutes?: number | undefined;
+}, {
+    status: "draft" | "published" | "archived";
+    title: string;
+    created_at: string;
+    created_by: string;
+    updated_at: string;
+    updated_by: string;
+    path_id: string;
+    courses: {
+        order: number;
+        course_id: string;
+        required?: boolean | undefined;
+        title_override?: string | undefined;
+        course?: {
+            status: "draft" | "published" | "archived";
+            title: string;
+            course_id: string;
+            product_suite?: string | undefined;
+            product_concept?: string | undefined;
+            short_description?: string | undefined;
+            topic_tags?: string[] | undefined;
+            published_at?: string | undefined;
+            estimated_duration_minutes?: number | undefined;
+            difficulty_level?: "beginner" | "intermediate" | "advanced" | undefined;
+            cover_image_url?: string | undefined;
+        } | undefined;
+    }[];
+    product_suite?: string | undefined;
+    product_concept?: string | undefined;
+    version?: number | undefined;
+    description?: string | undefined;
+    short_description?: string | undefined;
+    topic_tags?: string[] | undefined;
+    badges?: string[] | undefined;
+    published_version?: number | undefined;
+    published_at?: string | undefined;
+    published_by?: string | undefined;
+    estimated_duration_minutes?: number | undefined;
+}>;
+export type LearningPathDetail = z.infer<typeof LearningPathDetailSchema>;
+/**
+ * Path Detail with Rollup Progress (Learner View)
+ *
+ * Path detail enriched with user's progress rollup and course completion states.
+ */
+export declare const PathDetailSchema: z.ZodObject<{
+    path_id: z.ZodString;
+    title: z.ZodString;
+    description: z.ZodOptional<z.ZodString>;
+    short_description: z.ZodOptional<z.ZodString>;
+    product_suite: z.ZodOptional<z.ZodString>;
+    product_concept: z.ZodOptional<z.ZodString>;
+    topic_tags: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
+    badges: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
+    status: z.ZodEnum<["draft", "published", "archived"]>;
+    version: z.ZodDefault<z.ZodNumber>;
+    published_version: z.ZodOptional<z.ZodNumber>;
+    published_at: z.ZodOptional<z.ZodString>;
+    published_by: z.ZodOptional<z.ZodString>;
+    estimated_duration_minutes: z.ZodOptional<z.ZodNumber>;
+    created_at: z.ZodString;
+    created_by: z.ZodString;
+    updated_at: z.ZodString;
+    updated_by: z.ZodString;
+} & {
+    courses: z.ZodArray<z.ZodObject<{
+        course_id: z.ZodString;
+        order: z.ZodNumber;
+        required: z.ZodDefault<z.ZodBoolean>;
+        title_override: z.ZodOptional<z.ZodString>;
+    } & {
+        course: z.ZodOptional<z.ZodObject<{
+            course_id: z.ZodString;
+            title: z.ZodString;
+            short_description: z.ZodOptional<z.ZodString>;
+            cover_image_url: z.ZodOptional<z.ZodString>;
+            product_suite: z.ZodOptional<z.ZodString>;
+            product_concept: z.ZodOptional<z.ZodString>;
+            topic_tags: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
+            estimated_duration_minutes: z.ZodOptional<z.ZodNumber>;
+            difficulty_level: z.ZodOptional<z.ZodEnum<["beginner", "intermediate", "advanced"]>>;
+            status: z.ZodEnum<["draft", "published", "archived"]>;
+            published_at: z.ZodOptional<z.ZodString>;
+        }, "strip", z.ZodTypeAny, {
+            status: "draft" | "published" | "archived";
+            title: string;
+            course_id: string;
+            topic_tags: string[];
+            product_suite?: string | undefined;
+            product_concept?: string | undefined;
+            short_description?: string | undefined;
+            published_at?: string | undefined;
+            estimated_duration_minutes?: number | undefined;
+            difficulty_level?: "beginner" | "intermediate" | "advanced" | undefined;
+            cover_image_url?: string | undefined;
+        }, {
+            status: "draft" | "published" | "archived";
+            title: string;
+            course_id: string;
+            product_suite?: string | undefined;
+            product_concept?: string | undefined;
+            short_description?: string | undefined;
+            topic_tags?: string[] | undefined;
+            published_at?: string | undefined;
+            estimated_duration_minutes?: number | undefined;
+            difficulty_level?: "beginner" | "intermediate" | "advanced" | undefined;
+            cover_image_url?: string | undefined;
+        }>>;
+    }, "strip", z.ZodTypeAny, {
+        order: number;
+        course_id: string;
+        required: boolean;
+        title_override?: string | undefined;
+        course?: {
+            status: "draft" | "published" | "archived";
+            title: string;
+            course_id: string;
+            topic_tags: string[];
+            product_suite?: string | undefined;
+            product_concept?: string | undefined;
+            short_description?: string | undefined;
+            published_at?: string | undefined;
+            estimated_duration_minutes?: number | undefined;
+            difficulty_level?: "beginner" | "intermediate" | "advanced" | undefined;
+            cover_image_url?: string | undefined;
+        } | undefined;
+    }, {
+        order: number;
+        course_id: string;
+        required?: boolean | undefined;
+        title_override?: string | undefined;
+        course?: {
+            status: "draft" | "published" | "archived";
+            title: string;
+            course_id: string;
+            product_suite?: string | undefined;
+            product_concept?: string | undefined;
+            short_description?: string | undefined;
+            topic_tags?: string[] | undefined;
+            published_at?: string | undefined;
+            estimated_duration_minutes?: number | undefined;
+            difficulty_level?: "beginner" | "intermediate" | "advanced" | undefined;
+            cover_image_url?: string | undefined;
+        } | undefined;
+    }>, "many">;
+} & {
+    progress: z.ZodOptional<z.ZodObject<{
+        total_courses: z.ZodNumber;
+        completed_courses: z.ZodNumber;
+        percent_complete: z.ZodNumber;
+        status: z.ZodEnum<["not_started", "in_progress", "completed"]>;
+        next_course_id: z.ZodOptional<z.ZodString>;
+        started_at: z.ZodOptional<z.ZodString>;
+        completed_at: z.ZodOptional<z.ZodString>;
+        last_activity_at: z.ZodOptional<z.ZodString>;
+    }, "strip", z.ZodTypeAny, {
+        status: "completed" | "not_started" | "in_progress";
+        percent_complete: number;
+        total_courses: number;
+        completed_courses: number;
+        completed_at?: string | undefined;
+        started_at?: string | undefined;
+        next_course_id?: string | undefined;
+        last_activity_at?: string | undefined;
+    }, {
+        status: "completed" | "not_started" | "in_progress";
+        percent_complete: number;
+        total_courses: number;
+        completed_courses: number;
+        completed_at?: string | undefined;
+        started_at?: string | undefined;
+        next_course_id?: string | undefined;
+        last_activity_at?: string | undefined;
+    }>>;
+    course_completion: z.ZodDefault<z.ZodRecord<z.ZodString, z.ZodBoolean>>;
+}, "strip", z.ZodTypeAny, {
+    status: "draft" | "published" | "archived";
+    title: string;
+    version: number;
+    created_at: string;
+    created_by: string;
+    topic_tags: string[];
+    badges: string[];
+    updated_at: string;
+    updated_by: string;
+    path_id: string;
+    courses: {
+        order: number;
+        course_id: string;
+        required: boolean;
+        title_override?: string | undefined;
+        course?: {
+            status: "draft" | "published" | "archived";
+            title: string;
+            course_id: string;
+            topic_tags: string[];
+            product_suite?: string | undefined;
+            product_concept?: string | undefined;
+            short_description?: string | undefined;
+            published_at?: string | undefined;
+            estimated_duration_minutes?: number | undefined;
+            difficulty_level?: "beginner" | "intermediate" | "advanced" | undefined;
+            cover_image_url?: string | undefined;
+        } | undefined;
+    }[];
+    course_completion: Record<string, boolean>;
+    product_suite?: string | undefined;
+    product_concept?: string | undefined;
+    description?: string | undefined;
+    short_description?: string | undefined;
+    published_version?: number | undefined;
+    published_at?: string | undefined;
+    published_by?: string | undefined;
+    estimated_duration_minutes?: number | undefined;
+    progress?: {
+        status: "completed" | "not_started" | "in_progress";
+        percent_complete: number;
+        total_courses: number;
+        completed_courses: number;
+        completed_at?: string | undefined;
+        started_at?: string | undefined;
+        next_course_id?: string | undefined;
+        last_activity_at?: string | undefined;
+    } | undefined;
+}, {
+    status: "draft" | "published" | "archived";
+    title: string;
+    created_at: string;
+    created_by: string;
+    updated_at: string;
+    updated_by: string;
+    path_id: string;
+    courses: {
+        order: number;
+        course_id: string;
+        required?: boolean | undefined;
+        title_override?: string | undefined;
+        course?: {
+            status: "draft" | "published" | "archived";
+            title: string;
+            course_id: string;
+            product_suite?: string | undefined;
+            product_concept?: string | undefined;
+            short_description?: string | undefined;
+            topic_tags?: string[] | undefined;
+            published_at?: string | undefined;
+            estimated_duration_minutes?: number | undefined;
+            difficulty_level?: "beginner" | "intermediate" | "advanced" | undefined;
+            cover_image_url?: string | undefined;
+        } | undefined;
+    }[];
+    product_suite?: string | undefined;
+    product_concept?: string | undefined;
+    version?: number | undefined;
+    description?: string | undefined;
+    short_description?: string | undefined;
+    topic_tags?: string[] | undefined;
+    badges?: string[] | undefined;
+    published_version?: number | undefined;
+    published_at?: string | undefined;
+    published_by?: string | undefined;
+    estimated_duration_minutes?: number | undefined;
+    progress?: {
+        status: "completed" | "not_started" | "in_progress";
+        percent_complete: number;
+        total_courses: number;
+        completed_courses: number;
+        completed_at?: string | undefined;
+        started_at?: string | undefined;
+        next_course_id?: string | undefined;
+        last_activity_at?: string | undefined;
+    } | undefined;
+    course_completion?: Record<string, boolean> | undefined;
+}>;
+export type PathDetail = z.infer<typeof PathDetailSchema>;
+/**
+ * My Learning Response
+ *
+ * Learner's personalized learning dashboard.
+ */
+export declare const MyLearningSchema: z.ZodObject<{
+    required: z.ZodDefault<z.ZodArray<z.ZodObject<{
+        type: z.ZodEnum<["course", "path"]>;
+        course_id: z.ZodOptional<z.ZodString>;
+        path_id: z.ZodOptional<z.ZodString>;
+        title: z.ZodString;
+        due_at: z.ZodOptional<z.ZodString>;
+        assignment_id: z.ZodOptional<z.ZodString>;
+        progress_percent: z.ZodDefault<z.ZodNumber>;
+    }, "strip", z.ZodTypeAny, {
+        type: "path" | "course";
+        title: string;
+        progress_percent: number;
+        course_id?: string | undefined;
+        path_id?: string | undefined;
+        assignment_id?: string | undefined;
+        due_at?: string | undefined;
+    }, {
+        type: "path" | "course";
+        title: string;
+        course_id?: string | undefined;
+        path_id?: string | undefined;
+        assignment_id?: string | undefined;
+        due_at?: string | undefined;
+        progress_percent?: number | undefined;
+    }>, "many">>;
+    in_progress: z.ZodDefault<z.ZodArray<z.ZodObject<{
+        type: z.ZodEnum<["course", "path"]>;
+        course_id: z.ZodOptional<z.ZodString>;
+        path_id: z.ZodOptional<z.ZodString>;
+        title: z.ZodString;
+        progress_percent: z.ZodDefault<z.ZodNumber>;
+        last_accessed_at: z.ZodString;
+        current_lesson_id: z.ZodOptional<z.ZodString>;
+    }, "strip", z.ZodTypeAny, {
+        type: "path" | "course";
+        title: string;
+        last_accessed_at: string;
+        progress_percent: number;
+        course_id?: string | undefined;
+        path_id?: string | undefined;
+        current_lesson_id?: string | undefined;
+    }, {
+        type: "path" | "course";
+        title: string;
+        last_accessed_at: string;
+        course_id?: string | undefined;
+        path_id?: string | undefined;
+        current_lesson_id?: string | undefined;
+        progress_percent?: number | undefined;
+    }>, "many">>;
+    completed: z.ZodDefault<z.ZodArray<z.ZodObject<{
+        type: z.ZodEnum<["course", "path"]>;
+        course_id: z.ZodOptional<z.ZodString>;
+        path_id: z.ZodOptional<z.ZodString>;
+        title: z.ZodString;
+        completed_at: z.ZodString;
+    }, "strip", z.ZodTypeAny, {
+        type: "path" | "course";
+        title: string;
+        completed_at: string;
+        course_id?: string | undefined;
+        path_id?: string | undefined;
+    }, {
+        type: "path" | "course";
+        title: string;
+        completed_at: string;
+        course_id?: string | undefined;
+        path_id?: string | undefined;
+    }>, "many">>;
+}, "strip", z.ZodTypeAny, {
+    required: {
+        type: "path" | "course";
+        title: string;
+        progress_percent: number;
+        course_id?: string | undefined;
+        path_id?: string | undefined;
+        assignment_id?: string | undefined;
+        due_at?: string | undefined;
+    }[];
+    completed: {
+        type: "path" | "course";
+        title: string;
+        completed_at: string;
+        course_id?: string | undefined;
+        path_id?: string | undefined;
+    }[];
+    in_progress: {
+        type: "path" | "course";
+        title: string;
+        last_accessed_at: string;
+        progress_percent: number;
+        course_id?: string | undefined;
+        path_id?: string | undefined;
+        current_lesson_id?: string | undefined;
+    }[];
+}, {
+    required?: {
+        type: "path" | "course";
+        title: string;
+        course_id?: string | undefined;
+        path_id?: string | undefined;
+        assignment_id?: string | undefined;
+        due_at?: string | undefined;
+        progress_percent?: number | undefined;
+    }[] | undefined;
+    completed?: {
+        type: "path" | "course";
+        title: string;
+        completed_at: string;
+        course_id?: string | undefined;
+        path_id?: string | undefined;
+    }[] | undefined;
+    in_progress?: {
+        type: "path" | "course";
+        title: string;
+        last_accessed_at: string;
+        course_id?: string | undefined;
+        path_id?: string | undefined;
+        current_lesson_id?: string | undefined;
+        progress_percent?: number | undefined;
+    }[] | undefined;
+}>;
+export type MyLearning = z.infer<typeof MyLearningSchema>;
+/**
+ * Assignment Summary
+ *
+ * Assignment representation for lists and detail views.
+ */
+export declare const AssignmentSummarySchema: z.ZodObject<{
+    assignment_id: z.ZodString;
+    assignment_type: z.ZodEnum<["course", "path"]>;
+    course_id: z.ZodOptional<z.ZodString>;
+    path_id: z.ZodOptional<z.ZodString>;
+    title: z.ZodString;
+    status: z.ZodEnum<["assigned", "started", "completed", "waived"]>;
+    due_at: z.ZodOptional<z.ZodString>;
+    assigned_at: z.ZodString;
+    progress_percent: z.ZodDefault<z.ZodNumber>;
+    is_overdue: z.ZodDefault<z.ZodBoolean>;
+}, "strip", z.ZodTypeAny, {
+    status: "assigned" | "completed" | "started" | "waived";
+    title: string;
+    assignment_id: string;
+    assignment_type: "path" | "course";
+    assigned_at: string;
+    progress_percent: number;
+    is_overdue: boolean;
+    course_id?: string | undefined;
+    path_id?: string | undefined;
+    due_at?: string | undefined;
+}, {
+    status: "assigned" | "completed" | "started" | "waived";
+    title: string;
+    assignment_id: string;
+    assignment_type: "path" | "course";
+    assigned_at: string;
+    course_id?: string | undefined;
+    path_id?: string | undefined;
+    due_at?: string | undefined;
+    progress_percent?: number | undefined;
+    is_overdue?: boolean | undefined;
+}>;
+export type AssignmentSummary = z.infer<typeof AssignmentSummarySchema>;
+/**
+ * Certificate Summary (Issued)
+ *
+ * Learner-facing certificate representation for "My Certificates".
+ */
+export declare const CertificateSummarySchema: z.ZodObject<{
+    certificate_id: z.ZodString;
+    template_id: z.ZodString;
+    template_name: z.ZodString;
+    recipient_name: z.ZodString;
+    course_title: z.ZodOptional<z.ZodString>;
+    path_title: z.ZodOptional<z.ZodString>;
+    completion_date: z.ZodString;
+    issued_at: z.ZodString;
+    badge_text: z.ZodString;
+}, "strip", z.ZodTypeAny, {
+    template_id: string;
+    badge_text: string;
+    certificate_id: string;
+    issued_at: string;
+    recipient_name: string;
+    completion_date: string;
+    template_name: string;
+    course_title?: string | undefined;
+    path_title?: string | undefined;
+}, {
+    template_id: string;
+    badge_text: string;
+    certificate_id: string;
+    issued_at: string;
+    recipient_name: string;
+    completion_date: string;
+    template_name: string;
+    course_title?: string | undefined;
+    path_title?: string | undefined;
+}>;
+export type CertificateSummary = z.infer<typeof CertificateSummarySchema>;
+/**
+ * Certificate Template Summary
+ *
+ * Admin-facing certificate template representation.
+ */
+export declare const CertificateTemplateSummarySchema: z.ZodObject<{
+    template_id: z.ZodString;
+    name: z.ZodString;
+    description: z.ZodOptional<z.ZodString>;
+    status: z.ZodEnum<["draft", "published", "archived"]>;
+    applies_to: z.ZodEnum<["course", "path"]>;
+    applies_to_id: z.ZodString;
+    created_at: z.ZodString;
+    updated_at: z.ZodString;
+    published_at: z.ZodOptional<z.ZodString>;
+}, "strip", z.ZodTypeAny, {
+    status: "draft" | "published" | "archived";
+    created_at: string;
+    name: string;
+    updated_at: string;
+    template_id: string;
+    applies_to: "path" | "course";
+    applies_to_id: string;
+    description?: string | undefined;
+    published_at?: string | undefined;
+}, {
+    status: "draft" | "published" | "archived";
+    created_at: string;
+    name: string;
+    updated_at: string;
+    template_id: string;
+    applies_to: "path" | "course";
+    applies_to_id: string;
+    description?: string | undefined;
+    published_at?: string | undefined;
+}>;
+export type CertificateTemplateSummary = z.infer<typeof CertificateTemplateSummarySchema>;
+//# sourceMappingURL=contracts.d.ts.map

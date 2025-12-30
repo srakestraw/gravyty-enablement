@@ -1,0 +1,107 @@
+/**
+ * Course Domain Types
+ *
+ * Defines Course, CourseSection, CourseBadge, and CourseStatus types.
+ */
+import { z } from 'zod';
+import { MediaRefSchema } from './media.js';
+/**
+ * Course Badge
+ *
+ * Badges that can be earned by completing a course.
+ */
+export const CourseBadgeSchema = z.object({
+    badge_id: z.string(),
+    name: z.string(),
+    description: z.string().optional(),
+    icon_url: z.string().url().optional(),
+});
+/**
+ * Course Status
+ *
+ * Publishing state machine: draft -> published (immutable snapshots)
+ */
+export const CourseStatusSchema = z.enum(['draft', 'published', 'archived']);
+/**
+ * Course Section
+ *
+ * A section within a course containing lessons.
+ */
+export const CourseSectionSchema = z.object({
+    section_id: z.string(),
+    title: z.string(),
+    description: z.string().optional(),
+    order: z.number().int().min(0), // Display order within course
+    lesson_ids: z.array(z.string()), // Ordered list of lesson IDs
+});
+/**
+ * Course
+ *
+ * A structured learning experience with sections and lessons.
+ * Supports versioning: published courses create immutable snapshots.
+ */
+export const CourseSchema = z.object({
+    course_id: z.string(),
+    title: z.string(),
+    description: z.string().optional(),
+    short_description: z.string().optional(), // For cards/lists
+    // Categorization
+    product_suite: z.string().optional(),
+    product_concept: z.string().optional(),
+    topic_tags: z.array(z.string()).default([]),
+    related_course_ids: z.array(z.string()).default([]), // Manual related courses
+    // Media
+    cover_image: MediaRefSchema.optional(),
+    // Badges
+    badges: z.array(CourseBadgeSchema).default([]),
+    // Structure
+    sections: z.array(CourseSectionSchema).default([]),
+    // Versioning and publishing
+    status: CourseStatusSchema,
+    version: z.number().int().min(1).default(1), // Increments on publish
+    published_version: z.number().int().min(1).optional(), // Latest published version
+    published_at: z.string().optional(), // ISO datetime
+    published_by: z.string().optional(), // User ID
+    // Metadata
+    estimated_duration_minutes: z.number().int().min(0).optional(),
+    difficulty_level: z.enum(['beginner', 'intermediate', 'advanced']).optional(),
+    // Timestamps
+    created_at: z.string(), // ISO datetime
+    created_by: z.string(), // User ID
+    updated_at: z.string(), // ISO datetime
+    updated_by: z.string(), // User ID
+});
+/**
+ * Course Publishing Invariants
+ *
+ * - draft courses can be edited freely
+ * - published courses create immutable snapshots (version increment)
+ * - published snapshots cannot be modified (only archived)
+ * - learners see published versions only
+ */
+export function validateCoursePublishing(course) {
+    const errors = [];
+    if (course.status === 'published') {
+        // Published courses must have all required fields
+        if (!course.published_at) {
+            errors.push('Published courses must have published_at timestamp');
+        }
+        if (!course.published_by) {
+            errors.push('Published courses must have published_by user ID');
+        }
+        if (course.sections.length === 0) {
+            errors.push('Published courses must have at least one section');
+        }
+        // Validate all sections have lessons
+        for (const section of course.sections) {
+            if (section.lesson_ids.length === 0) {
+                errors.push(`Section ${section.section_id} must have at least one lesson`);
+            }
+        }
+    }
+    return {
+        valid: errors.length === 0,
+        errors,
+    };
+}
+//# sourceMappingURL=course.js.map

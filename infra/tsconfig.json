@@ -29,7 +29,12 @@
   },
   "exclude": [
     "node_modules",
-    "cdk.out"
+    "cdk.out",
+    "lambda"
+  ],
+  "include": [
+    "lib/**/*",
+    "bin/**/*"
   ]
 }
 

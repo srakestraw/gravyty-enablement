@@ -4,5 +4,8 @@
 
 export * from './types.js';
 
+// LMS Domain Module
+export * from './lms/index.js';
+
 
 

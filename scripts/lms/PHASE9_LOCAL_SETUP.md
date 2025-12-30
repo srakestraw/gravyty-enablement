@@ -1,6 +1,6 @@
 # Phase 9 Certificates v1 - Local DynamoDB Setup Guide
 
-This guide enables running Phase 9 Certificates smoke tests locally without AWS credentials using DynamoDB Local.
+This guide enables running Phase 9 Certificates smoke tests locally without AWS credentials using a local DynamoDB emulator.
 
 ## What Was Changed
 
@@ -27,7 +27,13 @@ This guide enables running Phase 9 Certificates smoke tests locally without AWS 
   - Lesson: `test_lesson_phase9` (video type)
 - Prints IDs for use in smoke test
 
-### 4. Updated Smoke Test Documentation
+### 4. Dynalite Startup Script (Docker-Free Option)
+**File:** `scripts/lms/start_local_dynamo.ts`
+- Starts Dynalite (Node-based DynamoDB emulator) on port 8000
+- Idempotent: detects if DynamoDB is already running
+- No Docker required - pure Node.js solution
+
+### 5. Updated Smoke Test Documentation
 **File:** `scripts/lms/phase9_certificates_smoke.md`
 - Added "Local DynamoDB Setup" section at top
 - Updated course completion step with API example
@@ -35,17 +41,54 @@ This guide enables running Phase 9 Certificates smoke tests locally without AWS 
 
 ## Quick Start
 
-### Step 1: Start DynamoDB Local
+### Option A: Docker DynamoDB Local (Recommended if Docker available)
+
+#### Step 1: Start DynamoDB Local
 ```bash
 docker run -d -p 8000:8000 --name dynamodb-local amazon/dynamodb-local
 ```
 
+**Verify:**
+```bash
+docker ps --filter "name=dynamodb-local"
+```
+
+### Option B: Dynalite (No Docker Required)
+
+#### Step 1: Start Dynalite
+```bash
+npm run dynamo:local
+```
+
+Or directly:
+```bash
+tsx scripts/lms/start_local_dynamo.ts
+```
+
+**What it does:**
+- Checks if DynamoDB is already running on port 8000
+- If not, starts Dynalite server
+- Keeps process alive until Ctrl+C
+
+**Note:** Keep this terminal open while running tests.
+
 ### Step 2: Create Tables
+
+In a **new terminal** (keep DynamoDB/Dynalite running in the first terminal):
+
 ```bash
 DYNAMODB_ENDPOINT=http://localhost:8000 tsx scripts/lms/local_dynamo_setup.ts
 ```
 
+Or use the convenience script:
+```bash
+npm run phase9:setup
+```
+
 ### Step 3: Seed Test Data
+
+If you didn't use `npm run phase9:setup` above, run:
+
 ```bash
 DYNAMODB_ENDPOINT=http://localhost:8000 tsx scripts/lms/seed_phase9_certificates.ts
 ```
@@ -110,6 +153,8 @@ After setup, verify:
 ## Cleanup
 
 To reset test data:
+
+**If using Docker (Option A):**
 ```bash
 # Stop and remove DynamoDB Local container
 docker stop dynamodb-local
@@ -120,6 +165,18 @@ docker run -d -p 8000:8000 --name dynamodb-local amazon/dynamodb-local
 DYNAMODB_ENDPOINT=http://localhost:8000 tsx scripts/lms/local_dynamo_setup.ts
 DYNAMODB_ENDPOINT=http://localhost:8000 tsx scripts/lms/seed_phase9_certificates.ts
 ```
+
+**If using Dynalite (Option B):**
+```bash
+# Stop Dynalite (Ctrl+C in the terminal where it's running)
+# Restart Dynalite
+npm run dynamo:local
+
+# In another terminal, recreate tables and seed
+npm run phase9:setup
+```
+
+**Note:** Dynalite is in-memory by default, so stopping it clears all data. Tables need to be recreated after restart.
 
 ## Next Steps
 

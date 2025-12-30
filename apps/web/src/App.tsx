@@ -19,11 +19,15 @@ import { AdminHubPage } from './pages/AdminHubPage';
 
 // Learn pages
 import { CoursesPage } from './pages/learn/CoursesPage';
+import { CourseDetailPage } from './pages/learn/CourseDetailPage';
+import { LessonPlayerPage } from './pages/learn/LessonPlayerPage';
 import { LearningPathsPage } from './pages/learn/LearningPathsPage';
+import { LearningPathDetailPage } from './pages/learn/LearningPathDetailPage';
 import { CertificationsPage } from './pages/learn/CertificationsPage';
 import { AssignmentsPage } from './pages/learn/AssignmentsPage';
 import { RolePlayingPage } from './pages/learn/RolePlayingPage';
 import { MyLearningPage } from './pages/learn/MyLearningPage';
+import { PracticePage } from './pages/PracticePage';
 
 // Assets pages
 import { AssetLibraryPage } from './pages/assets/AssetLibraryPage';
@@ -47,7 +51,9 @@ import { AdminUsersRolesPage } from './pages/admin/AdminUsersRolesPage';
 import { AdminLearningPage } from './pages/admin/AdminLearningPage';
 // Admin Learning pages
 import { AdminLearningCoursesPage } from './pages/admin/learning/AdminLearningCoursesPage';
+import { AdminCourseEditorPage } from './pages/admin/learning/AdminCourseEditorPage';
 import { AdminLearningPathsPage } from './pages/admin/learning/AdminLearningPathsPage';
+import { AdminPathEditorPage } from './pages/admin/learning/AdminPathEditorPage';
 import { AdminLearningAssignmentsPage } from './pages/admin/learning/AdminLearningAssignmentsPage';
 import { AdminLearningCertificatesPage } from './pages/admin/learning/AdminLearningCertificatesPage';
 import { AdminLearningMediaPage } from './pages/admin/learning/AdminLearningMediaPage';
@@ -223,11 +229,41 @@ function App() {
         }
       />
       <Route
+        path="/enablement/learn/courses/:courseId"
+        element={
+          <RequireAuth>
+            <AppShell>
+              <CourseDetailPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/enablement/learn/courses/:courseId/lessons/:lessonId"
+        element={
+          <RequireAuth>
+            <AppShell>
+              <LessonPlayerPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
         path="/enablement/learn/paths"
         element={
           <RequireAuth>
             <AppShell>
               <LearningPathsPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/enablement/learn/paths/:pathId"
+        element={
+          <RequireAuth>
+            <AppShell>
+              <LearningPathDetailPage />
             </AppShell>
           </RequireAuth>
         }
@@ -504,12 +540,36 @@ function App() {
         }
       />
       <Route
+        path="/enablement/admin/learning/courses/:courseId"
+        element={
+          <RequireAuth>
+            <RequireAdmin>
+              <AppShell>
+                <AdminCourseEditorPage />
+              </AppShell>
+            </RequireAdmin>
+          </RequireAuth>
+        }
+      />
+      <Route
         path="/enablement/admin/learning/paths"
         element={
           <RequireAuth>
             <RequireAdmin>
               <AppShell>
                 <AdminLearningPathsPage />
+              </AppShell>
+            </RequireAdmin>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/enablement/admin/learning/paths/:pathId"
+        element={
+          <RequireAuth>
+            <RequireAdmin>
+              <AppShell>
+                <AdminPathEditorPage />
               </AppShell>
             </RequireAdmin>
           </RequireAuth>
