@@ -24,3 +24,4 @@ This directory contains images used on the unauthenticated landing page.
 - Ensure images are responsive and work on mobile devices
 
 
+

@@ -35,3 +35,4 @@ echo "1. Remove the table definitions from infra/lib/enablement-portal-stack.ts"
 echo "2. Run: npm run cdk:deploy"
 echo "3. CDK will delete the tables"
 
+

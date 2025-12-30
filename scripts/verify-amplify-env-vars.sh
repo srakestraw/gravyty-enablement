@@ -127,3 +127,4 @@ echo "• After adding/updating variables, you must redeploy"
 echo "• Check build logs to see if variables are being read (they're logged in preBuild phase)"
 echo ""
 
+

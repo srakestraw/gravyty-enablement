@@ -128,3 +128,4 @@ echo "Verify DNS propagation:"
 echo "  dig $CUSTOM_DOMAIN CNAME"
 echo "  or use: https://www.whatsmydns.net/#CNAME/$CUSTOM_DOMAIN"
 
+

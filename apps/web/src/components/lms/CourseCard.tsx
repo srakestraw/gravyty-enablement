@@ -71,3 +71,4 @@ export function CourseCard({ course, onClick }: CourseCardProps) {
   );
 }
 
+

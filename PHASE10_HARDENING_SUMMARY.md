@@ -260,3 +260,4 @@ QueryCommand {
 3. Code review: Verify no ScanCommand in primary flows
 4. Performance test: Verify reverse index queries are efficient
 
+

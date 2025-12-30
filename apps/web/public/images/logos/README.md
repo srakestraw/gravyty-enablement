@@ -16,3 +16,4 @@ The logo will be accessible at `/images/logos/gravyty-logo.svg` (or `.png`)
 Preferred format: SVG for scalability, or PNG with transparent background.
 
 
+

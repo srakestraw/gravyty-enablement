@@ -127,3 +127,4 @@ export function validateCoursePublishing(course: Course): { valid: boolean; erro
   };
 }
 
+

@@ -76,3 +76,4 @@ fi
 echo "Direct Console Link:"
 echo "  https://console.aws.amazon.com/amplify/home?region=us-east-1#/$APP_ID/domains"
 
+

@@ -73,3 +73,4 @@ If the certificate validation record is missing:
 3. **Return to Amplify Console** - it should automatically verify
 4. **Check status** - Should change from "SSL configuration" to "Domain activation"
 
+

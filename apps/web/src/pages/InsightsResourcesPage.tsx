@@ -5,3 +5,4 @@ export function InsightsResourcesPage() {
   return <InsightsAssetPerformancePage />;
 }
 
+

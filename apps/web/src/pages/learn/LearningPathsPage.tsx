@@ -23,7 +23,6 @@ import { AltRouteOutlined } from '@mui/icons-material';
 import { useLmsPaths } from '../../hooks/useLmsPaths';
 import { track } from '../../lib/telemetry';
 import type { PathSummary } from '@gravyty/domain';
-import { LinearProgress } from '@mui/material';
 
 function PathCard({ path, onClick }: { path: PathSummary; onClick: () => void }) {
   return (
