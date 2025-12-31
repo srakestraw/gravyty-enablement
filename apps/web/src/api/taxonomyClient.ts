@@ -145,48 +145,4 @@ export const taxonomyApi = {
   },
 };
 
-/**
- * Taxonomy Migration API Client
- */
-export interface LegacyTaxonomyValues {
-  product_suite: Record<string, { courses: number; resources: number }>;
-  product: Record<string, { courses: number; resources: number }>;
-  topic_tags: Record<string, { courses: number; resources: number }>;
-}
-
-export interface ApplyMigrationRequest {
-  product?: Record<string, string>;
-  product_suite?: Record<string, string>;
-  topic_tags?: Record<string, string>;
-  dry_run?: boolean;
-}
-
-export interface ApplyMigrationResponse {
-  courses_updated: number;
-  resources_updated: number;
-  dry_run: boolean;
-}
-
-export const taxonomyMigrationApi = {
-  /**
-   * Scan for legacy taxonomy values
-   */
-  async scanLegacyValues(key?: string) {
-    const url = `/v1/taxonomy/migration/scan${key ? `?key=${key}` : ''}`;
-    return apiFetch<{ data: LegacyTaxonomyValues }>(url);
-  },
-
-  /**
-   * Apply migration mapping
-   */
-  async applyMigration(mapping: ApplyMigrationRequest) {
-    return apiFetch<{ data: ApplyMigrationResponse }>('/v1/taxonomy/migration/apply', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(mapping),
-    });
-  },
-};
 

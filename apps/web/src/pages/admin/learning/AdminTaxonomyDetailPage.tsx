@@ -100,6 +100,7 @@ export function AdminTaxonomyDetailPage() {
   const [showMenuColorPicker, setShowMenuColorPicker] = useState(false);
 
   const COLOR_PALETTE = [
+    '#092362', // dark blue
     '#1976d2', // blue
     '#388e3c', // green
     '#f57c00', // orange
@@ -108,6 +109,7 @@ export function AdminTaxonomyDetailPage() {
     '#0288d1', // light blue
     '#c2185b', // pink
     '#5d4037', // brown
+    '#00838F', // teal
   ];
 
   // Helper to check if a color is in the palette

@@ -14,7 +14,6 @@ import {
   CardActionArea,
   CircularProgress,
   Alert,
-  Button,
 } from '@mui/material';
 import { CategoryOutlined } from '@mui/icons-material';
 import { useTaxonomyOptions } from '../../../hooks/useTaxonomyOptions';
@@ -88,21 +87,13 @@ export function AdminTaxonomyPage() {
 
   return (
     <Box sx={{ p: 3 }}>
-      <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <Box>
-          <Typography variant="h4" gutterBottom>
-            Taxonomy
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Manage controlled values used across Courses and Resources.
-          </Typography>
-        </Box>
-        <Button
-          variant="outlined"
-          onClick={() => navigate('/enablement/admin/taxonomy/migration')}
-        >
-          Migration & Cleanup
-        </Button>
+      <Box sx={{ mb: 4 }}>
+        <Typography variant="h4" gutterBottom>
+          Taxonomy
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          Manage controlled values used across Courses and Resources.
+        </Typography>
       </Box>
 
       <Grid container spacing={3}>
