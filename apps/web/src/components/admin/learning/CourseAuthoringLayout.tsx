@@ -34,9 +34,15 @@ export function CourseAuthoringLayout({
 
   // Build grid template columns string
   // When inspector is closed, it doesn't reserve space (editor expands)
-  const gridColumns = contextPanel && contextPanelOpen
-    ? `${OUTLINE_WIDTH}px minmax(0, 1fr) ${contextPanelWidth}px`
-    : `${OUTLINE_WIDTH}px minmax(0, 1fr)`;
+  // When outline is not provided (empty), don't reserve space for it
+  const hasOutline = !!outline;
+  const gridColumns = hasOutline
+    ? (contextPanel && contextPanelOpen
+        ? `${OUTLINE_WIDTH}px minmax(0, 1fr) ${contextPanelWidth}px`
+        : `${OUTLINE_WIDTH}px minmax(0, 1fr)`)
+    : (contextPanel && contextPanelOpen
+        ? `minmax(0, 1fr) ${contextPanelWidth}px`
+        : `minmax(0, 1fr)`);
 
   return (
     <Box
@@ -54,18 +60,20 @@ export function CourseAuthoringLayout({
         }),
       }}
     >
-      {/* Left: Outline (fixed width) */}
-      <Box
-        sx={{
-          display: { xs: contextPanelOpen ? 'none' : 'flex', md: 'flex' },
-          flexDirection: 'column',
-          overflow: 'hidden',
-          borderRight: 1,
-          borderColor: 'divider',
-        }}
-      >
-        {outline}
-      </Box>
+      {/* Left: Outline (fixed width) - conditionally shown */}
+      {outline && (
+        <Box
+          sx={{
+            display: { xs: contextPanelOpen ? 'none' : 'flex', md: 'flex' },
+            flexDirection: 'column',
+            overflow: 'hidden',
+            borderRight: 1,
+            borderColor: 'divider',
+          }}
+        >
+          {outline}
+        </Box>
+      )}
 
       {/* Middle: Editor (flexible, can shrink) */}
       <Box

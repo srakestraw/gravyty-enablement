@@ -59,6 +59,32 @@ export function AdminCourseEditorPage() {
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [inspectorActiveTab, setInspectorActiveTab] = useState<'issues' | 'properties'>('issues');
   
+  // Editor tab state (Details or Course Outline) - persist in localStorage
+  // For new courses, always default to 'details' tab
+  const [editorTab, setEditorTab] = useState<'details' | 'outline'>(() => {
+    // For new courses, always start on Details tab
+    if (isNew) {
+      return 'details';
+    }
+    // For existing courses, restore from localStorage or default to 'details'
+    const stored = localStorage.getItem('lms.courseEditor.editorTab');
+    return (stored === 'details' || stored === 'outline') ? stored : 'details';
+  });
+  
+  // Reset to Details tab when switching to a new course
+  useEffect(() => {
+    if (isNew) {
+      setEditorTab('details');
+    }
+  }, [isNew, courseId]);
+  
+  // Persist editor tab selection (but not for new courses)
+  useEffect(() => {
+    if (!isNew) {
+      localStorage.setItem('lms.courseEditor.editorTab', editorTab);
+    }
+  }, [editorTab, isNew]);
+  
   // Restore inspector state from localStorage only for existing courses (not new)
   useEffect(() => {
     if (!isNew && courseId) {
@@ -265,6 +291,13 @@ export function AdminCourseEditorPage() {
       }
     }, 100);
   }, [course, searchParams, setSearchParams]);
+  
+  // When switching back to Details tab from Outline tab, reset selection to course_details
+  useEffect(() => {
+    if (editorTab === 'details' && selection?.kind !== 'course_details') {
+      handleSelectCourseDetails();
+    }
+  }, [editorTab, selection?.kind, handleSelectCourseDetails]);
 
   // Get selected node (for sections/lessons)
   const selectedNode = useMemo(() => {
@@ -1003,24 +1036,27 @@ export function AdminCourseEditorPage() {
       {courseTree && course && (
         <CourseAuthoringLayout
           outline={
-            <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-              {/* Content Outline - no course card */}
-              <TreeOutlinePanel
-                tree={courseTree}
-                selectedNodeId={selection?.kind === 'section' || selection?.kind === 'lesson' ? selection.id || null : null}
-                onSelectNode={handleSelectNode}
-                onAddSection={handleAddSection}
-                onAddLesson={handleAddLesson}
-                onRenameNode={handleRenameNode}
-                onDeleteNode={handleDeleteNode}
-                onReorderNode={(nodeId, direction) => {
-                  // Stub for now - can implement later
-                  console.log('Reorder node', nodeId, direction);
-                }}
-                shouldShowError={shouldShowError}
-                markFieldTouched={markFieldTouched}
-              />
-            </Box>
+            // Left outline panel - only show when NOT editing course details (i.e., editing section/lesson)
+            // When editing course details, don't render the outline panel at all (outline is in the Course Outline tab)
+            selection?.kind !== 'course_details' ? (
+              <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                <TreeOutlinePanel
+                  tree={courseTree}
+                  selectedNodeId={selection?.kind === 'section' || selection?.kind === 'lesson' ? selection.id || null : null}
+                  onSelectNode={handleSelectNode}
+                  onAddSection={handleAddSection}
+                  onAddLesson={handleAddLesson}
+                  onRenameNode={handleRenameNode}
+                  onDeleteNode={handleDeleteNode}
+                  onReorderNode={(nodeId, direction) => {
+                    // Stub for now - can implement later
+                    console.log('Reorder node', nodeId, direction);
+                  }}
+                  shouldShowError={shouldShowError}
+                  markFieldTouched={markFieldTouched}
+                />
+              </Box>
+            ) : null
           }
           editor={
             <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }} data-course-editor>
@@ -1049,6 +1085,18 @@ export function AdminCourseEditorPage() {
                 onOpenInspector={handleOpenInspectorToIssues}
                 inspectorOpen={inspectorOpen}
                 inspectorActiveTab={inspectorActiveTab}
+                editorTab={editorTab}
+                onEditorTabChange={setEditorTab}
+                // Outline panel props
+                courseTree={courseTree}
+                onSelectNode={handleSelectNode}
+                onAddSection={handleAddSection}
+                onRenameNode={handleRenameNode}
+                onDeleteNode={handleDeleteNode}
+                onReorderNode={(nodeId, direction) => {
+                  // Stub for now - can implement later
+                  console.log('Reorder node', nodeId, direction);
+                }}
               />
             </Box>
           }
@@ -1063,6 +1111,7 @@ export function AdminCourseEditorPage() {
               onClose={() => setInspectorOpen(false)}
               activeTab={inspectorActiveTab}
               onTabChange={setInspectorActiveTab}
+              editorTab={editorTab}
             />
           }
           contextPanelOpen={inspectorOpen}

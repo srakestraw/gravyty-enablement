@@ -9,6 +9,7 @@ import { Box, Tabs, Tab, IconButton, Typography } from '@mui/material';
 import { Close as CloseIcon } from '@mui/icons-material';
 import { IssuesPanel } from './IssuesPanel';
 import { PropertiesPanel } from './PropertiesPanel';
+import { CourseSummaryPanel } from './CourseSummaryPanel';
 import type { ValidationIssue } from '../../../validations/lmsValidations';
 import type { CourseTreeNode } from '../../../types/courseTree';
 import type { Course } from '@gravyty/domain';
@@ -23,6 +24,7 @@ export interface InspectorProps {
   onClose?: () => void;
   activeTab?: 'issues' | 'properties';
   onTabChange?: (tab: 'issues' | 'properties') => void;
+  editorTab?: 'details' | 'outline'; // Which editor tab is active (Details or Course Outline)
 }
 
 export function Inspector({
@@ -35,6 +37,7 @@ export function Inspector({
   onClose,
   activeTab: controlledActiveTab,
   onTabChange,
+  editorTab = 'details',
 }: InspectorProps) {
   const [internalActiveTab, setInternalActiveTab] = useState<'issues' | 'properties'>(() => {
     const stored = localStorage.getItem('lms.courseEditor.inspectorTab');
@@ -105,16 +108,46 @@ export function Inspector({
       {/* Content */}
       <Box sx={{ flex: 1, overflow: 'auto' }}>
         {activeTab === 'issues' && (
-          <IssuesPanel
-            validationIssues={validationIssues}
-            courseTree={courseTree}
-            courseId={course?.course_id}
-            onSelectCourseDetails={onSelectCourseDetails}
-            onSelectNode={onSelectNode}
-          />
+          <>
+            {/* When editor is on Details tab, show course summary first */}
+            {editorTab === 'details' && course && (
+              <CourseSummaryPanel course={course} />
+            )}
+            <IssuesPanel
+              validationIssues={validationIssues}
+              courseTree={courseTree}
+              courseId={course?.course_id}
+              onSelectCourseDetails={onSelectCourseDetails}
+              onSelectNode={onSelectNode}
+            />
+          </>
         )}
         {activeTab === 'properties' && (
-          <PropertiesPanel selectedNode={selectedNode} course={course} />
+          <>
+            {/* When editor is on Details tab, show course summary instead of node properties */}
+            {editorTab === 'details' ? (
+              course ? (
+                <CourseSummaryPanel course={course} />
+              ) : (
+                <Box sx={{ p: 2 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Course data not available
+                  </Typography>
+                </Box>
+              )
+            ) : (
+              /* When editor is on Course Outline tab, show node properties */
+              selectedNode ? (
+                <PropertiesPanel selectedNode={selectedNode} course={course} />
+              ) : (
+                <Box sx={{ p: 2 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Select a section or lesson to view properties
+                  </Typography>
+                </Box>
+              )
+            )}
+          </>
         )}
       </Box>
     </Box>

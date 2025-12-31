@@ -17,6 +17,9 @@ import {
   Tooltip,
   InputBase,
   CircularProgress,
+  Tabs,
+  Tab,
+  Grid,
 } from '@mui/material';
 import {
   Image as ImageIcon,
@@ -31,7 +34,8 @@ import {
   Error as ErrorIcon,
 } from '@mui/icons-material';
 import { LessonEditor } from './LessonEditor';
-import { DetailsDrawer } from './DetailsDrawer';
+import { DetailsTabContent } from './DetailsTabContent';
+import { TreeOutlinePanel } from './TreeOutlinePanel';
 import { RichTextEditor } from '../../common/RichTextEditor';
 import { focusRegistry } from '../../../utils/focusRegistry';
 import type { Course, CourseSection, Lesson } from '@gravyty/domain';
@@ -62,6 +66,16 @@ export interface EditorPanelProps {
   onOpenInspector?: () => void;
   inspectorOpen?: boolean;
   inspectorActiveTab?: 'issues' | 'properties';
+  // Editor tab state (for Inspector to know which tab is active)
+  editorTab?: 'details' | 'outline';
+  onEditorTabChange?: (tab: 'details' | 'outline') => void;
+  // Outline panel props (for Course Outline tab)
+  courseTree?: CourseTreeNode | null;
+  onSelectNode?: (nodeId: string | null) => void;
+  onAddSection?: () => void;
+  onRenameNode?: (nodeId: string, newTitle: string) => void;
+  onDeleteNode?: (nodeId: string) => void;
+  onReorderNode?: (nodeId: string, direction: 'up' | 'down') => void;
 }
 
 export function EditorPanel({
@@ -88,8 +102,41 @@ export function EditorPanel({
   onOpenInspector,
   inspectorOpen = false,
   inspectorActiveTab = 'issues',
+  editorTab: controlledEditorTab,
+  onEditorTabChange,
+  courseTree = null,
+  onSelectNode,
+  onAddSection,
+  onRenameNode,
+  onDeleteNode,
+  onReorderNode,
 }: EditorPanelProps) {
-  const [detailsDrawerOpen, setDetailsDrawerOpen] = useState(false);
+  // Tab state for course details editing
+  const [internalEditorTab, setInternalEditorTab] = useState<'details' | 'outline'>(() => {
+    const stored = localStorage.getItem('lms.courseEditor.editorTab');
+    return (stored === 'details' || stored === 'outline') ? stored : 'details';
+  });
+  
+  // Use controlled tab if provided, otherwise use internal state
+  const editorTab = controlledEditorTab ?? internalEditorTab;
+  
+  const handleEditorTabChange = (newTab: 'details' | 'outline') => {
+    if (onEditorTabChange) {
+      onEditorTabChange(newTab);
+    } else {
+      setInternalEditorTab(newTab);
+    }
+    if (selection?.kind === 'course_details') {
+      localStorage.setItem('lms.courseEditor.editorTab', newTab);
+    }
+  };
+  
+  // Persist tab selection
+  useEffect(() => {
+    if (selection?.kind === 'course_details' && editorTab) {
+      localStorage.setItem('lms.courseEditor.editorTab', editorTab);
+    }
+  }, [editorTab, selection?.kind]);
   
   // Refs for focus registry
   const titleRef = useRef<HTMLInputElement>(null);
@@ -134,25 +181,7 @@ export function EditorPanel({
     };
   }, [course?.course_id]);
 
-  // Course metadata state
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [shortDescription, setShortDescription] = useState('');
-  const [relatedCourseIds, setRelatedCourseIds] = useState<string[]>([]);
-
-  // Track the last synced course ID to avoid overwriting user input
-  const lastSyncedCourseIdRef = useRef<string | null>(null);
-  
-  // Sync state with course (only when course ID changes, indicating a new course was loaded)
-  useEffect(() => {
-    if (course && course.course_id !== lastSyncedCourseIdRef.current) {
-      setTitle(course.title || '');
-      setDescription(course.description || '');
-      setShortDescription(course.short_description || '');
-      setRelatedCourseIds(course.related_course_ids || []);
-      lastSyncedCourseIdRef.current = course.course_id;
-    }
-  }, [course?.course_id]);
+  // Note: Course metadata state (title, description, etc.) is now managed in DetailsTabContent
 
   // Handle inline title edit
   const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -301,16 +330,6 @@ export function EditorPanel({
                 />
               )}
 
-              {/* Details Chip - only show for course details */}
-              {selection?.kind === 'course_details' && course && (
-                <Chip
-                  label="Details"
-                  size="small"
-                  variant={detailsDrawerOpen ? 'filled' : 'outlined'}
-                  onClick={() => setDetailsDrawerOpen(!detailsDrawerOpen)}
-                  sx={{ cursor: 'pointer', flexShrink: 0 }}
-                />
-              )}
 
               {/* Issues Chip - always visible */}
               {onOpenInspector && (
@@ -424,19 +443,38 @@ export function EditorPanel({
         </Box>
       </Box>
 
-      {/* Details Drawer - only show for course details */}
-      {selection?.kind === 'course_details' && course && (
-        <DetailsDrawer
-          course={course}
-          open={detailsDrawerOpen}
-          onToggle={() => setDetailsDrawerOpen(!detailsDrawerOpen)}
-          onUpdateCourse={handleCourseFieldChange}
-          shouldShowError={shouldShowError}
-          markFieldTouched={markFieldTouched}
-        />
+      {/* Tabs - show for course details OR when in Course Outline tab (to allow navigation back) */}
+      {(selection?.kind === 'course_details' || editorTab === 'outline') && course && (
+        <Box sx={{ borderBottom: 1, borderColor: 'divider', width: '100%' }}>
+          <Tabs
+            value={editorTab}
+            onChange={(_, v) => {
+              handleEditorTabChange(v);
+              // If switching back to Details tab and we're on a section/lesson, reset to course_details
+              if (v === 'details' && selection?.kind !== 'course_details') {
+                // This will be handled by the parent component via onEditorTabChange callback
+              }
+            }}
+            variant="fullWidth"
+            sx={{
+              minHeight: 48,
+              width: '100%',
+              '& .MuiTab-root': {
+                minHeight: 48,
+                padding: '12px 24px',
+                fontSize: '0.875rem',
+                fontWeight: 500,
+                textTransform: 'none',
+              },
+            }}
+          >
+            <Tab value="details" label="Details" />
+            <Tab value="outline" label="Course Outline" />
+          </Tabs>
+        </Box>
       )}
 
-      <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
+      <Box sx={{ flex: 1, overflow: 'auto' }}>
         {!selection && (
           <Box sx={{ p: 3, textAlign: 'center' }}>
             <Typography color="text.secondary">
@@ -445,93 +483,40 @@ export function EditorPanel({
           </Box>
         )}
 
-        {/* Course Details Editor */}
-        {selection?.kind === 'course_details' && course && (
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <TextField
-              inputRef={titleRef}
-              label="Title"
-              value={title}
-              onChange={(e) => {
-                setTitle(e.target.value);
-                handleCourseFieldChange('title', e.target.value);
-              }}
-              onBlur={() => {
-                if (markFieldTouched && course) {
-                  markFieldTouched('course', course.course_id, 'title');
-                }
-              }}
-              required
-              fullWidth
-              error={course && shouldShowError && (!title || title.trim() === '') && shouldShowError('course', course.course_id, 'title')}
-              helperText={course && shouldShowError && (!title || title.trim() === '') && shouldShowError('course', course.course_id, 'title') ? 'Course title is required' : ''}
-            />
-
-            <TextField
-              inputRef={shortDescriptionRef}
-              label="Short Description"
-              value={shortDescription}
-              onChange={(e) => {
-                setShortDescription(e.target.value);
-                handleCourseFieldChange('short_description', e.target.value);
-              }}
-              onBlur={() => {
-                if (markFieldTouched && course) {
-                  markFieldTouched('course', course.course_id, 'short_description');
-                }
-              }}
-              required
-              multiline
-              rows={2}
-              fullWidth
-              error={course && shouldShowError && (!shortDescription || shortDescription.trim() === '') && shouldShowError('course', course.course_id, 'short_description')}
-              helperText={course && shouldShowError && (!shortDescription || shortDescription.trim() === '') && shouldShowError('course', course.course_id, 'short_description') ? 'Short description is required' : 'Required: Brief description for course cards'}
-            />
-
-            <RichTextEditor
-              inputRef={descriptionRef}
-              label="Description"
-              value={description}
-              onChange={(value) => {
-                setDescription(value);
-                handleCourseFieldChange('description', value);
-              }}
-              rows={4}
-              fullWidth
-              helperText="Optional: Full course description"
-            />
-
-            <Autocomplete
-              multiple
-              options={publishedCourses}
-              getOptionLabel={(option) => (typeof option === 'string' ? option : option.title)}
-              value={relatedCourseIds.map((id) => publishedCourses.find((c) => c.course_id === id) || id)}
-              onChange={(_, newValue) => {
-                const ids = newValue.map((v) => (typeof v === 'string' ? v : v.course_id));
-                setRelatedCourseIds(ids);
-                handleCourseFieldChange('related_course_ids', ids);
-              }}
-              renderInput={(params) => (
-                <TextField {...params} label="Related Courses" placeholder="Select courses" />
-              )}
-              renderTags={(value, getTagProps) =>
-                value.map((option, index) => {
-                  const course = typeof option === 'string' ? null : option;
-                  return (
-                    <Chip
-                      label={course ? course.title : option}
-                      {...getTagProps({ index })}
-                      key={course ? course.course_id : option}
-                    />
-                  );
-                })
-              }
+        {/* Course Details Editor with Tabs */}
+        {/* Show Details tab content when on Details tab and selection is course_details */}
+        {editorTab === 'details' && selection?.kind === 'course_details' && course && (
+          <DetailsTabContent
+            course={course}
+            onUpdateCourse={handleCourseFieldChange}
+            shouldShowError={shouldShowError}
+            markFieldTouched={markFieldTouched}
+            titleRef={titleRef}
+            shortDescriptionRef={shortDescriptionRef}
+            descriptionRef={descriptionRef}
+          />
+        )}
+        
+        {/* Show Course Outline tab content when on Outline tab (regardless of selection kind) */}
+        {editorTab === 'outline' && courseTree && onSelectNode && onAddSection && onRenameNode && onDeleteNode && onReorderNode && (
+          <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+            <TreeOutlinePanel
+              tree={courseTree}
+              selectedNodeId={selection?.kind === 'section' || selection?.kind === 'lesson' ? selection.id || null : null}
+              onSelectNode={onSelectNode}
+              onAddSection={onAddSection}
+              onAddLesson={onAddLesson}
+              onRenameNode={onRenameNode}
+              onDeleteNode={onDeleteNode}
+              onReorderNode={onReorderNode}
+              shouldShowError={shouldShowError}
+              markFieldTouched={markFieldTouched}
             />
           </Box>
         )}
 
-        {/* Section Editor */}
-        {((selectedNode && selectedNode.type === 'section' && selectedNode.sectionData) ||
+        {/* Section Editor - only show when NOT in Course Outline tab (to avoid conflicts) */}
+        {editorTab !== 'outline' && ((selectedNode && selectedNode.type === 'section' && selectedNode.sectionData) ||
           (selection?.kind === 'section' && selection.id && course)) && (() => {
           // Get section data from selectedNode if available, otherwise from course.sections
           const sectionId = selectedNode?.id || selection?.id;
@@ -601,8 +586,8 @@ export function EditorPanel({
           );
         })()}
 
-        {/* Lesson Editor */}
-        {selectedNode && selectedNode.type === 'lesson' && selectedNode.lessonData && course && (
+        {/* Lesson Editor - only show when NOT in Course Outline tab (to avoid conflicts) */}
+        {editorTab !== 'outline' && selectedNode && selectedNode.type === 'lesson' && selectedNode.lessonData && course && (
           <LessonEditor 
             lesson={selectedNode.lessonData} 
             onUpdate={onUpdateLesson} 
