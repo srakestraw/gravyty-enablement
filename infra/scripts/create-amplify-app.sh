@@ -229,3 +229,4 @@ echo "  https://console.aws.amazon.com/amplify/home?region=$REGION#/$APP_ID"
 
 
 
+

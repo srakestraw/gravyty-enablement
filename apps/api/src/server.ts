@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import { requestIdMiddleware } from './middleware/requestId';
@@ -8,6 +9,8 @@ import * as eventHandlers from './handlers/events';
 import * as analyticsHandlers from './handlers/analytics';
 import { createStorageRepos } from './storage/factory';
 import lmsRoutes from './routes/lms';
+import adminUsersRoutes from './routes/adminUsers';
+import taxonomyRoutes from './routes/taxonomy';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -44,6 +47,12 @@ v1.use('/lms', lmsRoutes);
 // LMS Admin routes (Contributor+)
 import lmsAdminRoutes from './routes/lmsAdmin';
 v1.use('/lms/admin', lmsAdminRoutes);
+
+// Admin Users routes (Admin only)
+v1.use('/admin/users', requireRole('Admin'), adminUsersRoutes);
+
+// Taxonomy routes (Viewer+ for read, Admin for write)
+v1.use('/taxonomy', taxonomyRoutes);
 
 app.use('/v1', v1);
 

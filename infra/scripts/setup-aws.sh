@@ -177,3 +177,4 @@ echo "  2. Start the API server: npm run dev --workspace=apps/api"
 
 
 
+

@@ -107,7 +107,9 @@ export async function jwtAuthMiddleware(
         groups,
         extractedRole: role,
         hasCognitoGroups: !!payload['cognito:groups'],
+        cognitoGroupsValue: payload['cognito:groups'],
         allClaims: Object.keys(payload),
+        rawPayload: JSON.stringify(payload, null, 2).substring(0, 500),
       });
     }
 

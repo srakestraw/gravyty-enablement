@@ -5,7 +5,7 @@
 import { useState, useEffect } from 'react';
 import { lmsAdminApi, type AdminCourseSummary } from '../api/lmsAdminClient';
 
-export function useAdminCourses(params?: { status?: string; product_suite?: string; q?: string }) {
+export function useAdminCourses(params?: { status?: string; product?: string; product_suite?: string; q?: string }) {
   const [data, setData] = useState<AdminCourseSummary[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -36,7 +36,7 @@ export function useAdminCourses(params?: { status?: string; product_suite?: stri
     return () => {
       cancelled = true;
     };
-  }, [params?.status, params?.product_suite, params?.q]);
+  }, [params?.status, params?.product, params?.product_suite, params?.q]);
 
   const refetch = () => {
     setLoading(true);

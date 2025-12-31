@@ -15,6 +15,7 @@ import {
 } from '@aws-sdk/lib-dynamodb';
 import { dynamoDocClient } from '../../aws/dynamoClient';
 import { createHash } from 'crypto';
+import { normalizeTaxonomyFieldsFromStorage } from '@gravyty/domain';
 import type {
   Course,
   CourseSummary,
@@ -85,7 +86,8 @@ export class LmsRepo {
     });
 
     const { Items = [], LastEvaluatedKey } = await dynamoDocClient.send(command);
-    let courses = (Items as Course[]).map(this.toCourseSummary);
+    // Normalize taxonomy fields before converting to summary
+    let courses = (Items as Course[]).map((c) => normalizeTaxonomyFieldsFromStorage(c) as Course).map(this.toCourseSummary);
 
     // Apply client-side filters
     if (params.query) {
@@ -98,12 +100,12 @@ export class LmsRepo {
       );
     }
 
-    if (params.product_suite) {
-      courses = courses.filter((c) => c.product_suite === params.product_suite);
+    if (params.product) {
+      courses = courses.filter((c) => c.product === params.product);
     }
 
-    if (params.product_concept) {
-      courses = courses.filter((c) => c.product_concept === params.product_concept);
+    if (params.product_suite) {
+      courses = courses.filter((c) => c.product_suite === params.product_suite);
     }
 
     if (params.badge || params.badges) {
@@ -155,11 +157,13 @@ export class LmsRepo {
       return null;
     }
 
-    const course = Item as Course;
-    if (publishedOnly && course.status !== 'published') {
+    const courseRaw = Item as Course;
+    if (publishedOnly && courseRaw.status !== 'published') {
       return null;
     }
 
+    // Normalize taxonomy fields (map legacy to new names)
+    const course = normalizeTaxonomyFieldsFromStorage(courseRaw) as Course;
     return course;
   }
 
@@ -198,7 +202,8 @@ export class LmsRepo {
     });
 
     const { Items = [], LastEvaluatedKey } = await dynamoDocClient.send(command);
-    const paths = (Items as LearningPath[]).map(this.toPathSummary);
+    // Normalize taxonomy fields before converting to summary
+    const paths = (Items as LearningPath[]).map((p) => normalizeTaxonomyFieldsFromStorage(p) as LearningPath).map(this.toPathSummary);
 
     const nextCursor = LastEvaluatedKey
       ? Buffer.from(JSON.stringify(LastEvaluatedKey)).toString('base64')
@@ -581,8 +586,8 @@ export class LmsRepo {
       title: course.title,
       short_description: course.short_description,
       cover_image_url: course.cover_image?.url,
-      product_suite: course.product_suite,
-      product_concept: course.product_concept,
+      product: course.product, // Was product_suite
+      product_suite: course.product_suite, // Was product_concept
       topic_tags: course.topic_tags || [],
       estimated_duration_minutes: course.estimated_duration_minutes,
       difficulty_level: course.difficulty_level,
@@ -599,8 +604,8 @@ export class LmsRepo {
       path_id: path.path_id,
       title: path.title,
       short_description: path.short_description,
-      product_suite: path.product_suite,
-      product_concept: path.product_concept,
+      product: path.product, // Was product_suite
+      product_suite: path.product_suite, // Was product_concept
       topic_tags: path.topic_tags || [],
       estimated_duration_minutes: path.estimated_duration_minutes,
       course_count: path.courses?.length || 0,
@@ -979,7 +984,7 @@ export class LmsRepo {
   async updateCourseDraft(
     courseId: string,
     userId: string,
-    updates: Partial<Pick<Course, 'title' | 'description' | 'short_description' | 'product_suite' | 'product_concept' | 'topic_tags' | 'badges' | 'cover_image'>>
+    updates: Partial<Pick<Course, 'title' | 'description' | 'short_description' | 'product' | 'product_suite' | 'topic_tags' | 'product_id' | 'product_suite_id' | 'topic_tag_ids' | 'badges' | 'cover_image'>>
   ): Promise<Course> {
     const now = new Date().toISOString();
     
@@ -1165,7 +1170,7 @@ export class LmsRepo {
   async updatePathDraft(
     pathId: string,
     userId: string,
-    updates: Partial<Pick<LearningPath, 'title' | 'description' | 'short_description' | 'product_suite' | 'product_concept' | 'topic_tags' | 'badges'>> & {
+    updates: Partial<Pick<LearningPath, 'title' | 'description' | 'short_description' | 'product' | 'product_suite' | 'topic_tags' | 'badges'>> & {
       courses?: Array<{ course_id: string; order: number; required?: boolean; title_override?: string }>;
     }
   ): Promise<LearningPath> {
@@ -1187,8 +1192,8 @@ export class LmsRepo {
       title: updates.title ?? existing.title,
       description: updates.description ?? existing.description,
       short_description: updates.short_description ?? existing.short_description,
+      product: updates.product ?? existing.product,
       product_suite: updates.product_suite ?? existing.product_suite,
-      product_concept: updates.product_concept ?? existing.product_concept,
       topic_tags: updates.topic_tags ?? existing.topic_tags,
       badges: updates.badges ?? existing.badges,
       courses: updates.courses 

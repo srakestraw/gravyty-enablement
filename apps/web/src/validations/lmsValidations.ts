@@ -10,6 +10,10 @@ export interface ValidationIssue {
   severity: 'error' | 'warning';
   field: string;
   message: string;
+  // Structured entity information for navigation
+  entityType?: 'course' | 'section' | 'lesson';
+  entityId?: string;
+  fieldKey?: string;
 }
 
 export interface ValidationError {
@@ -210,25 +214,60 @@ export function validateCourseDraft(course: Course, lessons: Lesson[]): { errors
 
   // Required fields
   if (!course.title || course.title.trim() === '') {
-    errors.push({ severity: 'error', field: 'title', message: 'Course title is required' });
+    errors.push({ 
+      severity: 'error', 
+      field: 'title', 
+      message: 'Course title is required',
+      entityType: 'course',
+      entityId: course.course_id,
+      fieldKey: 'title',
+    });
   }
 
   if (!course.short_description || course.short_description.trim() === '') {
-    errors.push({ severity: 'error', field: 'short_description', message: 'Short description is required' });
+    errors.push({ 
+      severity: 'error', 
+      field: 'short_description', 
+      message: 'Short description is required',
+      entityType: 'course',
+      entityId: course.course_id,
+      fieldKey: 'short_description',
+    });
   }
 
   // Warnings for optional but recommended fields
   if (!course.description || course.description.trim() === '') {
-    warnings.push({ severity: 'warning', field: 'description', message: 'Description is recommended but not required' });
+    warnings.push({ 
+      severity: 'warning', 
+      field: 'description', 
+      message: 'Description is recommended but not required',
+      entityType: 'course',
+      entityId: course.course_id,
+      fieldKey: 'description',
+    });
   }
 
   if (!course.cover_image) {
-    warnings.push({ severity: 'warning', field: 'cover_image', message: 'Cover image is recommended but not required' });
+    warnings.push({ 
+      severity: 'warning', 
+      field: 'cover_image', 
+      message: 'Cover image is recommended but not required',
+      entityType: 'course',
+      entityId: course.course_id,
+      fieldKey: 'cover_image',
+    });
   }
 
   // Structure validation
   if (!course.sections || course.sections.length === 0) {
-    errors.push({ severity: 'error', field: 'sections', message: 'Course must have at least one section' });
+    errors.push({ 
+      severity: 'error', 
+      field: 'sections', 
+      message: 'Course must have at least one section',
+      entityType: 'course',
+      entityId: course.course_id,
+      fieldKey: 'sections',
+    });
   } else {
     // Validate sections
     course.sections.forEach((section, sectionIndex) => {
@@ -237,6 +276,9 @@ export function validateCourseDraft(course: Course, lessons: Lesson[]): { errors
           severity: 'error',
           field: `sections[${sectionIndex}].title`,
           message: `Section ${sectionIndex + 1} must have a title`,
+          entityType: 'section',
+          entityId: section.section_id,
+          fieldKey: 'title',
         });
       }
 
@@ -245,6 +287,9 @@ export function validateCourseDraft(course: Course, lessons: Lesson[]): { errors
           severity: 'error',
           field: `sections[${sectionIndex}].lessons`,
           message: `Section "${section.title || sectionIndex + 1}" must have at least one lesson`,
+          entityType: 'section',
+          entityId: section.section_id,
+          fieldKey: 'lessons',
         });
       }
     });
@@ -276,6 +321,9 @@ export function validateCourseDraft(course: Course, lessons: Lesson[]): { errors
               severity: 'error',
               field: `lessons[${lessonId}].title`,
               message: `Lesson "${lessonId}" must have a title`,
+              entityType: 'lesson',
+              entityId: lessonId,
+              fieldKey: 'title',
             });
           }
 
@@ -285,6 +333,9 @@ export function validateCourseDraft(course: Course, lessons: Lesson[]): { errors
               severity: 'error',
               field: `lessons[${lessonId}].video_media`,
               message: `Video lesson "${lesson.title || lessonId}" must have a video media reference`,
+              entityType: 'lesson',
+              entityId: lessonId,
+              fieldKey: 'video_media',
             });
           }
 
@@ -295,6 +346,9 @@ export function validateCourseDraft(course: Course, lessons: Lesson[]): { errors
                 severity: 'error',
                 field: `lessons[${lessonId}].transcript.full_text`,
                 message: `Lesson "${lesson.title || lessonId}" transcript full_text cannot be empty if provided`,
+                entityType: 'lesson',
+                entityId: lessonId,
+                fieldKey: 'transcript.full_text',
               });
             }
           }

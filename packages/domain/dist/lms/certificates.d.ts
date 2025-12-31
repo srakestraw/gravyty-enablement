@@ -46,8 +46,8 @@ export declare const CertificateTemplateSchema: z.ZodObject<{
     published_at: z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
     status: "draft" | "published" | "archived";
-    created_at: string;
     name: string;
+    created_at: string;
     updated_at: string;
     template_id: string;
     applies_to: "path" | "course";
@@ -65,8 +65,8 @@ export declare const CertificateTemplateSchema: z.ZodObject<{
     signatory_title?: string | undefined;
 }, {
     status: "draft" | "published" | "archived";
-    created_at: string;
     name: string;
+    created_at: string;
     updated_at: string;
     template_id: string;
     applies_to: "path" | "course";
@@ -144,8 +144,8 @@ export declare const IssuedCertificateSchema: z.ZodObject<{
     }>;
     created_at: z.ZodString;
 }, "strip", z.ZodTypeAny, {
-    user_id: string;
     created_at: string;
+    user_id: string;
     template_id: string;
     certificate_id: string;
     issued_at: string;
@@ -167,8 +167,8 @@ export declare const IssuedCertificateSchema: z.ZodObject<{
     path_id?: string | undefined;
     issued_by?: string | undefined;
 }, {
-    user_id: string;
     created_at: string;
+    user_id: string;
     template_id: string;
     certificate_id: string;
     issued_at: string;

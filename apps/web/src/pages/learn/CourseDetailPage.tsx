@@ -116,8 +116,8 @@ export function CourseDetailPage() {
           </Typography>
         )}
         <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
+          {course.product && <Chip label={course.product} />}
           {course.product_suite && <Chip label={course.product_suite} />}
-          {course.product_concept && <Chip label={course.product_concept} />}
           {course.difficulty_level && <Chip label={course.difficulty_level} />}
           {course.estimated_duration_minutes && (
             <Chip label={`${course.estimated_duration_minutes} min`} />

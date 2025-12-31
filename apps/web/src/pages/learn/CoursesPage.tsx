@@ -52,7 +52,7 @@ export function CoursesPage() {
   const { courses, loading, error, nextCursor, refetch } = useLmsCourses(
     {
       q: debouncedQuery || undefined,
-      product_suite: productSuite || undefined,
+      product: productSuite || undefined,
       topics: selectedTopics.length > 0 ? selectedTopics : undefined,
       limit: 20,
     },
@@ -71,8 +71,8 @@ export function CoursesPage() {
   const allTopics = Array.from(
     new Set(courses.flatMap((c) => c.topic_tags || []))
   ).sort();
-  const allProductSuites = Array.from(
-    new Set(courses.map((c) => c.product_suite).filter(Boolean) as string[])
+  const allProducts = Array.from(
+    new Set(courses.map((c) => c.product).filter(Boolean) as string[])
   ).sort();
 
   const handleLoadMore = () => {
@@ -109,16 +109,16 @@ export function CoursesPage() {
           </Grid>
           <Grid item xs={12} md={4}>
             <FormControl fullWidth>
-              <InputLabel>Product Suite</InputLabel>
+              <InputLabel>Product</InputLabel>
               <Select
                 value={productSuite}
                 onChange={(e) => setProductSuite(e.target.value)}
-                label="Product Suite"
+                label="Product"
               >
                 <MenuItem value="">All</MenuItem>
-                {allProductSuites.map((suite) => (
-                  <MenuItem key={suite} value={suite}>
-                    {suite}
+                {allProducts.map((product) => (
+                  <MenuItem key={product} value={product}>
+                    {product}
                   </MenuItem>
                 ))}
               </Select>

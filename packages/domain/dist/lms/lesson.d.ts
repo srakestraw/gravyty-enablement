@@ -233,8 +233,8 @@ export declare const LessonSchema: z.ZodObject<{
     updated_by: z.ZodString;
 }, "strip", z.ZodTypeAny, {
     type: "video" | "reading" | "quiz" | "assignment" | "interactive";
-    title: string;
     created_at: string;
+    title: string;
     created_by: string;
     section_id: string;
     order: number;
@@ -282,8 +282,8 @@ export declare const LessonSchema: z.ZodObject<{
     } | undefined;
 }, {
     type: "video" | "reading" | "quiz" | "assignment" | "interactive";
-    title: string;
     created_at: string;
+    title: string;
     created_by: string;
     section_id: string;
     order: number;

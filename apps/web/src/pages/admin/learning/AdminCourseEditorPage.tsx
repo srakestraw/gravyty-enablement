@@ -5,7 +5,7 @@
  */
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -33,23 +33,36 @@ import {
 import { useAdminCourse } from '../../../hooks/useAdminCourse';
 import { lmsAdminApi } from '../../../api/lmsAdminClient';
 import { validateCoursePublish, getValidationSummary, validateCourseDraft } from '../../../validations/lmsValidations';
-import { OutlinePanel } from '../../../components/admin/learning/OutlinePanel';
+import { TreeOutlinePanel } from '../../../components/admin/learning/TreeOutlinePanel';
 import { EditorPanel } from '../../../components/admin/learning/EditorPanel';
-import { PublishReadinessPanel } from '../../../components/admin/learning/PublishReadinessPanel';
+import { CourseAuthoringLayout } from '../../../components/admin/learning/CourseAuthoringLayout';
+import { Inspector } from '../../../components/admin/learning/Inspector';
+import { buildCourseTree, findNodeById, type CourseTreeNode } from '../../../types/courseTree';
+import { focusRegistry } from '../../../utils/focusRegistry';
+import { parseSelectionFromUrl, selectionToUrlParam, type CourseSelection } from '../../../types/courseSelection';
 import type { Course, CourseSection, Lesson } from '@gravyty/domain';
 import { v4 as uuidv4 } from 'uuid';
 
 export function AdminCourseEditorPage() {
   const { courseId } = useParams<{ courseId: string }>();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const isNew = courseId === 'new';
   const { data, loading, error, refetch } = useAdminCourse(isNew ? null : courseId || null);
 
   // Local state
   const [course, setCourse] = useState<Course | null>(null);
   const [lessons, setLessons] = useState<Lesson[]>([]);
-  const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
-  const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
+  
+  // Inspector panel state
+  const [inspectorOpen, setInspectorOpen] = useState(false);
+  const [inspectorTab, setInspectorTab] = useState<'issues' | 'properties'>('issues');
+  
+  // Selection state - what is currently being edited
+  const [selection, setSelection] = useState<CourseSelection | null>(() => {
+    const selected = searchParams.get('selected');
+    return parseSelectionFromUrl(selected);
+  });
   const [saving, setSaving] = useState(false);
   const [savingLessons, setSavingLessons] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
@@ -57,6 +70,10 @@ export function AdminCourseEditorPage() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [publishedCourses, setPublishedCourses] = useState<Array<{ course_id: string; title: string }>>([]);
   const [discardDialogOpen, setDiscardDialogOpen] = useState(false);
+  
+  // Validation state model
+  const [hasAttemptedPublish, setHasAttemptedPublish] = useState(false);
+  const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
   
   // Debounce refs
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -131,8 +148,118 @@ export function AdminCourseEditorPage() {
     return validateCourseDraft(course, lessons);
   }, [course, lessons]);
 
-  const selectedLesson = lessons.find((l) => l.lesson_id === selectedLessonId) || null;
-  const selectedSection = course?.sections.find((s) => s.section_id === selectedSectionId) || null;
+  // Build tree from course data
+  const courseTree = useMemo(() => {
+    const allIssues = [...draftValidation.errors, ...draftValidation.warnings];
+    return buildCourseTree(course, course?.sections || [], lessons, allIssues);
+  }, [course, lessons, draftValidation]);
+
+  // Handle selection changes (for sections/lessons from outline)
+  const handleSelectNode = useCallback((nodeId: string | null) => {
+    if (!nodeId || !courseTree) {
+      setSelection(null);
+      const newParams = new URLSearchParams(searchParams);
+      newParams.delete('selected');
+      setSearchParams(newParams, { replace: true });
+      return;
+    }
+    
+    const node = findNodeById(courseTree, nodeId);
+    if (!node) return;
+    
+    // Only handle sections and lessons (not course)
+    if (node.type === 'section') {
+      const newSelection: CourseSelection = { kind: 'section', id: nodeId };
+      setSelection(newSelection);
+      const newParams = new URLSearchParams(searchParams);
+      newParams.set('selected', selectionToUrlParam(newSelection)!);
+      setSearchParams(newParams, { replace: true });
+      
+      setTimeout(() => {
+        focusRegistry.focus('section', nodeId, 'title');
+      }, 100);
+    } else if (node.type === 'lesson') {
+      const newSelection: CourseSelection = { kind: 'lesson', id: nodeId };
+      setSelection(newSelection);
+      const newParams = new URLSearchParams(searchParams);
+      newParams.set('selected', selectionToUrlParam(newSelection)!);
+      setSearchParams(newParams, { replace: true });
+      
+      setTimeout(() => {
+        focusRegistry.focus('lesson', nodeId, 'title');
+      }, 100);
+    }
+  }, [courseTree, searchParams, setSearchParams]);
+
+  // Handle course details selection
+  const handleSelectCourseDetails = useCallback(() => {
+    const newSelection: CourseSelection = { kind: 'course_details' };
+    setSelection(newSelection);
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set('selected', selectionToUrlParam(newSelection)!);
+    setSearchParams(newParams, { replace: true });
+    
+    setTimeout(() => {
+      if (course) {
+        focusRegistry.focus('course', course.course_id, 'title');
+      }
+    }, 100);
+  }, [course, searchParams, setSearchParams]);
+
+  // Get selected node (for sections/lessons)
+  const selectedNode = useMemo(() => {
+    if (!selection || selection.kind === 'course_details' || !courseTree) return null;
+    if (!selection.id) return null;
+    return findNodeById(courseTree, selection.id);
+  }, [selection, courseTree]);
+
+  // Default selection logic: course_details if missing required metadata, else no selection
+  useEffect(() => {
+    if (!course) return;
+    
+    const urlSelection = parseSelectionFromUrl(searchParams.get('selected'));
+    if (urlSelection) {
+      setSelection(urlSelection);
+      return;
+    }
+    
+    // Check if course has missing required metadata
+    const hasMissingMetadata = !course.title || !course.short_description;
+    if (hasMissingMetadata) {
+      handleSelectCourseDetails();
+    }
+    // Otherwise, no default selection (user must select section/lesson or click "Edit details")
+  }, [course?.course_id]); // Only run on initial load
+  
+  // Show inspector when there are validation errors
+  useEffect(() => {
+    if (draftValidation.errors.length > 0) {
+      setInspectorTab('issues');
+      setInspectorOpen(true);
+    } else if (inspectorTab === 'issues' && draftValidation.errors.length === 0) {
+      // Keep inspector open but don't force it closed
+    }
+  }, [draftValidation.errors.length, inspectorTab]);
+
+  // Helper to determine if inline error should be shown (only for selected node)
+  const shouldShowError = useCallback((entityType: 'course' | 'section' | 'lesson', entityId: string, fieldKey: string): boolean => {
+    // Only show errors for the selected entity
+    if (entityType === 'course') {
+      if (selection?.kind !== 'course_details') return false;
+    } else {
+      if (selection?.kind !== entityType || selection?.id !== entityId) return false;
+    }
+    
+    if (hasAttemptedPublish) return true;
+    const key = `${entityType}:${entityId}:${fieldKey}`;
+    return touchedFields.has(key);
+  }, [hasAttemptedPublish, touchedFields, selection]);
+
+  // Helper to mark field as touched
+  const markFieldTouched = useCallback((entityType: 'course' | 'section' | 'lesson', entityId: string, fieldKey: string) => {
+    const key = `${entityType}:${entityId}:${fieldKey}`;
+    setTouchedFields((prev) => new Set(prev).add(key));
+  }, []);
 
   // Debounced auto-save for course metadata
   const debouncedSaveCourse = useCallback(async (updates: Partial<Course>) => {
@@ -170,20 +297,6 @@ export function AdminCourseEditorPage() {
       debouncedSaveCourse(updates);
     }, 1000);
   }, [course, isNew, debouncedSaveCourse]);
-
-  // Lesson update handlers (triggers debounced save)
-  const handleUpdateLesson = useCallback((updates: Partial<Lesson>) => {
-    if (!selectedLesson || !course) return;
-
-    const updatedLesson = { ...selectedLesson, ...updates };
-    const updatedLessons = lessons.map((l) =>
-      l.lesson_id === selectedLesson.lesson_id ? updatedLesson : l
-    );
-    setLessons(updatedLessons);
-
-    // Trigger debounced save
-    saveLessonsStructure(false);
-  }, [selectedLesson, course, lessons, saveLessonsStructure]);
 
   // Save lessons structure to backend (with debouncing and refetch)
   const saveLessonsStructure = useCallback(async (immediate = false) => {
@@ -259,31 +372,73 @@ export function AdminCourseEditorPage() {
     }
   }, [course, lessons, isNew, refetch]);
 
+  // Auto-save on node change (debounced) - only for sections/lessons
+  useEffect(() => {
+    if (!selection || selection.kind === 'course_details' || !course || course.course_id === 'new') return;
+    
+    // Debounce save when node changes
+    const timeoutId = setTimeout(() => {
+      saveLessonsStructure(false);
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [selection?.id, course?.course_id, saveLessonsStructure]);
+
+  // Section update handler
+  const handleUpdateSection = useCallback((sectionId: string, updates: Partial<CourseSection>) => {
+    if (!course) return;
+
+    const updatedSections = course.sections.map((s) =>
+      s.section_id === sectionId ? { ...s, ...updates } : s
+    );
+    setCourse({ ...course, sections: updatedSections });
+    saveLessonsStructure(false);
+  }, [course, saveLessonsStructure]);
+
+  // Lesson update handlers (triggers debounced save)
+  const handleUpdateLesson = useCallback((updates: Partial<Lesson>) => {
+    if (!selectedNode || selectedNode.type !== 'lesson' || !course) return;
+
+    const updatedLesson = { ...selectedNode.lessonData!, ...updates };
+    const updatedLessons = lessons.map((l) =>
+      l.lesson_id === selectedNode.id ? updatedLesson : l
+    );
+    setLessons(updatedLessons);
+
+    // Trigger debounced save
+    saveLessonsStructure(false);
+  }, [selectedNode, course, lessons, saveLessonsStructure]);
+
   // Outline handlers
   const handleAddSection = () => {
     if (!course) return;
 
     const newSection: CourseSection = {
       section_id: uuidv4(),
-      title: 'New Section',
+      title: '', // Start with empty title to trigger placeholder
       order: course.sections.length,
       lesson_ids: [],
     };
 
     const updatedSections = [...course.sections, newSection];
     setCourse({ ...course, sections: updatedSections });
-    setSelectedSectionId(newSection.section_id);
+    handleSelectNode(newSection.section_id);
     saveLessonsStructure(false);
   };
 
-  const handleRenameSection = (sectionId: string, newTitle: string) => {
-    if (!course) return;
+  const handleRenameNode = (nodeId: string, newTitle: string) => {
+    if (!course || !courseTree) return;
 
-    const updatedSections = course.sections.map((s) =>
-      s.section_id === sectionId ? { ...s, title: newTitle } : s
-    );
-    setCourse({ ...course, sections: updatedSections });
-    saveLessonsStructure(false);
+    const node = findNodeById(courseTree, nodeId);
+    if (!node) return;
+
+    if (node.type === 'course') {
+      handleUpdateCourse({ title: newTitle });
+    } else if (node.type === 'section') {
+      handleUpdateSection(nodeId, { title: newTitle });
+    } else if (node.type === 'lesson') {
+      handleUpdateLesson({ title: newTitle });
+    }
   };
 
   const handleReorderSection = (sectionId: string, direction: 'up' | 'down') => {
@@ -304,30 +459,61 @@ export function AdminCourseEditorPage() {
     saveLessonsStructure(false);
   };
 
-  const handleDeleteSection = (sectionId: string) => {
-    if (!course) return;
+  const handleDeleteNode = (nodeId: string) => {
+    if (!course || !courseTree) return;
 
-    const section = course.sections.find((s) => s.section_id === sectionId);
-    if (!section) return;
+    const node = findNodeById(courseTree, nodeId);
+    if (!node) return;
 
-    // Remove lessons in this section
-    const updatedLessons = lessons.filter((l) => l.section_id !== sectionId);
-    setLessons(updatedLessons);
+    if (node.type === 'section') {
+      const section = course.sections.find((s) => s.section_id === nodeId);
+      if (!section) return;
 
-    // Remove section and reorder
-    const updatedSections = course.sections
-      .filter((s) => s.section_id !== sectionId)
-      .map((s, idx) => ({ ...s, order: idx }));
-    setCourse({ ...course, sections: updatedSections });
+      // Remove lessons in this section
+      const updatedLessons = lessons.filter((l) => l.section_id !== nodeId);
+      setLessons(updatedLessons);
 
-    if (selectedSectionId === sectionId) {
-      setSelectedSectionId(null);
+      // Remove section and reorder
+      const updatedSections = course.sections
+        .filter((s) => s.section_id !== nodeId)
+        .map((s, idx) => ({ ...s, order: idx }));
+      setCourse({ ...course, sections: updatedSections });
+
+      if (selection?.kind === 'section' && selection.id === nodeId) {
+        // Clear selection or select course details if section was selected
+        handleSelectCourseDetails();
+      }
+
+      saveLessonsStructure(false);
+    } else if (node.type === 'lesson') {
+      const lesson = lessons.find((l) => l.lesson_id === nodeId);
+      if (!lesson) return;
+
+      const section = course.sections.find((s) => s.section_id === lesson.section_id);
+      if (!section) return;
+
+      // Remove from section
+      const updatedSection = {
+        ...section,
+        lesson_ids: section.lesson_ids.filter((id) => id !== nodeId),
+      };
+      const updatedSections = course.sections.map((s) =>
+        s.section_id === section.section_id ? updatedSection : s
+      );
+      setCourse({ ...course, sections: updatedSections });
+
+      // Remove lesson
+      const updatedLessons = lessons.filter((l) => l.lesson_id !== nodeId);
+      setLessons(updatedLessons);
+
+      if (selection?.kind === 'lesson' && selection.id === nodeId) {
+        // Select parent section when lesson is deleted
+        handleSelectNode(section.section_id);
+      }
+
+      saveLessonsStructure(false);
     }
-    if (selectedLessonId && section.lesson_ids.includes(selectedLessonId)) {
-      setSelectedLessonId(null);
-    }
-
-    saveLessonsStructure(false);
+    // Course deletion not supported
   };
 
   const handleAddLesson = (sectionId: string) => {
@@ -363,7 +549,7 @@ export function AdminCourseEditorPage() {
     );
     setCourse({ ...course, sections: updatedSections });
 
-    setSelectedLessonId(newLesson.lesson_id);
+    handleSelectNode(newLesson.lesson_id);
     saveLessonsStructure(false);
   };
 
@@ -501,9 +687,12 @@ export function AdminCourseEditorPage() {
           title: course.title,
           description: course.description,
           short_description: course.short_description,
+          product: course.product,
           product_suite: course.product_suite,
-          product_concept: course.product_concept,
           topic_tags: course.topic_tags,
+          product_id: course.product_id,
+          product_suite_id: course.product_suite_id,
+          topic_tag_ids: course.topic_tag_ids,
           badges: course.badges,
         });
 
@@ -515,9 +704,12 @@ export function AdminCourseEditorPage() {
           title: course.title,
           description: course.description,
           short_description: course.short_description,
+          product: course.product,
           product_suite: course.product_suite,
-          product_concept: course.product_concept,
           topic_tags: course.topic_tags,
+          product_id: course.product_id,
+          product_suite_id: course.product_suite_id,
+          topic_tag_ids: course.topic_tag_ids,
           badges: course.badges,
           cover_image: course.cover_image,
         });
@@ -539,7 +731,33 @@ export function AdminCourseEditorPage() {
 
   // Publish
   const handlePublish = async () => {
-    if (!course || isNew || !validationResult.valid) return;
+    if (!course || isNew) return;
+
+    // Set hasAttemptedPublish to show inline errors
+    setHasAttemptedPublish(true);
+
+    // Don't proceed if validation fails
+    if (!validationResult.valid) {
+      // Show inspector with issues tab and scroll to first error
+      setInspectorTab('issues');
+      setInspectorOpen(true);
+      
+      // Find first error and navigate to it
+      const firstError = draftValidation.errors[0];
+      if (firstError && firstError.entityType && firstError.entityId) {
+        if (firstError.entityType === 'course') {
+          handleSelectCourseDetails();
+        } else {
+          handleSelectNode(firstError.entityId);
+        }
+        setTimeout(() => {
+          if (firstError.fieldKey) {
+            focusRegistry.focus(firstError.entityType!, firstError.entityId!, firstError.fieldKey);
+          }
+        }, 200);
+      }
+      return;
+    }
 
     setPublishing(true);
     setSaveError(null);
@@ -549,6 +767,9 @@ export function AdminCourseEditorPage() {
       navigate('/enablement/admin/learning/courses');
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Failed to publish course');
+      // Show inspector with issues tab on publish failure
+      setInspectorTab('issues');
+      setInspectorOpen(true);
     } finally {
       setPublishing(false);
     }
@@ -557,6 +778,14 @@ export function AdminCourseEditorPage() {
   // Preview as learner (deep-link to first lesson)
   const handlePreview = () => {
     if (!course) return;
+
+    // Set hasAttemptedPublish to show inline errors if validation fails
+    setHasAttemptedPublish(true);
+
+    // Check if course is published before previewing
+    if (course.status !== 'published') {
+      return;
+    }
 
     // Find first lesson by section order ASC, lesson order ASC
     const sortedSections = [...course.sections].sort((a, b) => a.order - b.order);
@@ -609,33 +838,6 @@ export function AdminCourseEditorPage() {
     setDiscardDialogOpen(false);
   };
 
-  // Navigate to issue in editor
-  const handleNavigateToIssue = (field: string) => {
-    // Simple navigation: scroll to top and focus relevant area
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-
-    // Try to navigate to specific areas based on field
-    if (field.startsWith('lessons[')) {
-      // Extract lesson ID from field like "lessons[lesson_123].title"
-      const match = field.match(/lessons\[([^\]]+)\]/);
-      if (match && match[1]) {
-        const lessonId = match[1];
-        setSelectedLessonId(lessonId);
-        // EditorPanel will auto-switch to lesson tab
-      }
-    } else if (field.startsWith('sections[')) {
-      // Extract section index
-      const match = field.match(/sections\[(\d+)\]/);
-      if (match && match[1]) {
-        const sectionIndex = parseInt(match[1], 10);
-        const section = course?.sections[sectionIndex];
-        if (section) {
-          setSelectedSectionId(section.section_id);
-        }
-      }
-    }
-    // For metadata fields (title, short_description, etc.), EditorPanel will show Course tab
-  };
 
   if (loading) {
     return (
@@ -683,154 +885,106 @@ export function AdminCourseEditorPage() {
 
   return (
     <Box sx={{ height: 'calc(100vh - 64px)', display: 'flex', flexDirection: 'column' }}>
-      {/* Header */}
-      <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Typography variant="h4">
-              {isNew ? 'Create Course' : `Edit Course: ${course?.title || 'Loading...'}`}
-            </Typography>
-            {(saving || savingLessons) && (
-              <Chip
-                icon={<CircularProgress size={16} />}
-                label="Saving..."
-                size="small"
-                color="primary"
-              />
-            )}
-            {!saving && !savingLessons && lastSaved && (
-              <Chip
-                icon={<SavedIcon />}
-                label={`Saved ${lastSaved.toLocaleTimeString()}`}
-                size="small"
-                color="success"
-                variant="outlined"
-              />
-            )}
-          </Box>
-          <Box sx={{ display: 'flex', gap: 1 }}>
-            {course && course.status === 'published' ? (
-              <Tooltip title="Preview course as a learner (opens first lesson)">
-                <Button
-                  variant="outlined"
-                  startIcon={<PreviewIcon />}
-                  onClick={handlePreview}
-                >
-                  Preview
-                </Button>
-              </Tooltip>
-            ) : (
-              <Tooltip title="Course must be published to preview. Publish to see the learner experience.">
-                <span>
-                  <Button
-                    variant="outlined"
-                    startIcon={<PreviewIcon />}
-                    disabled
-                  >
-                    Preview
-                  </Button>
-                </span>
-              </Tooltip>
-            )}
-            {!isNew && (
-              <Tooltip title="Discard unsaved changes and reload from server">
-                <Button
-                  variant="outlined"
-                  startIcon={<RefreshIcon />}
-                  onClick={() => setDiscardDialogOpen(true)}
-                  disabled={saving || savingLessons}
-                >
-                  Discard Changes
-                </Button>
-              </Tooltip>
-            )}
+      {/* Minimal top banner - only show on publish attempt */}
+      {hasAttemptedPublish && !validationResult.valid && validationResult.errors.length > 0 && (
+        <Alert 
+          severity="error" 
+          sx={{ m: 2, py: 0.5 }}
+          action={
             <Button
-              variant="contained"
-              startIcon={<SaveIcon />}
-              onClick={handleSave}
-              disabled={saving || !course?.title}
+              size="small"
+              onClick={() => {
+                setInspectorTab('issues');
+                setInspectorOpen(true);
+              }}
             >
-              {saving ? 'Saving...' : 'Save Draft'}
+              View issues
             </Button>
-            {!isNew && data?.is_draft && (
-              <Button
-                variant="contained"
-                color="success"
-                startIcon={<PublishIcon />}
-                onClick={handlePublish}
-                disabled={publishing || !validationResult.valid}
-              >
-                {publishing ? 'Publishing...' : 'Publish'}
-              </Button>
-            )}
-            <Button onClick={() => navigate('/enablement/admin/learning/courses')}>
-              Cancel
-            </Button>
-          </Box>
-        </Box>
+          }
+        >
+          <Typography variant="body2">
+            {validationResult.errors.length} issue{validationResult.errors.length !== 1 ? 's' : ''} must be fixed before publishing
+          </Typography>
+        </Alert>
+      )}
 
-        {saveError && (
-          <Alert severity="error" sx={{ mb: 1 }}>
-            {saveError}
-          </Alert>
-        )}
+      {saveError && (
+        <Alert severity="error" sx={{ m: 2 }}>
+          {saveError}
+        </Alert>
+      )}
 
-        {!validationResult.valid && (
-          <Alert severity="warning">
-            {getValidationSummary(validationResult)}. Please fix errors before publishing.
-          </Alert>
-        )}
-      </Box>
-
-      {/* Main Content */}
-      <Box sx={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-        {/* Left: Outline */}
-        <Box sx={{ width: 300, borderRight: 1, borderColor: 'divider' }}>
-          {course && (
-            <OutlinePanel
-              sections={course.sections}
-              lessons={lessons}
-              selectedLessonId={selectedLessonId}
-              onSelectLesson={setSelectedLessonId}
-              onAddSection={handleAddSection}
-              onRenameSection={handleRenameSection}
-              onReorderSection={handleReorderSection}
-              onDeleteSection={handleDeleteSection}
-              onAddLesson={handleAddLesson}
-              onReorderLesson={handleReorderLesson}
-              onMoveLesson={handleMoveLesson}
-              onDeleteLesson={handleDeleteLesson}
-            />
-          )}
-        </Box>
-
-        {/* Center: Editor */}
-        <Box sx={{ flex: 1, overflow: 'auto' }}>
-          {course && (
-            <EditorPanel
-              course={course}
-              selectedSection={selectedSection}
-              selectedLesson={selectedLesson}
-              publishedCourses={publishedCourses}
-              onUpdateCourse={handleUpdateCourse}
-              onUpdateLesson={handleUpdateLesson}
-            />
-          )}
-        </Box>
-
-        {/* Right: Publish Readiness Panel */}
-        <Box sx={{ width: 300, borderLeft: 1, borderColor: 'divider', overflow: 'auto', p: 2 }}>
-          {course && (
-            <PublishReadinessPanel
-              entityType="course"
-              errors={validationResult.errors}
-              warnings={draftValidation.warnings.map((w) => ({ field: w.field, message: w.message }))}
-              status={course.status}
-              onNavigateToIssue={handleNavigateToIssue}
-            />
-          )}
-        </Box>
-      </Box>
+      {/* Main Content - 3-column layout */}
+      {courseTree && course && (
+        <CourseAuthoringLayout
+          outline={
+            <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+              {/* Content Outline - no course card */}
+              <TreeOutlinePanel
+                tree={courseTree}
+                selectedNodeId={selection?.kind === 'section' || selection?.kind === 'lesson' ? selection.id || null : null}
+                onSelectNode={handleSelectNode}
+                onAddSection={handleAddSection}
+                onAddLesson={handleAddLesson}
+                onRenameNode={handleRenameNode}
+                onDeleteNode={handleDeleteNode}
+                onReorderNode={(nodeId, direction) => {
+                  // Stub for now - can implement later
+                  console.log('Reorder node', nodeId, direction);
+                }}
+                shouldShowError={shouldShowError}
+                markFieldTouched={markFieldTouched}
+              />
+            </Box>
+          }
+          editor={
+            <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }} data-course-editor>
+              <EditorPanel
+                course={course}
+                selection={selection}
+                selectedNode={selectedNode}
+                publishedCourses={publishedCourses}
+                onUpdateCourse={handleUpdateCourse}
+                onUpdateSection={handleUpdateSection}
+                onUpdateLesson={handleUpdateLesson}
+                onAddLesson={handleAddLesson}
+                shouldShowError={shouldShowError}
+                markFieldTouched={markFieldTouched}
+                // Header props
+                isNew={isNew}
+                saving={saving || savingLessons}
+                lastSaved={lastSaved}
+                publishing={publishing}
+                onSave={handleSave}
+                onPublish={handlePublish}
+                onPreview={handlePreview}
+                onDiscardChanges={() => setDiscardDialogOpen(true)}
+                onCancel={() => navigate('/enablement/admin/learning/courses')}
+                issuesCount={draftValidation.errors.length}
+                onOpenInspector={(tab) => {
+                  setInspectorTab(tab);
+                  setInspectorOpen(true);
+                }}
+              />
+            </Box>
+          }
+          contextPanel={
+            inspectorOpen ? (
+              <Inspector
+                selectedNode={selection?.kind === 'course_details' ? courseTree : selectedNode}
+                course={course}
+                validationIssues={[...draftValidation.errors, ...draftValidation.warnings]}
+                courseTree={courseTree}
+                onSelectCourseDetails={handleSelectCourseDetails}
+                onSelectNode={handleSelectNode}
+                defaultTab={inspectorTab}
+              />
+            ) : null
+          }
+          contextPanelOpen={inspectorOpen}
+          onContextPanelToggle={() => setInspectorOpen(!inspectorOpen)}
+        />
+      )}
 
       {/* Discard Changes Dialog */}
       <Dialog open={discardDialogOpen} onClose={() => setDiscardDialogOpen(false)}>

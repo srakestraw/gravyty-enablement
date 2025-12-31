@@ -202,3 +202,89 @@ export const notificationsApi = {
   },
 };
 
+/**
+ * Admin Users API
+ */
+export interface AdminUser {
+  username: string;
+  email: string;
+  name?: string;
+  role: 'Viewer' | 'Contributor' | 'Approver' | 'Admin';
+  enabled: boolean;
+  user_status: 'UNCONFIRMED' | 'CONFIRMED' | 'ARCHIVED' | 'COMPROMISED' | 'UNKNOWN' | 'RESET_REQUIRED' | 'FORCE_CHANGE_PASSWORD';
+  created_at: string;
+  modified_at: string;
+  groups: string[];
+}
+
+export interface ListUsersParams {
+  query?: string;
+  limit?: number;
+  cursor?: string;
+}
+
+export interface ListUsersResponse {
+  items: AdminUser[];
+  next_cursor?: string;
+}
+
+export interface InviteUserPayload {
+  email: string;
+  name?: string;
+  role?: 'Viewer' | 'Contributor' | 'Approver' | 'Admin';
+}
+
+export const usersApi = {
+  /**
+   * GET /v1/admin/users
+   */
+  listUsers: async (params?: ListUsersParams): Promise<ApiResponse<ListUsersResponse>> => {
+    const queryParams = new URLSearchParams();
+    if (params?.query) queryParams.append('query', params.query);
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.cursor) queryParams.append('cursor', params.cursor);
+
+    const queryString = queryParams.toString();
+    const endpoint = `/v1/admin/users${queryString ? `?${queryString}` : ''}`;
+    return apiFetch<ListUsersResponse>(endpoint);
+  },
+
+  /**
+   * POST /v1/admin/users/invite
+   */
+  inviteUser: async (payload: InviteUserPayload): Promise<ApiResponse<AdminUser>> => {
+    return apiFetch<AdminUser>('/v1/admin/users/invite', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  /**
+   * PATCH /v1/admin/users/:username/role
+   */
+  setUserRole: async (username: string, role: 'Viewer' | 'Contributor' | 'Approver' | 'Admin'): Promise<ApiResponse<AdminUser>> => {
+    return apiFetch<AdminUser>(`/v1/admin/users/${encodeURIComponent(username)}/role`, {
+      method: 'PATCH',
+      body: JSON.stringify({ role }),
+    });
+  },
+
+  /**
+   * PATCH /v1/admin/users/:username/enable
+   */
+  enableUser: async (username: string): Promise<ApiResponse<AdminUser>> => {
+    return apiFetch<AdminUser>(`/v1/admin/users/${encodeURIComponent(username)}/enable`, {
+      method: 'PATCH',
+    });
+  },
+
+  /**
+   * PATCH /v1/admin/users/:username/disable
+   */
+  disableUser: async (username: string): Promise<ApiResponse<AdminUser>> => {
+    return apiFetch<AdminUser>(`/v1/admin/users/${encodeURIComponent(username)}/disable`, {
+      method: 'PATCH',
+    });
+  },
+};
+

@@ -46,9 +46,19 @@ export const CourseSchema = z.object({
     description: z.string().optional(),
     short_description: z.string().optional(), // For cards/lists
     // Categorization
-    product_suite: z.string().optional(),
-    product_concept: z.string().optional(),
+    // New field names (preferred)
+    product: z.string().optional(), // Was "product_suite"
+    product_suite: z.string().optional(), // Was "product_concept"
     topic_tags: z.array(z.string()).default([]),
+    product_id: z.string().optional(), // Was "product_suite_id"
+    product_suite_id: z.string().optional(), // Was "product_concept_id"
+    topic_tag_ids: z.array(z.string()).default([]),
+    // Legacy fields (for backward compatibility - will be normalized on read)
+    // These are kept in schema but should not be written going forward
+    legacy_product_suite: z.string().optional(), // Old product_suite -> maps to product
+    legacy_product_concept: z.string().optional(), // Old product_concept -> maps to product_suite
+    legacy_product_suite_id: z.string().optional(), // Old product_suite_id -> maps to product_id
+    legacy_product_concept_id: z.string().optional(), // Old product_concept_id -> maps to product_suite_id
     related_course_ids: z.array(z.string()).default([]), // Manual related courses
     // Media
     cover_image: MediaRefSchema.optional(),

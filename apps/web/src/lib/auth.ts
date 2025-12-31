@@ -43,9 +43,8 @@ if (userPoolDomainInput) {
   }
 }
 
-// Debug logging for domain construction (only in browser, not during build)
-// This will help troubleshoot domain issues in production
-if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+// Debug logging for domain construction (dev mode only)
+if (import.meta.env.DEV && typeof window !== 'undefined' && typeof document !== 'undefined') {
   try {
     console.log('[Auth] Domain configuration:', {
       userPoolDomainInput,
@@ -145,17 +144,19 @@ if (userPoolId && userPoolClientId && userPoolDomain) {
     });
     isConfigured = true;
     
-    // Log configuration in both dev and production for debugging
-    console.log('[Auth] Amplify configured successfully', {
-      environment: isProduction ? 'production' : 'development',
-      userPoolId,
-      userPoolClientId,
-      domain: validatedDomain,
-      domainInput: userPoolDomainInput,
-      cognitoRegion,
-      currentOrigin,
-      redirectSignIn: redirectSignIn.slice(0, 2), // Log first 2 URLs only
-    });
+    // Log configuration in dev mode only
+    if (import.meta.env.DEV) {
+        console.log('[Auth] Amplify configured successfully', {
+          environment: isProduction ? 'production' : 'development',
+          userPoolId,
+          userPoolClientId,
+          domain: validatedDomain,
+          domainInput: userPoolDomainInput,
+          cognitoRegion,
+          currentOrigin,
+          redirectSignIn: redirectSignIn.slice(0, 2), // Log first 2 URLs only
+        });
+      }
   } catch (error) {
     console.error('[Auth] Failed to configure Amplify:', error, {
       userPoolId,

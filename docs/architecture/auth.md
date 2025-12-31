@@ -199,9 +199,53 @@ See the detailed guide: [Google OAuth Setup Runbook](../runbooks/google-oauth-se
 
 ## User Management
 
+### Admin Users & Roles Module
+
+The Admin Users & Roles module provides a web interface for managing users and their role assignments. It is backed by Cognito groups and provides full CRUD operations for user management.
+
+**Access**: Admin-only (protected by `requireRole('Admin')` middleware)
+
+**Features**:
+- List users with search and filtering
+- Invite new users via email
+- Change user roles (Viewer, Contributor, Approver, Admin)
+- Enable/disable user accounts
+- Audit trail for all admin actions
+
+**API Endpoints** (all require Admin role):
+- `GET /v1/admin/users` - List users with pagination
+- `POST /v1/admin/users/invite` - Invite new user
+- `PATCH /v1/admin/users/:username/role` - Update user role
+- `PATCH /v1/admin/users/:username/enable` - Enable user account
+- `PATCH /v1/admin/users/:username/disable` - Disable user account
+
+**Role Management**:
+- Users can only belong to one role group at a time
+- Changing a user's role removes them from their current role group and adds them to the new group
+- Role groups: Viewer, Contributor, Approver, Admin (in order of precedence)
+
+**Audit Trail**:
+All admin actions emit audit events to `/v1/events`:
+- `admin_users_invite` - User invitation
+- `admin_users_role_change` - Role changes
+- `admin_users_enable` - User enabled
+- `admin_users_disable` - User disabled
+
+Each audit event includes:
+- `actor`: Current admin user ID/email
+- `target_username`, `target_email`: Target user information
+- `old_role`, `new_role`: Role change details (when applicable)
+- `enabled_before`, `enabled_after`: Status change details (when applicable)
+
+**Dev Fallback**:
+When `COGNITO_USER_POOL_ID` is not configured, the API uses an in-memory user store with stub users for UI development.
+
 ### Assigning Users to Groups
 
-Users can be assigned to groups via AWS Console or CLI:
+Users can be assigned to groups via:
+1. **Admin UI**: Use the Users & Roles page in the web app
+2. **AWS Console**: Cognito User Pool → Users → Select user → Groups tab
+3. **CLI**:
 
 ```bash
 # Add user to Contributor group

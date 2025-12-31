@@ -4,6 +4,34 @@ import { z } from 'zod';
  */
 export const UserRoleSchema = z.enum(['Viewer', 'Contributor', 'Approver', 'Admin']);
 /**
+ * Cognito User Status
+ */
+export const CognitoUserStatusSchema = z.enum([
+    'UNCONFIRMED',
+    'CONFIRMED',
+    'ARCHIVED',
+    'COMPROMISED',
+    'UNKNOWN',
+    'RESET_REQUIRED',
+    'FORCE_CHANGE_PASSWORD',
+]);
+/**
+ * Admin User
+ *
+ * Represents a user in the admin context with role and status information.
+ */
+export const AdminUserSchema = z.object({
+    username: z.string(),
+    email: z.string().email(),
+    name: z.string().optional(),
+    role: UserRoleSchema,
+    enabled: z.boolean(),
+    user_status: CognitoUserStatusSchema,
+    created_at: z.string(),
+    modified_at: z.string(),
+    groups: z.array(z.string()),
+});
+/**
  * Content Status
  */
 export const ContentStatusSchema = z.enum(['Draft', 'Approved', 'Deprecated', 'Expired']);
@@ -15,12 +43,21 @@ export const ContentItemSchema = z.object({
     status: ContentStatusSchema,
     title: z.string(),
     summary: z.string(),
-    product_suite: z.string().optional(),
-    product_concept: z.string().optional(),
+    // New field names (preferred)
+    product: z.string().optional(), // Was "product_suite"
+    product_suite: z.string().optional(), // Was "product_concept"
+    tags: z.array(z.string()),
+    product_id: z.string().optional(), // Was "product_suite_id"
+    product_suite_id: z.string().optional(), // Was "product_concept_id"
+    topic_tag_ids: z.array(z.string()).default([]),
+    // Legacy fields (for backward compatibility - will be normalized on read)
+    legacy_product_suite: z.string().optional(), // Old product_suite -> maps to product
+    legacy_product_concept: z.string().optional(), // Old product_concept -> maps to product_suite
+    legacy_product_suite_id: z.string().optional(), // Old product_suite_id -> maps to product_id
+    legacy_product_concept_id: z.string().optional(), // Old product_concept_id -> maps to product_suite_id
     audience_role: z.string().optional(),
     lifecycle_stage: z.string().optional(),
     owner_user_id: z.string(),
-    tags: z.array(z.string()),
     version: z.string(),
     last_updated: z.string(),
     review_due_date: z.string().optional(),
@@ -36,7 +73,8 @@ export const ContentItemSchema = z.object({
     uploaded_at: z.string().optional(),
     // GSI attributes (for querying)
     status_last_updated: z.string().optional(), // For GSI1
-    product_suite_concept: z.string().optional(), // For GSI2
+    product_suite_concept: z.string().optional(), // For GSI2 (legacy - maps to product#product_suite)
+    product_product_suite: z.string().optional(), // For GSI2 (new - product#product_suite)
 });
 /**
  * Notification

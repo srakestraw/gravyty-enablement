@@ -131,8 +131,8 @@ export function LearningPathDetailPage() {
         )}
         
         <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
+          {path.product && <Chip label={path.product} />}
           {path.product_suite && <Chip label={path.product_suite} />}
-          {path.product_concept && <Chip label={path.product_concept} />}
           {path.estimated_duration_minutes && (
             <Chip label={`${path.estimated_duration_minutes} min`} />
           )}

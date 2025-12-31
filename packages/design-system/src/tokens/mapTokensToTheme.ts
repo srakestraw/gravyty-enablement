@@ -216,21 +216,51 @@ export function mapTokensToTheme(tokens: TokenFile): ThemeOptions {
   // Build shadows - MUI requires exactly 25 shadows
   const defaultMuiShadows = [
     'none',
-    '0px 1px 2px 0px rgba(0, 0, 0, 0.05)',
-    '0px 1px 3px 0px rgba(0, 0, 0, 0.1), 0px 1px 2px 0px rgba(0, 0, 0, 0.06)',
-    '0px 4px 6px -1px rgba(0, 0, 0, 0.1), 0px 2px 4px -1px rgba(0, 0, 0, 0.06)',
-    '0px 10px 15px -3px rgba(0, 0, 0, 0.1), 0px 4px 6px -2px rgba(0, 0, 0, 0.05)',
-    '0px 20px 25px -5px rgba(0, 0, 0, 0.1), 0px 10px 10px -5px rgba(0, 0, 0, 0.04)',
-    '0px 25px 50px -12px rgba(0, 0, 0, 0.25)',
+    // Shadow levels based on elevation system
+    '0px 1px 2px 0px rgba(0, 0, 0, 0.05)', // Elevation 1
+    '0px 1px 3px 0px rgba(0, 0, 0, 0.1), 0px 1px 2px 0px rgba(0, 0, 0, 0.06)', // Elevation 2
+    '0px 4px 6px -1px rgba(0, 0, 0, 0.1), 0px 2px 4px -1px rgba(0, 0, 0, 0.06)', // Elevation 3
+    '0px 10px 15px -3px rgba(0, 0, 0, 0.1), 0px 4px 6px -2px rgba(0, 0, 0, 0.05)', // Elevation 4
+    '0px 20px 25px -5px rgba(0, 0, 0, 0.1), 0px 10px 10px -5px rgba(0, 0, 0, 0.04)', // Elevation 5
+    '0px 25px 50px -12px rgba(0, 0, 0, 0.25)', // Elevation 6
+    // Additional elevation levels for MUI compatibility
+    '0px 1px 3px 0px rgba(0, 0, 0, 0.12), 0px 1px 1px 0px rgba(0, 0, 0, 0.14), 0px 2px 1px -1px rgba(0, 0, 0, 0.2)', // Elevation 7
+    '0px 1px 5px 0px rgba(0, 0, 0, 0.12), 0px 2px 2px 0px rgba(0, 0, 0, 0.14), 0px 3px 1px -2px rgba(0, 0, 0, 0.2)', // Elevation 8
+    '0px 2px 4px -1px rgba(0, 0, 0, 0.12), 0px 4px 5px 0px rgba(0, 0, 0, 0.14), 0px 1px 10px 0px rgba(0, 0, 0, 0.12)', // Elevation 9
+    '0px 3px 5px -1px rgba(0, 0, 0, 0.12), 0px 5px 8px 0px rgba(0, 0, 0, 0.14), 0px 1px 14px 0px rgba(0, 0, 0, 0.12)', // Elevation 10
+    '0px 3px 5px -1px rgba(0, 0, 0, 0.12), 0px 6px 10px 0px rgba(0, 0, 0, 0.14), 0px 1px 18px 0px rgba(0, 0, 0, 0.12)', // Elevation 11
+    '0px 4px 5px -2px rgba(0, 0, 0, 0.12), 0px 7px 10px 1px rgba(0, 0, 0, 0.14), 0px 2px 16px 1px rgba(0, 0, 0, 0.12)', // Elevation 12
+    '0px 5px 5px -3px rgba(0, 0, 0, 0.12), 0px 8px 10px 1px rgba(0, 0, 0, 0.14), 0px 3px 14px 2px rgba(0, 0, 0, 0.12)', // Elevation 13
+    '0px 5px 6px -3px rgba(0, 0, 0, 0.12), 0px 9px 12px 1px rgba(0, 0, 0, 0.14), 0px 3px 16px 2px rgba(0, 0, 0, 0.12)', // Elevation 14
+    '0px 6px 6px -3px rgba(0, 0, 0, 0.12), 0px 10px 14px 1px rgba(0, 0, 0, 0.14), 0px 4px 18px 3px rgba(0, 0, 0, 0.12)', // Elevation 15
+    '0px 6px 7px -4px rgba(0, 0, 0, 0.12), 0px 11px 15px 1px rgba(0, 0, 0, 0.14), 0px 4px 20px 3px rgba(0, 0, 0, 0.12)', // Elevation 16
+    '0px 7px 8px -4px rgba(0, 0, 0, 0.12), 0px 12px 17px 2px rgba(0, 0, 0, 0.14), 0px 5px 22px 4px rgba(0, 0, 0, 0.12)', // Elevation 17
+    '0px 7px 9px -4px rgba(0, 0, 0, 0.12), 0px 13px 19px 2px rgba(0, 0, 0, 0.14), 0px 5px 24px 4px rgba(0, 0, 0, 0.12)', // Elevation 18
+    '0px 8px 9px -5px rgba(0, 0, 0, 0.12), 0px 14px 21px 2px rgba(0, 0, 0, 0.14), 0px 6px 26px 5px rgba(0, 0, 0, 0.12)', // Elevation 19
+    '0px 8px 10px -5px rgba(0, 0, 0, 0.12), 0px 15px 23px 2px rgba(0, 0, 0, 0.14), 0px 6px 28px 5px rgba(0, 0, 0, 0.12)', // Elevation 20
+    '0px 9px 11px -5px rgba(0, 0, 0, 0.12), 0px 16px 25px 2px rgba(0, 0, 0, 0.14), 0px 6px 30px 5px rgba(0, 0, 0, 0.12)', // Elevation 21
+    '0px 9px 12px -6px rgba(0, 0, 0, 0.12), 0px 17px 27px 2px rgba(0, 0, 0, 0.14), 0px 7px 32px 6px rgba(0, 0, 0, 0.12)', // Elevation 22
+    '0px 10px 13px -6px rgba(0, 0, 0, 0.12), 0px 18px 29px 2px rgba(0, 0, 0, 0.14), 0px 7px 34px 6px rgba(0, 0, 0, 0.12)', // Elevation 23
+    '0px 10px 14px -6px rgba(0, 0, 0, 0.12), 0px 19px 31px 2px rgba(0, 0, 0, 0.14), 0px 8px 36px 7px rgba(0, 0, 0, 0.12)', // Elevation 24
   ];
 
   const customShadows = Object.values(shadows).map((shadow) => resolveTokenValue(shadow));
-  const themeShadows: ThemeOptions['shadows'] = [
-    'none',
-    ...customShadows,
-    // Fill remaining slots with default MUI shadows if needed
-    ...defaultMuiShadows.slice(1),
-  ].slice(0, 25) as ThemeOptions['shadows'];
+  
+  // Ensure we always have exactly 25 shadows (indices 0-24) for MUI compatibility
+  // If custom shadows are provided, use them; otherwise use all default shadows
+  const themeShadows: ThemeOptions['shadows'] = (() => {
+    if (customShadows.length > 0) {
+      // Custom shadows provided: use them + pad with defaults to reach 25
+      const combined = [
+        'none',
+        ...customShadows,
+        ...defaultMuiShadows.slice(1 + customShadows.length),
+      ];
+      return combined.slice(0, 25) as ThemeOptions['shadows'];
+    }
+    // No custom shadows: use all default shadows (guaranteed 25)
+    return defaultMuiShadows.slice(0, 25) as ThemeOptions['shadows'];
+  })();
 
   return {
     palette: themePalette,

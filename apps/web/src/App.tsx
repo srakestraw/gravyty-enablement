@@ -59,6 +59,7 @@ import { AdminLearningCertificatesPage } from './pages/admin/learning/AdminLearn
 import { AdminLearningMediaPage } from './pages/admin/learning/AdminLearningMediaPage';
 import { AdminTaxonomyPage } from './pages/admin/learning/AdminTaxonomyPage';
 import { AdminTaxonomyDetailPage } from './pages/admin/learning/AdminTaxonomyDetailPage';
+import { AdminTaxonomyMigrationPage } from './pages/admin/learning/AdminTaxonomyMigrationPage';
 
 const RETURN_TO_KEY = 'enablement_return_to';
 
@@ -632,6 +633,18 @@ function App() {
             <RequireAdmin>
               <AppShell>
                 <AdminTaxonomyDetailPage />
+              </AppShell>
+            </RequireAdmin>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/enablement/admin/learning/taxonomy/migration"
+        element={
+          <RequireAuth>
+            <RequireAdmin>
+              <AppShell>
+                <AdminTaxonomyMigrationPage />
               </AppShell>
             </RequireAdmin>
           </RequireAuth>

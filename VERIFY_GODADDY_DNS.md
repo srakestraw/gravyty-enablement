@@ -74,3 +74,4 @@ If the certificate validation record is missing:
 4. **Check status** - Should change from "SSL configuration" to "Domain activation"
 
 
+

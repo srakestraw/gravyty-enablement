@@ -15,8 +15,8 @@ export declare const CourseSummarySchema: z.ZodObject<{
     title: z.ZodString;
     short_description: z.ZodOptional<z.ZodString>;
     cover_image_url: z.ZodOptional<z.ZodString>;
+    product: z.ZodOptional<z.ZodString>;
     product_suite: z.ZodOptional<z.ZodString>;
-    product_concept: z.ZodOptional<z.ZodString>;
     topic_tags: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
     estimated_duration_minutes: z.ZodOptional<z.ZodNumber>;
     difficulty_level: z.ZodOptional<z.ZodEnum<["beginner", "intermediate", "advanced"]>>;
@@ -27,8 +27,8 @@ export declare const CourseSummarySchema: z.ZodObject<{
     title: string;
     course_id: string;
     topic_tags: string[];
+    product?: string | undefined;
     product_suite?: string | undefined;
-    product_concept?: string | undefined;
     short_description?: string | undefined;
     published_at?: string | undefined;
     estimated_duration_minutes?: number | undefined;
@@ -38,8 +38,8 @@ export declare const CourseSummarySchema: z.ZodObject<{
     status: "draft" | "published" | "archived";
     title: string;
     course_id: string;
+    product?: string | undefined;
     product_suite?: string | undefined;
-    product_concept?: string | undefined;
     short_description?: string | undefined;
     topic_tags?: string[] | undefined;
     published_at?: string | undefined;
@@ -58,9 +58,16 @@ export declare const CourseDetailSchema: z.ZodObject<{
     title: z.ZodString;
     description: z.ZodOptional<z.ZodString>;
     short_description: z.ZodOptional<z.ZodString>;
+    product: z.ZodOptional<z.ZodString>;
     product_suite: z.ZodOptional<z.ZodString>;
-    product_concept: z.ZodOptional<z.ZodString>;
     topic_tags: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
+    product_id: z.ZodOptional<z.ZodString>;
+    product_suite_id: z.ZodOptional<z.ZodString>;
+    topic_tag_ids: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
+    legacy_product_suite: z.ZodOptional<z.ZodString>;
+    legacy_product_concept: z.ZodOptional<z.ZodString>;
+    legacy_product_suite_id: z.ZodOptional<z.ZodString>;
+    legacy_product_concept_id: z.ZodOptional<z.ZodString>;
     related_course_ids: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
     cover_image: z.ZodOptional<z.ZodObject<{
         media_id: z.ZodString;
@@ -114,13 +121,13 @@ export declare const CourseDetailSchema: z.ZodObject<{
         description: z.ZodOptional<z.ZodString>;
         icon_url: z.ZodOptional<z.ZodString>;
     }, "strip", z.ZodTypeAny, {
-        badge_id: string;
         name: string;
+        badge_id: string;
         description?: string | undefined;
         icon_url?: string | undefined;
     }, {
-        badge_id: string;
         name: string;
+        badge_id: string;
         description?: string | undefined;
         icon_url?: string | undefined;
     }>, "many">>;
@@ -196,16 +203,17 @@ export declare const CourseDetailSchema: z.ZodObject<{
     }>, "many">;
 }, "strip", z.ZodTypeAny, {
     status: "draft" | "published" | "archived";
-    title: string;
-    version: number;
     created_at: string;
+    title: string;
+    topic_tag_ids: string[];
+    version: number;
     created_by: string;
     course_id: string;
     topic_tags: string[];
     related_course_ids: string[];
     badges: {
-        badge_id: string;
         name: string;
+        badge_id: string;
         description?: string | undefined;
         icon_url?: string | undefined;
     }[];
@@ -226,8 +234,14 @@ export declare const CourseDetailSchema: z.ZodObject<{
     }[];
     updated_at: string;
     updated_by: string;
+    product?: string | undefined;
     product_suite?: string | undefined;
-    product_concept?: string | undefined;
+    product_id?: string | undefined;
+    product_suite_id?: string | undefined;
+    legacy_product_suite?: string | undefined;
+    legacy_product_concept?: string | undefined;
+    legacy_product_suite_id?: string | undefined;
+    legacy_product_concept_id?: string | undefined;
     description?: string | undefined;
     short_description?: string | undefined;
     cover_image?: {
@@ -253,8 +267,8 @@ export declare const CourseDetailSchema: z.ZodObject<{
     difficulty_level?: "beginner" | "intermediate" | "advanced" | undefined;
 }, {
     status: "draft" | "published" | "archived";
-    title: string;
     created_at: string;
+    title: string;
     created_by: string;
     course_id: string;
     sections: {
@@ -274,8 +288,15 @@ export declare const CourseDetailSchema: z.ZodObject<{
     }[];
     updated_at: string;
     updated_by: string;
+    product?: string | undefined;
     product_suite?: string | undefined;
-    product_concept?: string | undefined;
+    product_id?: string | undefined;
+    product_suite_id?: string | undefined;
+    topic_tag_ids?: string[] | undefined;
+    legacy_product_suite?: string | undefined;
+    legacy_product_concept?: string | undefined;
+    legacy_product_suite_id?: string | undefined;
+    legacy_product_concept_id?: string | undefined;
     version?: number | undefined;
     description?: string | undefined;
     short_description?: string | undefined;
@@ -298,8 +319,8 @@ export declare const CourseDetailSchema: z.ZodObject<{
         thumbnail_url?: string | undefined;
     } | undefined;
     badges?: {
-        badge_id: string;
         name: string;
+        badge_id: string;
         description?: string | undefined;
         icon_url?: string | undefined;
     }[] | undefined;
@@ -488,8 +509,8 @@ export declare const LessonDetailSchema: z.ZodObject<{
     }>, "many">>;
 }, "strip", z.ZodTypeAny, {
     type: "video" | "reading" | "quiz" | "assignment" | "interactive";
-    title: string;
     created_at: string;
+    title: string;
     created_by: string;
     section_id: string;
     order: number;
@@ -553,8 +574,8 @@ export declare const LessonDetailSchema: z.ZodObject<{
     } | undefined;
 }, {
     type: "video" | "reading" | "quiz" | "assignment" | "interactive";
-    title: string;
     created_at: string;
+    title: string;
     created_by: string;
     section_id: string;
     order: number;
@@ -627,8 +648,8 @@ export declare const LearningPathSummarySchema: z.ZodObject<{
     path_id: z.ZodString;
     title: z.ZodString;
     short_description: z.ZodOptional<z.ZodString>;
+    product: z.ZodOptional<z.ZodString>;
     product_suite: z.ZodOptional<z.ZodString>;
-    product_concept: z.ZodOptional<z.ZodString>;
     topic_tags: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
     estimated_duration_minutes: z.ZodOptional<z.ZodNumber>;
     course_count: z.ZodDefault<z.ZodNumber>;
@@ -640,8 +661,8 @@ export declare const LearningPathSummarySchema: z.ZodObject<{
     topic_tags: string[];
     path_id: string;
     course_count: number;
+    product?: string | undefined;
     product_suite?: string | undefined;
-    product_concept?: string | undefined;
     short_description?: string | undefined;
     published_at?: string | undefined;
     estimated_duration_minutes?: number | undefined;
@@ -649,8 +670,8 @@ export declare const LearningPathSummarySchema: z.ZodObject<{
     status: "draft" | "published" | "archived";
     title: string;
     path_id: string;
+    product?: string | undefined;
     product_suite?: string | undefined;
-    product_concept?: string | undefined;
     short_description?: string | undefined;
     topic_tags?: string[] | undefined;
     published_at?: string | undefined;
@@ -667,8 +688,8 @@ export declare const PathSummarySchema: z.ZodObject<{
     path_id: z.ZodString;
     title: z.ZodString;
     short_description: z.ZodOptional<z.ZodString>;
+    product: z.ZodOptional<z.ZodString>;
     product_suite: z.ZodOptional<z.ZodString>;
-    product_concept: z.ZodOptional<z.ZodString>;
     topic_tags: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
     estimated_duration_minutes: z.ZodOptional<z.ZodNumber>;
     course_count: z.ZodDefault<z.ZodNumber>;
@@ -709,8 +730,8 @@ export declare const PathSummarySchema: z.ZodObject<{
     topic_tags: string[];
     path_id: string;
     course_count: number;
+    product?: string | undefined;
     product_suite?: string | undefined;
-    product_concept?: string | undefined;
     short_description?: string | undefined;
     published_at?: string | undefined;
     estimated_duration_minutes?: number | undefined;
@@ -728,8 +749,8 @@ export declare const PathSummarySchema: z.ZodObject<{
     status: "draft" | "published" | "archived";
     title: string;
     path_id: string;
+    product?: string | undefined;
     product_suite?: string | undefined;
-    product_concept?: string | undefined;
     short_description?: string | undefined;
     topic_tags?: string[] | undefined;
     published_at?: string | undefined;
@@ -757,9 +778,16 @@ export declare const LearningPathDetailSchema: z.ZodObject<{
     title: z.ZodString;
     description: z.ZodOptional<z.ZodString>;
     short_description: z.ZodOptional<z.ZodString>;
+    product: z.ZodOptional<z.ZodString>;
     product_suite: z.ZodOptional<z.ZodString>;
-    product_concept: z.ZodOptional<z.ZodString>;
     topic_tags: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
+    product_id: z.ZodOptional<z.ZodString>;
+    product_suite_id: z.ZodOptional<z.ZodString>;
+    topic_tag_ids: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
+    legacy_product_suite: z.ZodOptional<z.ZodString>;
+    legacy_product_concept: z.ZodOptional<z.ZodString>;
+    legacy_product_suite_id: z.ZodOptional<z.ZodString>;
+    legacy_product_concept_id: z.ZodOptional<z.ZodString>;
     badges: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
     status: z.ZodEnum<["draft", "published", "archived"]>;
     version: z.ZodDefault<z.ZodNumber>;
@@ -783,8 +811,8 @@ export declare const LearningPathDetailSchema: z.ZodObject<{
             title: z.ZodString;
             short_description: z.ZodOptional<z.ZodString>;
             cover_image_url: z.ZodOptional<z.ZodString>;
+            product: z.ZodOptional<z.ZodString>;
             product_suite: z.ZodOptional<z.ZodString>;
-            product_concept: z.ZodOptional<z.ZodString>;
             topic_tags: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
             estimated_duration_minutes: z.ZodOptional<z.ZodNumber>;
             difficulty_level: z.ZodOptional<z.ZodEnum<["beginner", "intermediate", "advanced"]>>;
@@ -795,8 +823,8 @@ export declare const LearningPathDetailSchema: z.ZodObject<{
             title: string;
             course_id: string;
             topic_tags: string[];
+            product?: string | undefined;
             product_suite?: string | undefined;
-            product_concept?: string | undefined;
             short_description?: string | undefined;
             published_at?: string | undefined;
             estimated_duration_minutes?: number | undefined;
@@ -806,8 +834,8 @@ export declare const LearningPathDetailSchema: z.ZodObject<{
             status: "draft" | "published" | "archived";
             title: string;
             course_id: string;
+            product?: string | undefined;
             product_suite?: string | undefined;
-            product_concept?: string | undefined;
             short_description?: string | undefined;
             topic_tags?: string[] | undefined;
             published_at?: string | undefined;
@@ -825,8 +853,8 @@ export declare const LearningPathDetailSchema: z.ZodObject<{
             title: string;
             course_id: string;
             topic_tags: string[];
+            product?: string | undefined;
             product_suite?: string | undefined;
-            product_concept?: string | undefined;
             short_description?: string | undefined;
             published_at?: string | undefined;
             estimated_duration_minutes?: number | undefined;
@@ -842,8 +870,8 @@ export declare const LearningPathDetailSchema: z.ZodObject<{
             status: "draft" | "published" | "archived";
             title: string;
             course_id: string;
+            product?: string | undefined;
             product_suite?: string | undefined;
-            product_concept?: string | undefined;
             short_description?: string | undefined;
             topic_tags?: string[] | undefined;
             published_at?: string | undefined;
@@ -854,9 +882,10 @@ export declare const LearningPathDetailSchema: z.ZodObject<{
     }>, "many">;
 }, "strip", z.ZodTypeAny, {
     status: "draft" | "published" | "archived";
-    title: string;
-    version: number;
     created_at: string;
+    title: string;
+    topic_tag_ids: string[];
+    version: number;
     created_by: string;
     topic_tags: string[];
     badges: string[];
@@ -873,8 +902,8 @@ export declare const LearningPathDetailSchema: z.ZodObject<{
             title: string;
             course_id: string;
             topic_tags: string[];
+            product?: string | undefined;
             product_suite?: string | undefined;
-            product_concept?: string | undefined;
             short_description?: string | undefined;
             published_at?: string | undefined;
             estimated_duration_minutes?: number | undefined;
@@ -882,8 +911,14 @@ export declare const LearningPathDetailSchema: z.ZodObject<{
             cover_image_url?: string | undefined;
         } | undefined;
     }[];
+    product?: string | undefined;
     product_suite?: string | undefined;
-    product_concept?: string | undefined;
+    product_id?: string | undefined;
+    product_suite_id?: string | undefined;
+    legacy_product_suite?: string | undefined;
+    legacy_product_concept?: string | undefined;
+    legacy_product_suite_id?: string | undefined;
+    legacy_product_concept_id?: string | undefined;
     description?: string | undefined;
     short_description?: string | undefined;
     published_version?: number | undefined;
@@ -892,8 +927,8 @@ export declare const LearningPathDetailSchema: z.ZodObject<{
     estimated_duration_minutes?: number | undefined;
 }, {
     status: "draft" | "published" | "archived";
-    title: string;
     created_at: string;
+    title: string;
     created_by: string;
     updated_at: string;
     updated_by: string;
@@ -907,8 +942,8 @@ export declare const LearningPathDetailSchema: z.ZodObject<{
             status: "draft" | "published" | "archived";
             title: string;
             course_id: string;
+            product?: string | undefined;
             product_suite?: string | undefined;
-            product_concept?: string | undefined;
             short_description?: string | undefined;
             topic_tags?: string[] | undefined;
             published_at?: string | undefined;
@@ -917,8 +952,15 @@ export declare const LearningPathDetailSchema: z.ZodObject<{
             cover_image_url?: string | undefined;
         } | undefined;
     }[];
+    product?: string | undefined;
     product_suite?: string | undefined;
-    product_concept?: string | undefined;
+    product_id?: string | undefined;
+    product_suite_id?: string | undefined;
+    topic_tag_ids?: string[] | undefined;
+    legacy_product_suite?: string | undefined;
+    legacy_product_concept?: string | undefined;
+    legacy_product_suite_id?: string | undefined;
+    legacy_product_concept_id?: string | undefined;
     version?: number | undefined;
     description?: string | undefined;
     short_description?: string | undefined;
@@ -940,9 +982,16 @@ export declare const PathDetailSchema: z.ZodObject<{
     title: z.ZodString;
     description: z.ZodOptional<z.ZodString>;
     short_description: z.ZodOptional<z.ZodString>;
+    product: z.ZodOptional<z.ZodString>;
     product_suite: z.ZodOptional<z.ZodString>;
-    product_concept: z.ZodOptional<z.ZodString>;
     topic_tags: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
+    product_id: z.ZodOptional<z.ZodString>;
+    product_suite_id: z.ZodOptional<z.ZodString>;
+    topic_tag_ids: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
+    legacy_product_suite: z.ZodOptional<z.ZodString>;
+    legacy_product_concept: z.ZodOptional<z.ZodString>;
+    legacy_product_suite_id: z.ZodOptional<z.ZodString>;
+    legacy_product_concept_id: z.ZodOptional<z.ZodString>;
     badges: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
     status: z.ZodEnum<["draft", "published", "archived"]>;
     version: z.ZodDefault<z.ZodNumber>;
@@ -966,8 +1015,8 @@ export declare const PathDetailSchema: z.ZodObject<{
             title: z.ZodString;
             short_description: z.ZodOptional<z.ZodString>;
             cover_image_url: z.ZodOptional<z.ZodString>;
+            product: z.ZodOptional<z.ZodString>;
             product_suite: z.ZodOptional<z.ZodString>;
-            product_concept: z.ZodOptional<z.ZodString>;
             topic_tags: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
             estimated_duration_minutes: z.ZodOptional<z.ZodNumber>;
             difficulty_level: z.ZodOptional<z.ZodEnum<["beginner", "intermediate", "advanced"]>>;
@@ -978,8 +1027,8 @@ export declare const PathDetailSchema: z.ZodObject<{
             title: string;
             course_id: string;
             topic_tags: string[];
+            product?: string | undefined;
             product_suite?: string | undefined;
-            product_concept?: string | undefined;
             short_description?: string | undefined;
             published_at?: string | undefined;
             estimated_duration_minutes?: number | undefined;
@@ -989,8 +1038,8 @@ export declare const PathDetailSchema: z.ZodObject<{
             status: "draft" | "published" | "archived";
             title: string;
             course_id: string;
+            product?: string | undefined;
             product_suite?: string | undefined;
-            product_concept?: string | undefined;
             short_description?: string | undefined;
             topic_tags?: string[] | undefined;
             published_at?: string | undefined;
@@ -1008,8 +1057,8 @@ export declare const PathDetailSchema: z.ZodObject<{
             title: string;
             course_id: string;
             topic_tags: string[];
+            product?: string | undefined;
             product_suite?: string | undefined;
-            product_concept?: string | undefined;
             short_description?: string | undefined;
             published_at?: string | undefined;
             estimated_duration_minutes?: number | undefined;
@@ -1025,8 +1074,8 @@ export declare const PathDetailSchema: z.ZodObject<{
             status: "draft" | "published" | "archived";
             title: string;
             course_id: string;
+            product?: string | undefined;
             product_suite?: string | undefined;
-            product_concept?: string | undefined;
             short_description?: string | undefined;
             topic_tags?: string[] | undefined;
             published_at?: string | undefined;
@@ -1067,9 +1116,10 @@ export declare const PathDetailSchema: z.ZodObject<{
     course_completion: z.ZodDefault<z.ZodRecord<z.ZodString, z.ZodBoolean>>;
 }, "strip", z.ZodTypeAny, {
     status: "draft" | "published" | "archived";
-    title: string;
-    version: number;
     created_at: string;
+    title: string;
+    topic_tag_ids: string[];
+    version: number;
     created_by: string;
     topic_tags: string[];
     badges: string[];
@@ -1086,8 +1136,8 @@ export declare const PathDetailSchema: z.ZodObject<{
             title: string;
             course_id: string;
             topic_tags: string[];
+            product?: string | undefined;
             product_suite?: string | undefined;
-            product_concept?: string | undefined;
             short_description?: string | undefined;
             published_at?: string | undefined;
             estimated_duration_minutes?: number | undefined;
@@ -1096,8 +1146,14 @@ export declare const PathDetailSchema: z.ZodObject<{
         } | undefined;
     }[];
     course_completion: Record<string, boolean>;
+    product?: string | undefined;
     product_suite?: string | undefined;
-    product_concept?: string | undefined;
+    product_id?: string | undefined;
+    product_suite_id?: string | undefined;
+    legacy_product_suite?: string | undefined;
+    legacy_product_concept?: string | undefined;
+    legacy_product_suite_id?: string | undefined;
+    legacy_product_concept_id?: string | undefined;
     description?: string | undefined;
     short_description?: string | undefined;
     published_version?: number | undefined;
@@ -1116,8 +1172,8 @@ export declare const PathDetailSchema: z.ZodObject<{
     } | undefined;
 }, {
     status: "draft" | "published" | "archived";
-    title: string;
     created_at: string;
+    title: string;
     created_by: string;
     updated_at: string;
     updated_by: string;
@@ -1131,8 +1187,8 @@ export declare const PathDetailSchema: z.ZodObject<{
             status: "draft" | "published" | "archived";
             title: string;
             course_id: string;
+            product?: string | undefined;
             product_suite?: string | undefined;
-            product_concept?: string | undefined;
             short_description?: string | undefined;
             topic_tags?: string[] | undefined;
             published_at?: string | undefined;
@@ -1141,8 +1197,15 @@ export declare const PathDetailSchema: z.ZodObject<{
             cover_image_url?: string | undefined;
         } | undefined;
     }[];
+    product?: string | undefined;
     product_suite?: string | undefined;
-    product_concept?: string | undefined;
+    product_id?: string | undefined;
+    product_suite_id?: string | undefined;
+    topic_tag_ids?: string[] | undefined;
+    legacy_product_suite?: string | undefined;
+    legacy_product_concept?: string | undefined;
+    legacy_product_suite_id?: string | undefined;
+    legacy_product_concept_id?: string | undefined;
     version?: number | undefined;
     description?: string | undefined;
     short_description?: string | undefined;
@@ -1388,8 +1451,8 @@ export declare const CertificateTemplateSummarySchema: z.ZodObject<{
     published_at: z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
     status: "draft" | "published" | "archived";
-    created_at: string;
     name: string;
+    created_at: string;
     updated_at: string;
     template_id: string;
     applies_to: "path" | "course";
@@ -1398,8 +1461,8 @@ export declare const CertificateTemplateSummarySchema: z.ZodObject<{
     published_at?: string | undefined;
 }, {
     status: "draft" | "published" | "archived";
-    created_at: string;
     name: string;
+    created_at: string;
     updated_at: string;
     template_id: string;
     applies_to: "path" | "course";

@@ -81,8 +81,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               });
             }
             
-            // Also log if Admin role is detected
-            if (role === 'Admin') {
+            // Also log if Admin role is detected (dev mode only)
+            if (role === 'Admin' && import.meta.env.DEV) {
               console.log('[Auth] ✅ Admin role detected!', {
                 rawGroups,
                 normalized: role,

@@ -45,8 +45,8 @@ export const CourseSummarySchema = z.object({
   title: z.string(),
   short_description: z.string().optional(),
   cover_image_url: z.string().url().optional(),
-  product_suite: z.string().optional(),
-  product_concept: z.string().optional(),
+  product: z.string().optional(), // Was "product_suite"
+  product_suite: z.string().optional(), // Was "product_concept"
   topic_tags: z.array(z.string()).default([]),
   estimated_duration_minutes: z.number().int().min(0).optional(),
   difficulty_level: z.enum(['beginner', 'intermediate', 'advanced']).optional(),
@@ -110,8 +110,8 @@ export const LearningPathSummarySchema = z.object({
   path_id: z.string(),
   title: z.string(),
   short_description: z.string().optional(),
-  product_suite: z.string().optional(),
-  product_concept: z.string().optional(),
+  product: z.string().optional(), // Was "product_suite"
+  product_suite: z.string().optional(), // Was "product_concept"
   topic_tags: z.array(z.string()).default([]),
   estimated_duration_minutes: z.number().int().min(0).optional(),
   course_count: z.number().int().min(0).default(0),

@@ -37,8 +37,8 @@ export async function listCourses(req: AuthenticatedRequest, res: Response) {
   
   try {
     const q = req.query.q as string | undefined;
+    const product = req.query.product as string | undefined;
     const product_suite = req.query.product_suite as string | undefined;
-    const product_concept = req.query.product_concept as string | undefined;
     const badge = req.query.badge as string | undefined;
     const badges = req.query.badges as string | undefined;
     const topic = req.query.topic as string | undefined;
@@ -48,8 +48,8 @@ export async function listCourses(req: AuthenticatedRequest, res: Response) {
     
     const result = await lmsRepo.listPublishedCourses({
       query: q,
+      product,
       product_suite,
-      product_concept,
       badge,
       badges: badges ? badges.split(',') : undefined,
       topic,

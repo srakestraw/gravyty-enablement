@@ -36,3 +36,4 @@ echo "2. Run: npm run cdk:deploy"
 echo "3. CDK will delete the tables"
 
 
+

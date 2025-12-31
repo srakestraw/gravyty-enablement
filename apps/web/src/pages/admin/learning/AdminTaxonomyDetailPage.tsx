@@ -75,6 +75,14 @@ export function AdminTaxonomyDetailPage() {
   const [creating, setCreating] = useState(false);
   const [saving, setSaving] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState<string | null>(null);
+  const [deleteUsage, setDeleteUsage] = useState<{
+    used_by_courses: number;
+    used_by_resources: number;
+    sample_course_ids?: string[];
+    sample_resource_ids?: string[];
+  } | null>(null);
+  const [checkingUsage, setCheckingUsage] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   if (!key || !['product', 'product_suite', 'topic_tag'].includes(key)) {
     return (
@@ -564,11 +572,132 @@ export function AdminTaxonomyDetailPage() {
                   <ArchiveIcon fontSize="small" sx={{ mr: 1 }} />
                   Archive
                 </MenuItem>
+                <MenuItem
+                  onClick={async () => {
+                    setCheckingUsage(true);
+                    try {
+                      const response = await taxonomyApi.getUsage(key, menuAnchor.optionId);
+                      if ('error' in response) {
+                        alert(`Failed to check usage: ${response.error.message}`);
+                        return;
+                      }
+                      setDeleteUsage(response.data);
+                      setDeleteDialogOpen(menuAnchor.optionId);
+                    } catch (err) {
+                      console.error('Error checking usage:', err);
+                      alert('Failed to check usage');
+                    } finally {
+                      setCheckingUsage(false);
+                      setMenuAnchor(null);
+                    }
+                  }}
+                  disabled={checkingUsage}
+                >
+                  <DeleteIcon fontSize="small" sx={{ mr: 1 }} />
+                  Delete
+                </MenuItem>
               </>
             )}
           </>
         )}
       </Menu>
+
+      {/* Delete Dialog */}
+      <Dialog
+        open={!!deleteDialogOpen}
+        onClose={() => {
+          setDeleteDialogOpen(null);
+          setDeleteUsage(null);
+        }}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Delete Option</DialogTitle>
+        <DialogContent>
+          {deleteUsage && deleteUsage.used_by_courses + deleteUsage.used_by_resources > 0 ? (
+            <>
+              <Alert severity="warning" sx={{ mb: 2 }}>
+                This option is currently in use and cannot be deleted.
+              </Alert>
+              <Typography variant="body2" gutterBottom>
+                <strong>Usage:</strong>
+              </Typography>
+              <Typography variant="body2" sx={{ mb: 1 }}>
+                • Used by {deleteUsage.used_by_courses} course(s)
+              </Typography>
+              <Typography variant="body2" sx={{ mb: 2 }}>
+                • Used by {deleteUsage.used_by_resources} resource(s)
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                To delete this option, you must first:
+              </Typography>
+              <Typography variant="body2" component="ul" sx={{ pl: 2 }}>
+                <li>Archive the option instead (keeps references intact)</li>
+                <li>Or migrate all references to another option</li>
+              </Typography>
+            </>
+          ) : (
+            <Typography variant="body2">
+              Are you sure you want to delete this option? This action cannot be undone.
+            </Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => {
+              setDeleteDialogOpen(null);
+              setDeleteUsage(null);
+            }}
+            disabled={deleting}
+          >
+            {deleteUsage && deleteUsage.used_by_courses + deleteUsage.used_by_resources > 0
+              ? 'Close'
+              : 'Cancel'}
+          </Button>
+          {deleteUsage && deleteUsage.used_by_courses + deleteUsage.used_by_resources === 0 && (
+            <Button
+              onClick={async () => {
+                if (!deleteDialogOpen) return;
+                setDeleting(true);
+                try {
+                  const response = await taxonomyApi.deleteOption(key, deleteDialogOpen);
+                  if ('error' in response) {
+                    alert(`Failed to delete option: ${response.error.message}`);
+                    return;
+                  }
+                  track('lms_taxonomy_option_deleted', { key, option_id: deleteDialogOpen });
+                  setDeleteDialogOpen(null);
+                  setDeleteUsage(null);
+                  refetch();
+                } catch (err) {
+                  console.error('Error deleting option:', err);
+                  alert('Failed to delete option');
+                } finally {
+                  setDeleting(false);
+                }
+              }}
+              color="error"
+              variant="contained"
+              disabled={deleting}
+            >
+              {deleting ? 'Deleting...' : 'Delete'}
+            </Button>
+          )}
+          {deleteUsage && deleteUsage.used_by_courses + deleteUsage.used_by_resources > 0 && (
+            <Button
+              onClick={async () => {
+                if (!deleteDialogOpen) return;
+                handleArchive(deleteDialogOpen);
+                setDeleteDialogOpen(null);
+                setDeleteUsage(null);
+              }}
+              variant="contained"
+            >
+              Archive Instead
+            </Button>
+          )}
+        </DialogActions>
+      </Dialog>
 
       {/* Create Dialog */}
       <Dialog open={createDialogOpen} onClose={() => setCreateDialogOpen(false)} maxWidth="sm" fullWidth>

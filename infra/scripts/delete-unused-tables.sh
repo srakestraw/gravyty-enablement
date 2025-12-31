@@ -64,3 +64,4 @@ echo "Remaining tables:"
 aws dynamodb list-tables --region "$REGION" --output table
 
 
+

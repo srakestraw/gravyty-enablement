@@ -69,8 +69,8 @@ function PathCard({ path, onClick }: { path: PathSummary; onClick: () => void })
                 {path.course_count > 0 && (
                   <Chip label={`${path.course_count} courses`} size="small" variant="outlined" />
                 )}
-                {path.product_suite && (
-                  <Chip label={path.product_suite} size="small" variant="outlined" />
+                {path.product && (
+                  <Chip label={path.product} size="small" variant="outlined" />
                 )}
               </Box>
               {path.topic_tags && path.topic_tags.length > 0 && (

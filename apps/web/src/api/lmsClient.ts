@@ -23,8 +23,8 @@ import type {
 
 export interface ListCoursesParams {
   q?: string;
-  product_suite?: string;
-  product_concept?: string;
+  product?: string; // Was "product_suite"
+  product_suite?: string; // Was "product_concept"
   badge?: string;
   badges?: string[];
   topic?: string;
@@ -111,8 +111,8 @@ export const lmsApi = {
   listCourses: async (params?: ListCoursesParams, options?: LmsClientOptions) => {
     const queryParams = new URLSearchParams();
     if (params?.q) queryParams.append('q', params.q);
+    if (params?.product) queryParams.append('product', params.product);
     if (params?.product_suite) queryParams.append('product_suite', params.product_suite);
-    if (params?.product_concept) queryParams.append('product_concept', params.product_concept);
     if (params?.badge) queryParams.append('badge', params.badge);
     if (params?.badges) queryParams.append('badges', params.badges.join(','));
     if (params?.topic) queryParams.append('topic', params.topic);

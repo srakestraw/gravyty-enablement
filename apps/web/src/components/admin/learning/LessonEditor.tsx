@@ -4,7 +4,7 @@
  * Editor for lesson details including transcript and resources
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -28,15 +28,19 @@ import {
 } from '@mui/icons-material';
 import { MediaSelectModal } from './MediaSelectModal';
 import { useAdminMedia } from '../../../hooks/useAdminMedia';
+import { focusRegistry } from '../../../utils/focusRegistry';
 import type { Lesson, MediaRef } from '@gravyty/domain';
+import type { NodeType } from '../../../types/courseTree';
 
 export interface LessonEditorProps {
   lesson: Lesson | null;
   onUpdate: (updates: Partial<Lesson>) => void;
   courseId?: string;
+  shouldShowError?: (entityType: NodeType, entityId: string, fieldKey: string) => boolean;
+  markFieldTouched?: (entityType: NodeType, entityId: string, fieldKey: string) => void;
 }
 
-export function LessonEditor({ lesson, onUpdate, courseId }: LessonEditorProps) {
+export function LessonEditor({ lesson, onUpdate, courseId, shouldShowError, markFieldTouched }: LessonEditorProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [durationSeconds, setDurationSeconds] = useState<number | undefined>();
@@ -45,8 +49,51 @@ export function LessonEditor({ lesson, onUpdate, courseId }: LessonEditorProps) 
   const [resourcesModalOpen, setResourcesModalOpen] = useState(false);
   const [posterModalOpen, setPosterModalOpen] = useState(false);
 
+  // Refs for focus registry
+  const titleRef = useRef<HTMLInputElement>(null);
+  const videoMediaRef = useRef<HTMLDivElement>(null);
+  const transcriptRef = useRef<HTMLTextAreaElement>(null);
+
   // Fetch media details for resources
   const { data: allMedia } = useAdminMedia();
+
+  // Register lesson fields with focus registry
+  useEffect(() => {
+    if (!lesson) return;
+
+    const unregisters: Array<() => void> = [];
+
+    if (titleRef.current) {
+      unregisters.push(focusRegistry.register({
+        entityType: 'lesson',
+        entityId: lesson.lesson_id,
+        fieldKey: 'title',
+        ref: titleRef,
+      }));
+    }
+
+    if (videoMediaRef.current) {
+      unregisters.push(focusRegistry.register({
+        entityType: 'lesson',
+        entityId: lesson.lesson_id,
+        fieldKey: 'video_media',
+        ref: videoMediaRef,
+      }));
+    }
+
+    if (transcriptRef.current) {
+      unregisters.push(focusRegistry.register({
+        entityType: 'lesson',
+        entityId: lesson.lesson_id,
+        fieldKey: 'transcript.full_text',
+        ref: transcriptRef,
+      }));
+    }
+
+    return () => {
+      unregisters.forEach((unregister) => unregister());
+    };
+  }, [lesson?.lesson_id]);
 
   useEffect(() => {
     if (lesson) {
@@ -138,12 +185,20 @@ export function LessonEditor({ lesson, onUpdate, courseId }: LessonEditorProps) 
 
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         <TextField
+          inputRef={titleRef}
           label="Title"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          onBlur={handleSave}
+          onBlur={() => {
+            handleSave();
+            if (markFieldTouched && lesson) {
+              markFieldTouched('lesson', lesson.lesson_id, 'title');
+            }
+          }}
           required
           fullWidth
+          error={lesson && shouldShowError && (!title || title.trim() === '') && shouldShowError('lesson', lesson.lesson_id, 'title')}
+          helperText={lesson && shouldShowError && (!title || title.trim() === '') && shouldShowError('lesson', lesson.lesson_id, 'title') ? 'Lesson title is required' : ''}
         />
 
         <TextField
@@ -170,7 +225,7 @@ export function LessonEditor({ lesson, onUpdate, courseId }: LessonEditorProps) 
         />
 
         {/* Video Media */}
-        <Paper sx={{ p: 2 }}>
+        <Paper ref={videoMediaRef} sx={{ p: 2 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
             <Typography variant="subtitle2">Video Media</Typography>
             <Button
@@ -197,9 +252,16 @@ export function LessonEditor({ lesson, onUpdate, courseId }: LessonEditorProps) 
               )}
             </Box>
           ) : (
-            <Typography variant="body2" color="text.secondary">
-              No video attached
-            </Typography>
+            <Box>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                No video attached
+              </Typography>
+              {lesson.type === 'video' && shouldShowError && shouldShowError('lesson', lesson.lesson_id, 'video_media') && (
+                <Alert severity="error" sx={{ mt: 1 }}>
+                  Video lesson must have a video media reference
+                </Alert>
+              )}
+            </Box>
           )}
         </Paper>
 
@@ -255,14 +317,21 @@ export function LessonEditor({ lesson, onUpdate, courseId }: LessonEditorProps) 
             Transcript
           </Typography>
           <TextField
+            inputRef={transcriptRef}
             label="Full Transcript Text"
             value={transcriptFullText}
             onChange={(e) => setTranscriptFullText(e.target.value)}
-            onBlur={handleSave}
+            onBlur={() => {
+              handleSave();
+              if (markFieldTouched && lesson) {
+                markFieldTouched('lesson', lesson.lesson_id, 'transcript.full_text');
+              }
+            }}
             multiline
             rows={10}
             fullWidth
             helperText="Optional: Full transcript text for search and accessibility"
+            error={lesson && shouldShowError && transcriptFullText !== undefined && transcriptFullText.trim() === '' && lesson.transcript?.full_text !== undefined && shouldShowError('lesson', lesson.lesson_id, 'transcript.full_text')}
           />
         </Paper>
       </Box>

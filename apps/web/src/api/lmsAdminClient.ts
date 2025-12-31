@@ -22,8 +22,8 @@ export interface AdminCourseSummary {
   version: number;
   updated_at: string;
   created_at: string;
-  product_suite?: string;
-  product_concept?: string;
+  product?: string; // Was "product_suite"
+  product_suite?: string; // Was "product_concept"
 }
 
 export interface AdminPathSummary {
@@ -40,9 +40,12 @@ export interface CreateCourseRequest {
   title: string;
   description?: string;
   short_description?: string;
-  product_suite?: string;
-  product_concept?: string;
+  product?: string; // Was "product_suite"
+  product_suite?: string; // Was "product_concept"
   topic_tags?: string[];
+  product_id?: string; // Was "product_suite_id"
+  product_suite_id?: string; // Was "product_concept_id"
+  topic_tag_ids?: string[];
   badges?: Array<{ badge_id: string; name: string; description?: string; icon_url?: string }>;
 }
 
@@ -50,9 +53,12 @@ export interface UpdateCourseRequest {
   title?: string;
   description?: string;
   short_description?: string;
-  product_suite?: string;
-  product_concept?: string;
+  product?: string; // Was "product_suite"
+  product_suite?: string; // Was "product_concept"
   topic_tags?: string[];
+  product_id?: string; // Was "product_suite_id"
+  product_suite_id?: string; // Was "product_concept_id"
+  topic_tag_ids?: string[];
   badges?: Array<{ badge_id: string; name: string; description?: string; icon_url?: string }>;
   cover_image?: MediaRef;
 }
@@ -168,7 +174,7 @@ export interface PresignMediaUploadResponse {
 
 export const lmsAdminApi = {
   // Courses
-  async listCourses(params?: { status?: string; product_suite?: string; q?: string }) {
+  async listCourses(params?: { status?: string; product?: string; product_suite?: string; q?: string }) {
     const query = new URLSearchParams();
     if (params?.status) query.append('status', params.status);
     if (params?.product_suite) query.append('product_suite', params.product_suite);

@@ -45,6 +45,7 @@ export async function listAdminCourses(req: AuthenticatedRequest, res: Response)
   
   try {
     const status = req.query.status as string | undefined;
+    const product = req.query.product as string | undefined;
     const productSuite = req.query.product_suite as string | undefined;
     const badge = req.query.badge as string | undefined;
     const q = req.query.q as string | undefined;
@@ -69,14 +70,17 @@ export async function listAdminCourses(req: AuthenticatedRequest, res: Response)
       version: c.version || 0,
       updated_at: c.updated_at,
       created_at: c.created_at,
+      product: c.product,
       product_suite: c.product_suite,
-      product_concept: c.product_concept,
     }));
     
     // Apply filters
     if (q) {
       const lowerQ = q.toLowerCase();
       courses = courses.filter((c) => c.title.toLowerCase().includes(lowerQ));
+    }
+    if (product) {
+      courses = courses.filter((c) => c.product === product);
     }
     if (productSuite) {
       courses = courses.filter((c) => c.product_suite === productSuite);
@@ -125,9 +129,18 @@ export async function createCourse(req: AuthenticatedRequest, res: Response) {
     title: z.string().min(1),
     description: z.string().optional(),
     short_description: z.string().optional(),
-    product_suite: z.string().optional(),
-    product_concept: z.string().optional(),
+    // New field names (preferred)
+    product: z.string().optional(), // Was "product_suite"
+    product_suite: z.string().optional(), // Was "product_concept"
     topic_tags: z.array(z.string()).optional(),
+    product_id: z.string().optional(), // Was "product_suite_id"
+    product_suite_id: z.string().optional(), // Was "product_concept_id"
+    topic_tag_ids: z.array(z.string()).optional(),
+    // Legacy fields (for backward compatibility - will be normalized)
+    legacy_product_suite: z.string().optional(), // Old product_suite -> maps to product
+    legacy_product_concept: z.string().optional(), // Old product_concept -> maps to product_suite
+    legacy_product_suite_id: z.string().optional(), // Old product_suite_id -> maps to product_id
+    legacy_product_concept_id: z.string().optional(), // Old product_concept_id -> maps to product_suite_id
     badges: z.array(z.object({ 
       badge_id: z.string(), 
       name: z.string(), 
@@ -152,6 +165,12 @@ export async function createCourse(req: AuthenticatedRequest, res: Response) {
     const now = new Date().toISOString();
     const courseId = `course_${uuidv4()}`;
     
+    // Normalize taxonomy fields (map legacy to new names)
+    const product = parsed.data.product ?? parsed.data.legacy_product_suite;
+    const product_suite = parsed.data.product_suite ?? parsed.data.legacy_product_concept;
+    const product_id = parsed.data.product_id ?? parsed.data.legacy_product_suite_id;
+    const product_suite_id = parsed.data.product_suite_id ?? parsed.data.legacy_product_concept_id;
+    
     const course: Course = {
       course_id: courseId,
       title: parsed.data.title,
@@ -159,9 +178,13 @@ export async function createCourse(req: AuthenticatedRequest, res: Response) {
       short_description: parsed.data.short_description,
       status: 'draft',
       version: 1,
-      product_suite: parsed.data.product_suite,
-      product_concept: parsed.data.product_concept,
+      // New field names (preferred)
+      product,
+      product_suite,
       topic_tags: parsed.data.topic_tags || [],
+      product_id,
+      product_suite_id,
+      topic_tag_ids: parsed.data.topic_tag_ids || [],
       badges: parsed.data.badges || [],
       sections: [],
       related_course_ids: [],
@@ -254,9 +277,18 @@ export async function updateCourse(req: AuthenticatedRequest, res: Response) {
     title: z.string().min(1).optional(),
     description: z.string().optional(),
     short_description: z.string().optional(),
-    product_suite: z.string().optional(),
-    product_concept: z.string().optional(),
+    // New field names (preferred)
+    product: z.string().optional(), // Was "product_suite"
+    product_suite: z.string().optional(), // Was "product_concept"
     topic_tags: z.array(z.string()).optional(),
+    product_id: z.string().optional(), // Was "product_suite_id"
+    product_suite_id: z.string().optional(), // Was "product_concept_id"
+    topic_tag_ids: z.array(z.string()).optional(),
+    // Legacy fields (for backward compatibility - will be normalized)
+    legacy_product_suite: z.string().optional(),
+    legacy_product_concept: z.string().optional(),
+    legacy_product_suite_id: z.string().optional(),
+    legacy_product_concept_id: z.string().optional(),
     badges: z.array(z.object({ 
       badge_id: z.string(), 
       name: z.string(), 
@@ -285,7 +317,27 @@ export async function updateCourse(req: AuthenticatedRequest, res: Response) {
   }
   
   try {
-    const course = await lmsRepo.updateCourseDraft(courseId, userId, parsed.data);
+    // Normalize taxonomy fields (map legacy to new names)
+    const updates: any = { ...parsed.data };
+    if (updates.product === undefined && updates.legacy_product_suite !== undefined) {
+      updates.product = updates.legacy_product_suite;
+    }
+    if (updates.product_suite === undefined && updates.legacy_product_concept !== undefined) {
+      updates.product_suite = updates.legacy_product_concept;
+    }
+    if (updates.product_id === undefined && updates.legacy_product_suite_id !== undefined) {
+      updates.product_id = updates.legacy_product_suite_id;
+    }
+    if (updates.product_suite_id === undefined && updates.legacy_product_concept_id !== undefined) {
+      updates.product_suite_id = updates.legacy_product_concept_id;
+    }
+    // Remove legacy fields from updates
+    delete updates.legacy_product_suite;
+    delete updates.legacy_product_concept;
+    delete updates.legacy_product_suite_id;
+    delete updates.legacy_product_concept_id;
+    
+    const course = await lmsRepo.updateCourseDraft(courseId, userId, updates);
     
     // Emit telemetry
     await emitLmsEvent(req, 'lms_admin_course_updated' as any, {
@@ -575,8 +627,8 @@ export async function createPath(req: AuthenticatedRequest, res: Response) {
     title: z.string().min(1),
     description: z.string().optional(),
     short_description: z.string().optional(),
-    product_suite: z.string().optional(),
-    product_concept: z.string().optional(),
+    product: z.string().optional(), // Was "product_suite"
+    product_suite: z.string().optional(), // Was "product_concept"
     topic_tags: z.array(z.string()).optional(),
     badges: z.array(z.string()).optional(),
     courses: z.array(z.object({
@@ -603,6 +655,10 @@ export async function createPath(req: AuthenticatedRequest, res: Response) {
     const now = new Date().toISOString();
     const pathId = `path_${uuidv4()}`;
     
+    // Normalize taxonomy fields
+    const product = parsed.data.product;
+    const product_suite = parsed.data.product_suite;
+    
     const path: LearningPath = {
       path_id: pathId,
       title: parsed.data.title,
@@ -610,8 +666,8 @@ export async function createPath(req: AuthenticatedRequest, res: Response) {
       short_description: parsed.data.short_description,
       status: 'draft',
       version: 1,
-      product_suite: parsed.data.product_suite,
-      product_concept: parsed.data.product_concept,
+      product,
+      product_suite,
       topic_tags: parsed.data.topic_tags || [],
       badges: parsed.data.badges || [],
       courses: (parsed.data.courses || []).map((c) => ({
@@ -740,8 +796,8 @@ export async function updatePath(req: AuthenticatedRequest, res: Response) {
     title: z.string().min(1).optional(),
     description: z.string().optional(),
     short_description: z.string().optional(),
-    product_suite: z.string().optional(),
-    product_concept: z.string().optional(),
+    product: z.string().optional(), // Was "product_suite"
+    product_suite: z.string().optional(), // Was "product_concept"
     topic_tags: z.array(z.string()).optional(),
     badges: z.array(z.string()).optional(),
     courses: z.array(z.object({

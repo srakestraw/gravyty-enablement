@@ -54,8 +54,8 @@ export function CourseCard({ course, onClick }: CourseCardProps) {
             {course.difficulty_level && (
               <Chip label={course.difficulty_level} size="small" variant="outlined" />
             )}
-            {course.product_suite && (
-              <Chip label={course.product_suite} size="small" variant="outlined" />
+            {course.product && (
+              <Chip label={course.product} size="small" variant="outlined" />
             )}
           </Box>
           {course.topic_tags && course.topic_tags.length > 0 && (
@@ -70,5 +70,6 @@ export function CourseCard({ course, onClick }: CourseCardProps) {
     </Card>
   );
 }
+
 
 

@@ -44,9 +44,16 @@ export declare const LearningPathSchema: z.ZodObject<{
     title: z.ZodString;
     description: z.ZodOptional<z.ZodString>;
     short_description: z.ZodOptional<z.ZodString>;
+    product: z.ZodOptional<z.ZodString>;
     product_suite: z.ZodOptional<z.ZodString>;
-    product_concept: z.ZodOptional<z.ZodString>;
     topic_tags: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
+    product_id: z.ZodOptional<z.ZodString>;
+    product_suite_id: z.ZodOptional<z.ZodString>;
+    topic_tag_ids: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
+    legacy_product_suite: z.ZodOptional<z.ZodString>;
+    legacy_product_concept: z.ZodOptional<z.ZodString>;
+    legacy_product_suite_id: z.ZodOptional<z.ZodString>;
+    legacy_product_concept_id: z.ZodOptional<z.ZodString>;
     badges: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
     courses: z.ZodDefault<z.ZodArray<z.ZodObject<{
         course_id: z.ZodString;
@@ -76,9 +83,10 @@ export declare const LearningPathSchema: z.ZodObject<{
     updated_by: z.ZodString;
 }, "strip", z.ZodTypeAny, {
     status: "draft" | "published" | "archived";
-    title: string;
-    version: number;
     created_at: string;
+    title: string;
+    topic_tag_ids: string[];
+    version: number;
     created_by: string;
     topic_tags: string[];
     badges: string[];
@@ -91,8 +99,14 @@ export declare const LearningPathSchema: z.ZodObject<{
         required: boolean;
         title_override?: string | undefined;
     }[];
+    product?: string | undefined;
     product_suite?: string | undefined;
-    product_concept?: string | undefined;
+    product_id?: string | undefined;
+    product_suite_id?: string | undefined;
+    legacy_product_suite?: string | undefined;
+    legacy_product_concept?: string | undefined;
+    legacy_product_suite_id?: string | undefined;
+    legacy_product_concept_id?: string | undefined;
     description?: string | undefined;
     short_description?: string | undefined;
     published_version?: number | undefined;
@@ -101,14 +115,21 @@ export declare const LearningPathSchema: z.ZodObject<{
     estimated_duration_minutes?: number | undefined;
 }, {
     status: "draft" | "published" | "archived";
-    title: string;
     created_at: string;
+    title: string;
     created_by: string;
     updated_at: string;
     updated_by: string;
     path_id: string;
+    product?: string | undefined;
     product_suite?: string | undefined;
-    product_concept?: string | undefined;
+    product_id?: string | undefined;
+    product_suite_id?: string | undefined;
+    topic_tag_ids?: string[] | undefined;
+    legacy_product_suite?: string | undefined;
+    legacy_product_concept?: string | undefined;
+    legacy_product_suite_id?: string | undefined;
+    legacy_product_concept_id?: string | undefined;
     version?: number | undefined;
     description?: string | undefined;
     short_description?: string | undefined;

@@ -234,9 +234,26 @@ const mergedThemeOptions = {
         ...fallbackThemeOptions.shape,
         ...tokenThemeOptions.shape,
     },
-    shadows: (tokenThemeOptions.shadows && tokenThemeOptions.shadows.length > 1)
-        ? tokenThemeOptions.shadows
-        : fallbackThemeOptions.shadows,
+    shadows: (() => {
+        // Ensure we always have exactly 25 shadows (indices 0-24) for MUI compatibility
+        // fallbackThemeOptions.shadows is always defined (we just created it above)
+        const fallbackShadows = fallbackThemeOptions.shadows;
+        if (tokenThemeOptions.shadows && Array.isArray(tokenThemeOptions.shadows) && tokenThemeOptions.shadows.length > 0) {
+            const tokenShadows = tokenThemeOptions.shadows;
+            // If token shadows are incomplete, pad with fallback shadows
+            if (tokenShadows.length < 25) {
+                const padded = [
+                    ...tokenShadows,
+                    ...fallbackShadows.slice(tokenShadows.length),
+                ];
+                return padded.slice(0, 25);
+            }
+            // If token shadows have 25+, take first 25
+            return tokenShadows.slice(0, 25);
+        }
+        // No token shadows or invalid: use fallback (guaranteed 25 shadows)
+        return fallbackShadows.slice(0, 25);
+    })(),
     breakpoints: fallbackThemeOptions.breakpoints,
 };
 export const theme = createTheme(mergedThemeOptions);

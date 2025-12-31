@@ -5,6 +5,48 @@ import { z } from 'zod';
 export declare const UserRoleSchema: z.ZodEnum<["Viewer", "Contributor", "Approver", "Admin"]>;
 export type UserRole = z.infer<typeof UserRoleSchema>;
 /**
+ * Cognito User Status
+ */
+export declare const CognitoUserStatusSchema: z.ZodEnum<["UNCONFIRMED", "CONFIRMED", "ARCHIVED", "COMPROMISED", "UNKNOWN", "RESET_REQUIRED", "FORCE_CHANGE_PASSWORD"]>;
+export type CognitoUserStatus = z.infer<typeof CognitoUserStatusSchema>;
+/**
+ * Admin User
+ *
+ * Represents a user in the admin context with role and status information.
+ */
+export declare const AdminUserSchema: z.ZodObject<{
+    username: z.ZodString;
+    email: z.ZodString;
+    name: z.ZodOptional<z.ZodString>;
+    role: z.ZodEnum<["Viewer", "Contributor", "Approver", "Admin"]>;
+    enabled: z.ZodBoolean;
+    user_status: z.ZodEnum<["UNCONFIRMED", "CONFIRMED", "ARCHIVED", "COMPROMISED", "UNKNOWN", "RESET_REQUIRED", "FORCE_CHANGE_PASSWORD"]>;
+    created_at: z.ZodString;
+    modified_at: z.ZodString;
+    groups: z.ZodArray<z.ZodString, "many">;
+}, "strip", z.ZodTypeAny, {
+    username: string;
+    email: string;
+    role: "Viewer" | "Contributor" | "Approver" | "Admin";
+    enabled: boolean;
+    user_status: "UNCONFIRMED" | "CONFIRMED" | "ARCHIVED" | "COMPROMISED" | "UNKNOWN" | "RESET_REQUIRED" | "FORCE_CHANGE_PASSWORD";
+    created_at: string;
+    modified_at: string;
+    groups: string[];
+    name?: string | undefined;
+}, {
+    username: string;
+    email: string;
+    role: "Viewer" | "Contributor" | "Approver" | "Admin";
+    enabled: boolean;
+    user_status: "UNCONFIRMED" | "CONFIRMED" | "ARCHIVED" | "COMPROMISED" | "UNKNOWN" | "RESET_REQUIRED" | "FORCE_CHANGE_PASSWORD";
+    created_at: string;
+    modified_at: string;
+    groups: string[];
+    name?: string | undefined;
+}>;
+export type AdminUser = z.infer<typeof AdminUserSchema>;
+/**
  * Content Status
  */
 export declare const ContentStatusSchema: z.ZodEnum<["Draft", "Approved", "Deprecated", "Expired"]>;
@@ -17,12 +59,19 @@ export declare const ContentItemSchema: z.ZodObject<{
     status: z.ZodEnum<["Draft", "Approved", "Deprecated", "Expired"]>;
     title: z.ZodString;
     summary: z.ZodString;
+    product: z.ZodOptional<z.ZodString>;
     product_suite: z.ZodOptional<z.ZodString>;
-    product_concept: z.ZodOptional<z.ZodString>;
+    tags: z.ZodArray<z.ZodString, "many">;
+    product_id: z.ZodOptional<z.ZodString>;
+    product_suite_id: z.ZodOptional<z.ZodString>;
+    topic_tag_ids: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
+    legacy_product_suite: z.ZodOptional<z.ZodString>;
+    legacy_product_concept: z.ZodOptional<z.ZodString>;
+    legacy_product_suite_id: z.ZodOptional<z.ZodString>;
+    legacy_product_concept_id: z.ZodOptional<z.ZodString>;
     audience_role: z.ZodOptional<z.ZodString>;
     lifecycle_stage: z.ZodOptional<z.ZodString>;
     owner_user_id: z.ZodString;
-    tags: z.ZodArray<z.ZodString, "many">;
     version: z.ZodString;
     last_updated: z.ZodString;
     review_due_date: z.ZodOptional<z.ZodString>;
@@ -38,17 +87,25 @@ export declare const ContentItemSchema: z.ZodObject<{
     uploaded_at: z.ZodOptional<z.ZodString>;
     status_last_updated: z.ZodOptional<z.ZodString>;
     product_suite_concept: z.ZodOptional<z.ZodString>;
+    product_product_suite: z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
     status: "Draft" | "Approved" | "Deprecated" | "Expired";
     content_id: string;
     title: string;
     summary: string;
-    owner_user_id: string;
     tags: string[];
+    topic_tag_ids: string[];
+    owner_user_id: string;
     version: string;
     last_updated: string;
+    product?: string | undefined;
     product_suite?: string | undefined;
-    product_concept?: string | undefined;
+    product_id?: string | undefined;
+    product_suite_id?: string | undefined;
+    legacy_product_suite?: string | undefined;
+    legacy_product_concept?: string | undefined;
+    legacy_product_suite_id?: string | undefined;
+    legacy_product_concept_id?: string | undefined;
     audience_role?: string | undefined;
     lifecycle_stage?: string | undefined;
     review_due_date?: string | undefined;
@@ -64,17 +121,25 @@ export declare const ContentItemSchema: z.ZodObject<{
     uploaded_at?: string | undefined;
     status_last_updated?: string | undefined;
     product_suite_concept?: string | undefined;
+    product_product_suite?: string | undefined;
 }, {
     status: "Draft" | "Approved" | "Deprecated" | "Expired";
     content_id: string;
     title: string;
     summary: string;
-    owner_user_id: string;
     tags: string[];
+    owner_user_id: string;
     version: string;
     last_updated: string;
+    product?: string | undefined;
     product_suite?: string | undefined;
-    product_concept?: string | undefined;
+    product_id?: string | undefined;
+    product_suite_id?: string | undefined;
+    topic_tag_ids?: string[] | undefined;
+    legacy_product_suite?: string | undefined;
+    legacy_product_concept?: string | undefined;
+    legacy_product_suite_id?: string | undefined;
+    legacy_product_concept_id?: string | undefined;
     audience_role?: string | undefined;
     lifecycle_stage?: string | undefined;
     review_due_date?: string | undefined;
@@ -90,6 +155,7 @@ export declare const ContentItemSchema: z.ZodObject<{
     uploaded_at?: string | undefined;
     status_last_updated?: string | undefined;
     product_suite_concept?: string | undefined;
+    product_product_suite?: string | undefined;
 }>;
 export type ContentItem = z.infer<typeof ContentItemSchema>;
 /**
@@ -108,21 +174,21 @@ export declare const NotificationSchema: z.ZodObject<{
 }, "strip", z.ZodTypeAny, {
     message: string;
     type: "info" | "success" | "warning" | "error";
+    created_at: string;
     title: string;
     notification_id: string;
     user_id: string;
     read: boolean;
-    created_at: string;
     content_id?: string | undefined;
     'created_at#notification_id'?: string | undefined;
 }, {
     message: string;
     type: "info" | "success" | "warning" | "error";
+    created_at: string;
     title: string;
     notification_id: string;
     user_id: string;
     read: boolean;
-    created_at: string;
     content_id?: string | undefined;
     'created_at#notification_id'?: string | undefined;
 }>;
@@ -138,19 +204,19 @@ export declare const SubscriptionSchema: z.ZodObject<{
     tags: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
     created_at: z.ZodString;
 }, "strip", z.ZodTypeAny, {
-    user_id: string;
     created_at: string;
+    user_id: string;
     subscription_id: string;
     product_suite?: string | undefined;
-    product_concept?: string | undefined;
     tags?: string[] | undefined;
+    product_concept?: string | undefined;
 }, {
-    user_id: string;
     created_at: string;
+    user_id: string;
     subscription_id: string;
     product_suite?: string | undefined;
-    product_concept?: string | undefined;
     tags?: string[] | undefined;
+    product_concept?: string | undefined;
 }>;
 export type Subscription = z.infer<typeof SubscriptionSchema>;
 /**

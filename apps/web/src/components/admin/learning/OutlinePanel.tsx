@@ -4,7 +4,7 @@
  * Left panel showing sections and lessons in a tree structure
  */
 
-import { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -20,6 +20,7 @@ import {
   DialogContent,
   DialogActions,
   Chip,
+  Alert,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -30,12 +31,15 @@ import {
   DragIndicator as DragIcon,
 } from '@mui/icons-material';
 import type { CourseSection, Lesson } from '@gravyty/domain';
+import { focusRegistry } from '../../../utils/focusRegistry';
 
 export interface OutlinePanelProps {
   sections: CourseSection[];
   lessons: Lesson[];
   selectedLessonId: string | null;
+  selectedSectionId?: string | null;
   onSelectLesson: (lessonId: string | null) => void;
+  onSelectSection?: (sectionId: string | null) => void;
   onAddSection: () => void;
   onRenameSection: (sectionId: string, newTitle: string) => void;
   onReorderSection: (sectionId: string, direction: 'up' | 'down') => void;
@@ -44,13 +48,17 @@ export interface OutlinePanelProps {
   onReorderLesson: (lessonId: string, direction: 'up' | 'down') => void;
   onMoveLesson: (lessonId: string, targetSectionId: string) => void;
   onDeleteLesson: (lessonId: string) => void;
+  shouldShowError?: (entityType: 'course' | 'section' | 'lesson', entityId: string, fieldKey: string) => boolean;
+  markFieldTouched?: (entityType: 'course' | 'section' | 'lesson', entityId: string, fieldKey: string) => void;
 }
 
 export function OutlinePanel({
   sections,
   lessons,
   selectedLessonId,
+  selectedSectionId,
   onSelectLesson,
+  onSelectSection,
   onAddSection,
   onRenameSection,
   onReorderSection,
@@ -59,20 +67,61 @@ export function OutlinePanel({
   onReorderLesson,
   onMoveLesson,
   onDeleteLesson,
+  shouldShowError,
+  markFieldTouched,
 }: OutlinePanelProps) {
   const [editingSectionId, setEditingSectionId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
+  const sectionTitleRef = useRef<HTMLInputElement | null>(null);
+
+  // Auto-start editing when a section is selected and not already editing
+  useEffect(() => {
+    if (selectedSectionId && editingSectionId !== selectedSectionId) {
+      const section = sections.find((s) => s.section_id === selectedSectionId);
+      if (section && (!section.title || section.title.trim() === '')) {
+        // Auto-start editing if section has no title
+        setEditingSectionId(selectedSectionId);
+        setEditTitle('');
+      }
+    }
+  }, [selectedSectionId, sections, editingSectionId]);
+
+  // Register section title field with focus registry when editing
+  useEffect(() => {
+    if (!editingSectionId || !sectionTitleRef.current) return;
+
+    const section = sections.find((s) => s.section_id === editingSectionId);
+    if (!section) return;
+
+    const unregister = focusRegistry.register({
+      entityType: 'section',
+      entityId: section.section_id,
+      fieldKey: 'title',
+      ref: sectionTitleRef as React.RefObject<HTMLElement>,
+    });
+
+    return () => {
+      unregister();
+    };
+  }, [editingSectionId, sections]);
 
   const sortedSections = [...sections].sort((a, b) => a.order - b.order);
 
   const handleStartEditSection = (section: CourseSection) => {
     setEditingSectionId(section.section_id);
-    setEditTitle(section.title);
+    setEditTitle(section.title || '');
+    if (onSelectSection) {
+      onSelectSection(section.section_id);
+    }
   };
 
   const handleSaveEditSection = () => {
-    if (editingSectionId && editTitle.trim()) {
-      onRenameSection(editingSectionId, editTitle.trim());
+    if (editingSectionId) {
+      const finalTitle = editTitle.trim() || 'Untitled section';
+      onRenameSection(editingSectionId, finalTitle);
+      if (markFieldTouched) {
+        markFieldTouched('section', editingSectionId, 'title');
+      }
       setEditingSectionId(null);
       setEditTitle('');
     }
@@ -126,13 +175,18 @@ export function OutlinePanel({
                     display: 'flex',
                     alignItems: 'center',
                     p: 1,
-                    bgcolor: 'grey.100',
+                    bgcolor: selectedSectionId === section.section_id ? 'action.selected' : 'grey.100',
                     borderRadius: 1,
                     mb: 0.5,
+                    border: selectedSectionId === section.section_id ? 2 : 0,
+                    borderColor: 'primary.main',
                   }}
                 >
                   {isEditing ? (
                     <TextField
+                      inputRef={(el) => {
+                        sectionTitleRef.current = el;
+                      }}
                       size="small"
                       value={editTitle}
                       onChange={(e) => setEditTitle(e.target.value)}
@@ -140,13 +194,23 @@ export function OutlinePanel({
                         if (e.key === 'Enter') handleSaveEditSection();
                         if (e.key === 'Escape') handleCancelEditSection();
                       }}
+                      onBlur={handleSaveEditSection}
+                      placeholder="Untitled section"
                       autoFocus
+                      error={shouldShowError && (!editTitle || editTitle.trim() === '') && shouldShowError('section', section.section_id, 'title')}
+                      helperText={shouldShowError && (!editTitle || editTitle.trim() === '') && shouldShowError('section', section.section_id, 'title') ? 'Section title is required' : ''}
                       sx={{ flex: 1, mr: 1 }}
                     />
                   ) : (
                     <>
-                      <Typography variant="subtitle2" sx={{ flex: 1, fontWeight: 600 }}>
-                        {section.title}
+                      <Typography 
+                        variant="subtitle2" 
+                        sx={{ flex: 1, fontWeight: 600, cursor: 'pointer' }}
+                        onClick={() => {
+                          handleStartEditSection(section);
+                        }}
+                      >
+                        {section.title || 'Untitled section'}
                       </Typography>
                       <Chip label={`${sectionLessons.length} lesson${sectionLessons.length !== 1 ? 's' : ''}`} size="small" />
                     </>
@@ -202,73 +266,99 @@ export function OutlinePanel({
 
                 {/* Lessons in Section */}
                 <List dense>
-                  {sectionLessons.map((lesson, lessonIndex) => (
-                    <ListItem
-                      key={lesson.lesson_id}
-                      disablePadding
-                      sx={{
-                        pl: 2,
-                        bgcolor: selectedLessonId === lesson.lesson_id ? 'action.selected' : 'transparent',
-                      }}
-                    >
-                      <ListItemButton
-                        onClick={() => onSelectLesson(lesson.lesson_id)}
-                        sx={{ py: 0.5 }}
+                  {sectionLessons.length === 0 ? (
+                    <ListItem disablePadding sx={{ pl: 2, mb: 1 }}>
+                      <Alert 
+                        severity="info" 
+                        sx={{ width: '100%', py: 0.5 }}
+                        action={
+                          <Button
+                            size="small"
+                            variant="contained"
+                            startIcon={<AddIcon />}
+                            onClick={() => onAddLesson(section.section_id)}
+                            sx={{ textTransform: 'none' }}
+                          >
+                            Add Lesson
+                          </Button>
+                        }
                       >
-                        <ListItemText
-                          primary={lesson.title || 'Untitled Lesson'}
-                          secondary={lesson.type}
-                          primaryTypographyProps={{ variant: 'body2' }}
-                          secondaryTypographyProps={{ variant: 'caption' }}
-                        />
-                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                          <IconButton
-                            size="small"
-                            disabled={lessonIndex === 0}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onReorderLesson(lesson.lesson_id, 'up');
-                            }}
-                            title="Move up"
-                          >
-                            <ArrowUpIcon fontSize="small" />
-                          </IconButton>
-                          <IconButton
-                            size="small"
-                            disabled={lessonIndex === sectionLessons.length - 1}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onReorderLesson(lesson.lesson_id, 'down');
-                            }}
-                            title="Move down"
-                          >
-                            <ArrowDownIcon fontSize="small" />
-                          </IconButton>
-                          <IconButton
-                            size="small"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onDeleteLesson(lesson.lesson_id);
-                            }}
-                            title="Delete lesson"
-                            color="error"
-                          >
-                            <DeleteIcon fontSize="small" />
-                          </IconButton>
-                        </Box>
-                      </ListItemButton>
+                        <Typography variant="caption">
+                          Add a lesson to publish
+                        </Typography>
+                      </Alert>
                     </ListItem>
-                  ))}
-                  <ListItem disablePadding sx={{ pl: 2 }}>
-                    <Button
-                      size="small"
-                      startIcon={<AddIcon />}
-                      onClick={() => onAddLesson(section.section_id)}
-                      sx={{ textTransform: 'none' }}
-                    >
-                      Add Lesson
-                    </Button>
-                  </ListItem>
+                  ) : (
+                    <>
+                      {sectionLessons.map((lesson, lessonIndex) => (
+                        <ListItem
+                          key={lesson.lesson_id}
+                          disablePadding
+                          sx={{
+                            pl: 2,
+                            bgcolor: selectedLessonId === lesson.lesson_id ? 'action.selected' : 'transparent',
+                          }}
+                        >
+                          <ListItemButton
+                            onClick={() => onSelectLesson(lesson.lesson_id)}
+                            sx={{ py: 0.5 }}
+                          >
+                            <ListItemText
+                              primary={lesson.title || 'Untitled Lesson'}
+                              secondary={lesson.type}
+                              primaryTypographyProps={{ variant: 'body2' }}
+                              secondaryTypographyProps={{ variant: 'caption' }}
+                            />
+                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                              <IconButton
+                                size="small"
+                                disabled={lessonIndex === 0}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onReorderLesson(lesson.lesson_id, 'up');
+                                }}
+                                title="Move up"
+                              >
+                                <ArrowUpIcon fontSize="small" />
+                              </IconButton>
+                              <IconButton
+                                size="small"
+                                disabled={lessonIndex === sectionLessons.length - 1}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onReorderLesson(lesson.lesson_id, 'down');
+                                }}
+                                title="Move down"
+                              >
+                                <ArrowDownIcon fontSize="small" />
+                              </IconButton>
+                              <IconButton
+                                size="small"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onDeleteLesson(lesson.lesson_id);
+                                }}
+                                title="Delete lesson"
+                                color="error"
+                              >
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            </Box>
+                          </ListItemButton>
+                        </ListItem>
+                      ))}
+                      <ListItem disablePadding sx={{ pl: 2 }}>
+                        <Button
+                          size="small"
+                          startIcon={<AddIcon />}
+                          onClick={() => onAddLesson(section.section_id)}
+                          sx={{ textTransform: 'none' }}
+                        >
+                          Add Lesson
+                        </Button>
+                      </ListItem>
+                    </>
+                  )}
                 </List>
               </Box>
             );
@@ -278,5 +368,6 @@ export function OutlinePanel({
     </Box>
   );
 }
+
 
 

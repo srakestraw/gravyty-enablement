@@ -340,6 +340,101 @@ Generate presigned download URL for content file.
 - `NOT_FOUND`: Content not found or no file attached
 - `FORBIDDEN`: Insufficient permissions to download
 
+### Admin Users
+
+#### GET /v1/admin/users
+
+List all users with admin context (role, status, groups).
+
+**Requires**: Admin role
+
+**Query Parameters**:
+- `limit` (number, optional): Page size (default: 50)
+- `cursor` (string, optional): Pagination cursor
+
+**Response**:
+```json
+{
+  "data": {
+    "items": [AdminUser],
+    "next_cursor": "string" // Optional, present if more results
+  },
+  "request_id": "req_..."
+}
+```
+
+#### POST /v1/admin/users/invite
+
+Invite a new user to the system.
+
+**Requires**: Admin role
+
+**Request Body**:
+```json
+{
+  "email": "string",
+  "name": "string", // Optional
+  "role": "Viewer" | "Contributor" | "Approver" | "Admin"
+}
+```
+
+**Response**:
+```json
+{
+  "data": AdminUser,
+  "request_id": "req_..."
+}
+```
+
+#### PATCH /v1/admin/users/:username/role
+
+Update a user's role.
+
+**Requires**: Admin role
+
+**Request Body**:
+```json
+{
+  "role": "Viewer" | "Contributor" | "Approver" | "Admin"
+}
+```
+
+**Response**:
+```json
+{
+  "data": AdminUser,
+  "request_id": "req_..."
+}
+```
+
+#### PATCH /v1/admin/users/:username/enable
+
+Enable a user account.
+
+**Requires**: Admin role
+
+**Response**:
+```json
+{
+  "data": AdminUser,
+  "request_id": "req_..."
+}
+```
+
+#### PATCH /v1/admin/users/:username/disable
+
+Disable a user account.
+
+**Requires**: Admin role
+
+**Response**:
+```json
+{
+  "data": AdminUser,
+  "request_id": "req_..."
+}
+```
+
 ## RBAC (Role-Based Access Control)
 
 ### Current Implementation (Stub)
