@@ -36,9 +36,6 @@ export class ApiStack extends cdk.NestedStack {
       },
     });
 
-    // Note: Lambda permission will be created in main stack after both nested stacks are deployed
-    // This breaks the circular dependency by creating the permission last
-
     // Create integration using lower-level construct to avoid automatic permission creation
     // Get the underlying CfnApi to create integration manually
     const cfnApi = this.httpApi.node.defaultChild as apigatewayv2.CfnApi;
@@ -70,6 +67,9 @@ export class ApiStack extends cdk.NestedStack {
     // Ensure routes depend on integration
     routeV1.addDependency(integration);
     routeHealth.addDependency(integration);
+
+    // Note: Lambda permission will be created in main stack after both nested stacks
+    // This avoids cross-stack circular dependencies between BaseStack and ApiStack
   }
 }
 

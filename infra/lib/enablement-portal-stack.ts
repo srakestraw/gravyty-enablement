@@ -295,15 +295,9 @@ export class EnablementPortalStack extends cdk.Stack {
         allowedOrigins,
       });
       this.httpApi = this.apiStack.httpApi;
-
-      // Create Lambda permission AFTER both stacks are deployed to break circular dependency
-      // This must be done in the main stack after nested stacks are created
-      this.apiLambda.addPermission('ApiGatewayInvoke', {
-        principal: new iam.ServicePrincipal('apigateway.amazonaws.com'),
-        // Use wildcard ARN to avoid circular dependency - works for any API Gateway in account/region
-        sourceArn: `arn:aws:execute-api:${this.region}:${this.account}:*/*/*`,
-      });
     }
+
+    // Transcription Worker Lambda (stays in main stack as it doesn't cause circular dependencies)
 
     // Transcription Worker Lambda (stays in main stack as it doesn't cause circular dependencies)
     const transcriptionWorkerLambda = new NodejsFunction(this, 'TranscriptionWorker', {
@@ -358,6 +352,18 @@ export class EnablementPortalStack extends cdk.Stack {
     });
 
     transcribeRule.addTarget(new targets.LambdaFunction(transcriptionWorkerLambda));
+
+    // Create Lambda permission AFTER both nested stacks are fully created
+    // This breaks the circular dependency by creating the permission last in the main stack
+    // Must be done after both BaseStack and ApiStack are instantiated
+    if (this.apiLambda && this.httpApi) {
+      // Use wildcard ARN to avoid referencing the specific API Gateway ARN
+      // This prevents circular dependencies between nested stacks
+      this.apiLambda.addPermission('ApiGatewayInvoke', {
+        principal: new iam.ServicePrincipal('apigateway.amazonaws.com'),
+        sourceArn: `arn:aws:execute-api:${this.region}:${this.account}:*/*/*`,
+      });
+    }
 
     new cdk.CfnOutput(this, 'EventsTableName', {
       value: this.eventsTable.tableName,

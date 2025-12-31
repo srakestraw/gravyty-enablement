@@ -1031,6 +1031,34 @@ VITE_COGNITO_USER_POOL_DOMAIN=<cognito-domain>
 - **Web**: `.env.local` file in `apps/web/`
 - **Infrastructure**: Set via `process.env` before CDK deploy
 
+#### Environment Isolation
+**Current Setup**: Development and production environments share the same DynamoDB tables and S3 buckets. This is intentional for early-stage development to simplify setup and reduce infrastructure costs.
+
+**Shared Resources**:
+- **LMS Tables**: `lms_courses`, `lms_lessons`, `lms_paths`, `lms_progress`, `lms_assignments`, `lms_certificates`, `lms_transcripts`
+- **Taxonomy Table**: `taxonomy`
+- **Content Tables**: `content_registry`, `notifications`, `subscriptions`, `events`
+- **S3 Buckets**: `enablement-content`, `lms-media`
+
+**Implications**:
+- Courses created locally (with `STORAGE_BACKEND=aws`) will appear in production
+- Taxonomy options created/updated locally will appear in production
+- Data created in production will be visible in local development
+- Exercise caution when testing destructive operations locally
+
+**Future: Separate Dev Environment**
+To create a separate dev environment later:
+1. Deploy a separate CDK stack with environment-specific table names (e.g., `lms_courses_dev`, `taxonomy_dev`)
+2. Set environment variables in `apps/api/.env` to point to dev tables:
+   ```
+   LMS_COURSES_TABLE=lms_courses_dev
+   LMS_LESSONS_TABLE=lms_lessons_dev
+   TAXONOMY_TABLE=taxonomy_dev
+   DDB_TABLE_CONTENT=content_registry_dev
+   # ... etc
+   ```
+3. Use separate AWS profiles or accounts for complete isolation
+
 ### Code Organization
 
 #### Monorepo Benefits
