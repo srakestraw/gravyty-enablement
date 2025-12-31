@@ -248,6 +248,29 @@ const tables = [
     ],
     BillingMode: 'PAY_PER_REQUEST',
   },
+  // Taxonomy Table
+  {
+    TableName: process.env.TAXONOMY_TABLE || 'taxonomy',
+    KeySchema: [
+      { AttributeName: 'option_id', KeyType: 'HASH' },
+    ],
+    AttributeDefinitions: [
+      { AttributeName: 'option_id', AttributeType: 'S' },
+      { AttributeName: 'group_key', AttributeType: 'S' },
+      { AttributeName: 'sort_order_label', AttributeType: 'S' },
+    ],
+    GlobalSecondaryIndexes: [
+      {
+        IndexName: 'GroupKeyIndex',
+        KeySchema: [
+          { AttributeName: 'group_key', KeyType: 'HASH' },
+          { AttributeName: 'sort_order_label', KeyType: 'RANGE' },
+        ],
+        Projection: { ProjectionType: 'ALL' },
+      },
+    ],
+    BillingMode: 'PAY_PER_REQUEST',
+  },
 ];
 
 async function createTable(tableDef: any) {

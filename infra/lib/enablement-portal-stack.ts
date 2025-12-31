@@ -24,6 +24,7 @@ export class EnablementPortalStack extends cdk.Stack {
   public readonly lmsProgressTable: dynamodb.Table;
   public readonly lmsAssignmentsTable: dynamodb.Table;
   public readonly lmsCertificatesTable: dynamodb.Table;
+  public readonly taxonomyTable: dynamodb.Table;
   // LMS S3 Bucket
   public readonly lmsMediaBucket: s3.Bucket;
   public readonly apiRole: iam.Role;
@@ -198,6 +199,22 @@ export class EnablementPortalStack extends cdk.Stack {
       sortKey: { name: 'issued_at', type: dynamodb.AttributeType.STRING },
     });
 
+    // Taxonomy Table
+    this.taxonomyTable = new dynamodb.Table(this, 'Taxonomy', {
+      tableName: 'taxonomy',
+      partitionKey: { name: 'option_id', type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+      pointInTimeRecovery: true,
+      encryption: dynamodb.TableEncryption.AWS_MANAGED,
+    });
+    // GSI: GroupKeyIndex
+    this.taxonomyTable.addGlobalSecondaryIndex({
+      indexName: 'GroupKeyIndex',
+      partitionKey: { name: 'group_key', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'sort_order_label', type: dynamodb.AttributeType.STRING },
+    });
+
     // LMS Media S3 Bucket
     this.lmsMediaBucket = new s3.Bucket(this, 'LmsMediaBucket', {
       bucketName: `lms-media-${this.account}-${this.region}`,
@@ -224,6 +241,7 @@ export class EnablementPortalStack extends cdk.Stack {
     this.lmsProgressTable.grantReadWriteData(lambdaRole);
     this.lmsAssignmentsTable.grantReadWriteData(lambdaRole);
     this.lmsCertificatesTable.grantReadWriteData(lambdaRole);
+    this.taxonomyTable.grantReadWriteData(lambdaRole);
 
     // Grant LMS S3 permissions (read/write on all objects in bucket)
     this.lmsMediaBucket.grantReadWrite(lambdaRole);
@@ -299,6 +317,23 @@ export class EnablementPortalStack extends cdk.Stack {
       description: 'Full administrative access',
       precedence: 4,
     });
+
+    // Grant Cognito admin permissions to Lambda role for user management
+    lambdaRole.addToPolicy(new iam.PolicyStatement({
+      effect: iam.Effect.ALLOW,
+      actions: [
+        'cognito-idp:ListUsers',
+        'cognito-idp:AdminCreateUser',
+        'cognito-idp:AdminGetUser',
+        'cognito-idp:AdminEnableUser',
+        'cognito-idp:AdminDisableUser',
+        'cognito-idp:AdminAddUserToGroup',
+        'cognito-idp:AdminRemoveUserFromGroup',
+        'cognito-idp:AdminListGroupsForUser',
+        'cognito-idp:ListGroups',
+      ],
+      resources: [this.userPool.userPoolArn],
+    }));
 
     // Google Identity Provider
     // Store Google OAuth credentials in SSM Parameter Store
@@ -425,6 +460,7 @@ export class EnablementPortalStack extends cdk.Stack {
           LMS_PROGRESS_TABLE: this.lmsProgressTable.tableName,
           LMS_ASSIGNMENTS_TABLE: this.lmsAssignmentsTable.tableName,
           LMS_CERTIFICATES_TABLE: this.lmsCertificatesTable.tableName,
+          TAXONOMY_TABLE: this.taxonomyTable.tableName,
           // LMS S3 Bucket
           LMS_MEDIA_BUCKET: this.lmsMediaBucket.bucketName,
         },
@@ -522,6 +558,12 @@ export class EnablementPortalStack extends cdk.Stack {
       value: this.lmsCertificatesTable.tableName,
       description: 'DynamoDB table name for LMS certificates',
       exportName: 'EnablementLmsCertificatesTableName',
+    });
+
+    new cdk.CfnOutput(this, 'TaxonomyTableName', {
+      value: this.taxonomyTable.tableName,
+      description: 'DynamoDB table name for taxonomy',
+      exportName: 'EnablementTaxonomyTableName',
     });
 
     new cdk.CfnOutput(this, 'LmsMediaBucketName', {

@@ -26,6 +26,7 @@ import {
   AssignmentIndOutlined,
   WorkspacePremiumOutlined,
   PermMediaOutlined,
+  CategoryOutlined,
   ArrowForwardOutlined,
 } from '@mui/icons-material';
 import { PlaceholderPage } from '../components/shared/PlaceholderPage';
@@ -204,6 +205,14 @@ export function AdminHubPage() {
             description="Manage media assets for courses and learning content"
             icon={<PermMediaOutlined />}
             path="/enablement/admin/learning/media"
+          />
+        </Grid>
+        <Grid item xs={12} sm={6} md={4}>
+          <HubTile
+            title="Taxonomy"
+            description="Manage controlled values used across Courses and Resources"
+            icon={<CategoryOutlined />}
+            path="/enablement/admin/learning/taxonomy"
           />
         </Grid>
       </Grid>

@@ -45,6 +45,7 @@ import {
   PlaylistPlayOutlined,
   AssignmentIndOutlined,
   PermMediaOutlined,
+  CategoryOutlined,
   ExpandMore,
   ExpandLess,
 } from '@mui/icons-material';
@@ -150,6 +151,7 @@ export function SideNav() {
             { label: 'Media Library', path: '/enablement/admin/learning/media', icon: <PermMediaOutlined fontSize="small" /> },
           ],
         },
+        { label: 'Taxonomy', path: '/enablement/admin/learning/taxonomy', icon: <CategoryOutlined fontSize="small" /> },
       ],
       adminOnly: true,
     },
