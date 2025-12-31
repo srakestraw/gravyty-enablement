@@ -151,7 +151,7 @@ export function SideNav() {
             { label: 'Media Library', path: '/enablement/admin/learning/media', icon: <PermMediaOutlined fontSize="small" /> },
           ],
         },
-        { label: 'Lists', path: '/enablement/admin/taxonomy', icon: <CategoryOutlined fontSize="small" /> },
+        { label: 'Taxonomy', path: '/enablement/admin/taxonomy', icon: <CategoryOutlined fontSize="small" /> },
       ],
       adminOnly: true,
     },

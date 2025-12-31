@@ -615,7 +615,7 @@ function App() {
         }
       />
       <Route
-        path="/enablement/admin/learning/taxonomy"
+        path="/enablement/admin/taxonomy"
         element={
           <RequireAuth>
             <RequireAdmin>
@@ -627,7 +627,7 @@ function App() {
         }
       />
       <Route
-        path="/enablement/admin/learning/taxonomy/:key"
+        path="/enablement/admin/taxonomy/:key"
         element={
           <RequireAuth>
             <RequireAdmin>
@@ -639,7 +639,7 @@ function App() {
         }
       />
       <Route
-        path="/enablement/admin/learning/taxonomy/migration"
+        path="/enablement/admin/taxonomy/migration"
         element={
           <RequireAuth>
             <RequireAdmin>

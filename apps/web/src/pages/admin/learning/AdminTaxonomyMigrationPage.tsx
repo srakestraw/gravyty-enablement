@@ -427,7 +427,7 @@ export function AdminTaxonomyMigrationPage() {
         Open Cleanup Options
       </Button>
       <Box sx={{ display: 'flex', gap: 2, mt: 3 }}>
-        <Button onClick={() => navigate('/enablement/admin/learning/taxonomy')}>
+        <Button onClick={() => navigate('/enablement/admin/taxonomy')}>
           Return to Taxonomy
         </Button>
       </Box>
@@ -448,7 +448,7 @@ export function AdminTaxonomyMigrationPage() {
         <Link
           component="button"
           variant="body1"
-          onClick={() => navigate('/enablement/admin/learning/taxonomy')}
+          onClick={() => navigate('/enablement/admin/taxonomy')}
           sx={{ textDecoration: 'none', cursor: 'pointer' }}
         >
           Taxonomy

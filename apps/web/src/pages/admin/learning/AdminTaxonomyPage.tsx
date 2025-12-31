@@ -91,7 +91,7 @@ export function AdminTaxonomyPage() {
       <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <Box>
           <Typography variant="h4" gutterBottom>
-            Lists
+            Taxonomy
           </Typography>
           <Typography variant="body2" color="text.secondary">
             Manage controlled values used across Courses and Resources.

@@ -34,6 +34,7 @@ import {
   DialogActions,
   InputAdornment,
   Tooltip,
+  Autocomplete,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -69,9 +70,11 @@ export function AdminTaxonomyDetailPage() {
   const [sortBy, setSortBy] = useState<SortOption>('default');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingLabel, setEditingLabel] = useState('');
+  const [editingParentId, setEditingParentId] = useState<string | null>(null);
   const [menuAnchor, setMenuAnchor] = useState<{ element: HTMLElement; optionId: string } | null>(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [newLabel, setNewLabel] = useState('');
+  const [newParentId, setNewParentId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [saving, setSaving] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState<string | null>(null);
@@ -94,6 +97,11 @@ export function AdminTaxonomyDetailPage() {
 
   const { options, loading, error, refetch, setOptions } = useTaxonomyOptions(key, {
     include_archived: true,
+  });
+
+  // Fetch Product Suites when viewing Products
+  const { options: productSuites } = useTaxonomyOptions('product_suite', {
+    include_archived: false,
   });
 
   // Track page view
@@ -151,6 +159,7 @@ export function AdminTaxonomyDetailPage() {
     try {
       const response = await taxonomyApi.createOption(key, {
         label: newLabel.trim(),
+        parent_id: key === 'product' ? (newParentId || undefined) : undefined,
       });
 
       if ('error' in response) {
@@ -160,6 +169,7 @@ export function AdminTaxonomyDetailPage() {
 
       track('lms_taxonomy_option_created', { key, option_id: response.data.option.option_id });
       setNewLabel('');
+      setNewParentId(null);
       setCreateDialogOpen(false);
       refetch();
     } catch (err) {
@@ -173,6 +183,7 @@ export function AdminTaxonomyDetailPage() {
   const handleStartEdit = (option: TaxonomyOption) => {
     setEditingId(option.option_id);
     setEditingLabel(option.label);
+    setEditingParentId(option.parent_id || null);
   };
 
   const handleSaveEdit = async (optionId: string) => {
@@ -192,9 +203,13 @@ export function AdminTaxonomyDetailPage() {
 
     setSaving(optionId);
     try {
-      const response = await taxonomyApi.updateOption(optionId, {
+      const updates: any = {
         label: editingLabel.trim(),
-      });
+      };
+      if (key === 'product') {
+        updates.parent_id = editingParentId || null;
+      }
+      const response = await taxonomyApi.updateOption(optionId, updates);
 
       if ('error' in response) {
         alert(`Failed to update option: ${response.error.message}`);
@@ -204,6 +219,7 @@ export function AdminTaxonomyDetailPage() {
       track('lms_taxonomy_option_renamed', { key, option_id: optionId });
       setEditingId(null);
       setEditingLabel('');
+      setEditingParentId(null);
       refetch();
     } catch (err) {
       console.error('Error updating option:', err);
@@ -216,6 +232,7 @@ export function AdminTaxonomyDetailPage() {
   const handleCancelEdit = () => {
     setEditingId(null);
     setEditingLabel('');
+    setEditingParentId(null);
   };
 
   const handleArchive = async (optionId: string) => {
@@ -328,7 +345,7 @@ export function AdminTaxonomyDetailPage() {
         <Link
           component="button"
           variant="body1"
-          onClick={() => navigate('/enablement/admin/learning/taxonomy')}
+          onClick={() => navigate('/enablement/admin/taxonomy')}
           sx={{ textDecoration: 'none', cursor: 'pointer' }}
         >
           Taxonomy
@@ -391,6 +408,7 @@ export function AdminTaxonomyDetailPage() {
             <TableRow>
               <TableCell sx={{ width: 40 }}>Order</TableCell>
               <TableCell>Label</TableCell>
+              {key === 'product' && <TableCell>Product Suite</TableCell>}
               <TableCell>Status</TableCell>
               <TableCell align="right">Actions</TableCell>
             </TableRow>
@@ -398,7 +416,7 @@ export function AdminTaxonomyDetailPage() {
           <TableBody>
             {filteredOptions.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} align="center" sx={{ py: 4 }}>
+                <TableCell colSpan={key === 'product' ? 5 : 4} align="center" sx={{ py: 4 }}>
                   {searchQuery ? (
                     <>
                       <Typography variant="body2" color="text.secondary" gutterBottom>
@@ -488,10 +506,38 @@ export function AdminTaxonomyDetailPage() {
                           onClick={() => handleStartEdit(option)}
                         >
                           {option.label}
-                          <EditIcon fontSize="small" sx={{ opacity: 0.5 }} />
                         </Box>
                       )}
                     </TableCell>
+                    {key === 'product' && (
+                      <TableCell>
+                        {isEditing ? (
+                          <Autocomplete
+                            size="small"
+                            options={productSuites}
+                            getOptionLabel={(option) => option.label}
+                            value={productSuites.find((ps) => ps.option_id === editingParentId) || null}
+                            onChange={(_, newValue) => {
+                              setEditingParentId(newValue?.option_id || null);
+                            }}
+                            renderInput={(params) => (
+                              <TextField
+                                {...params}
+                                placeholder="Select Product Suite"
+                                sx={{ minWidth: 200 }}
+                              />
+                            )}
+                            disabled={isSaving}
+                          />
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">
+                            {option.parent_id
+                              ? productSuites.find((ps) => ps.option_id === option.parent_id)?.label || 'Unknown'
+                              : 'None'}
+                          </Typography>
+                        )}
+                      </TableCell>
+                    )}
                     <TableCell>
                       <Chip
                         label={isArchived ? 'Archived' : 'Active'}
@@ -700,7 +746,16 @@ export function AdminTaxonomyDetailPage() {
       </Dialog>
 
       {/* Create Dialog */}
-      <Dialog open={createDialogOpen} onClose={() => setCreateDialogOpen(false)} maxWidth="sm" fullWidth>
+      <Dialog
+        open={createDialogOpen}
+        onClose={() => {
+          setCreateDialogOpen(false);
+          setNewLabel('');
+          setNewParentId(null);
+        }}
+        maxWidth="sm"
+        fullWidth
+      >
         <DialogTitle>Add Option</DialogTitle>
         <DialogContent>
           <TextField
@@ -716,9 +771,34 @@ export function AdminTaxonomyDetailPage() {
             }}
             sx={{ mt: 1 }}
           />
+          {key === 'product' && (
+            <Autocomplete
+              options={productSuites}
+              getOptionLabel={(option) => option.label}
+              value={productSuites.find((ps) => ps.option_id === newParentId) || null}
+              onChange={(_, newValue) => {
+                setNewParentId(newValue?.option_id || null);
+              }}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Product Suite"
+                  placeholder="Select Product Suite (optional)"
+                  sx={{ mt: 2 }}
+                />
+              )}
+            />
+          )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setCreateDialogOpen(false)} disabled={creating}>
+          <Button
+            onClick={() => {
+              setCreateDialogOpen(false);
+              setNewLabel('');
+              setNewParentId(null);
+            }}
+            disabled={creating}
+          >
             Cancel
           </Button>
           <Button onClick={handleCreate} variant="contained" disabled={!newLabel.trim() || creating}>
