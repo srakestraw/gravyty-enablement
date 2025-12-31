@@ -7,6 +7,7 @@
 import { Card, CardContent, CardActionArea, CardMedia, Box, Typography, Chip } from '@mui/material';
 import { PlayArrowOutlined } from '@mui/icons-material';
 import type { CourseSummary } from '@gravyty/domain';
+import { formatDurationMinutes } from '../../utils/formatDuration';
 
 export interface CourseCardProps {
   course: CourseSummary;
@@ -48,8 +49,8 @@ export function CourseCard({ course, onClick }: CourseCardProps) {
             </Typography>
           )}
           <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 'auto' }}>
-            {course.estimated_duration_minutes && (
-              <Chip label={`${course.estimated_duration_minutes} min`} size="small" variant="outlined" />
+            {course.estimated_minutes && (
+              <Chip label={formatDurationMinutes(course.estimated_minutes)} size="small" variant="outlined" />
             )}
             {course.difficulty_level && (
               <Chip label={course.difficulty_level} size="small" variant="outlined" />

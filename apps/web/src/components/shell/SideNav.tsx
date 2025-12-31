@@ -139,36 +139,21 @@ export function SideNav() {
       icon: <AdminPanelSettingsOutlined fontSize="small" />,
       items: [
         { label: 'Users & Roles', path: '/enablement/admin/users', icon: <ManageAccountsOutlined fontSize="small" /> },
-        {
-          label: 'Learning Admin',
-          path: '/enablement/admin/learning',
-          icon: <SchoolOutlined fontSize="small" />,
-          children: [
-            { label: 'Courses', path: '/enablement/admin/learning/courses', icon: <MenuBookOutlined fontSize="small" /> },
-            { label: 'Learning Paths', path: '/enablement/admin/learning/paths', icon: <AltRouteOutlined fontSize="small" /> },
-            { label: 'Assignments', path: '/enablement/admin/learning/assignments', icon: <AssignmentIndOutlined fontSize="small" /> },
-            { label: 'Certificate Templates', path: '/enablement/admin/learning/certificates', icon: <WorkspacePremiumOutlined fontSize="small" /> },
-            { label: 'Media Library', path: '/enablement/admin/learning/media', icon: <PermMediaOutlined fontSize="small" /> },
-          ],
-        },
         { label: 'Taxonomy', path: '/enablement/admin/taxonomy', icon: <CategoryOutlined fontSize="small" /> },
+        { label: 'Media Library', path: '/enablement/admin/learning/media', icon: <PermMediaOutlined fontSize="small" /> },
+        { label: 'Assignments', path: '/enablement/admin/learning/assignments', icon: <AssignmentIndOutlined fontSize="small" /> },
+        { label: 'Certificate Templates', path: '/enablement/admin/learning/certificates', icon: <WorkspacePremiumOutlined fontSize="small" /> },
       ],
       adminOnly: true,
     },
   ];
 
   // Initialize expanded state: all groups collapsed by default
-  // Also track expanded state for nested items (e.g., Learning Admin)
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {};
     navGroups.forEach((group) => {
       initial[group.label] = group.defaultExpanded ?? false;
     });
-    // Check if we're on a Learning Admin route and expand it
-    if (location.pathname.startsWith('/enablement/admin/learning')) {
-      initial['Admin'] = true;
-      initial['Learning Admin'] = true;
-    }
     return initial;
   });
 
@@ -188,10 +173,6 @@ export function SideNav() {
         if (currentPath.startsWith(item.path)) {
           return true;
         }
-        // Check nested children
-        if (item.children) {
-          return item.children.some((child) => currentPath.startsWith(child.path));
-        }
         return false;
       });
       
@@ -199,17 +180,6 @@ export function SideNav() {
         newExpanded[group.label] = true;
       }
       
-      // Auto-expand nested items (e.g., Learning Admin) when on their routes
-      group.items.forEach((item) => {
-        if (item.children) {
-          const hasActiveChild = item.children.some((child) => currentPath.startsWith(child.path));
-          // Also check if current path matches the parent path exactly or is a child route
-          const isParentRoute = currentPath === item.path || currentPath.startsWith(item.path + '/');
-          if ((hasActiveChild || isParentRoute) && !newExpanded[item.label]) {
-            newExpanded[item.label] = true;
-          }
-        }
-      });
     });
     
     setExpandedGroups(newExpanded);
@@ -249,6 +219,10 @@ export function SideNav() {
       return navItem.children.some((child) => location.pathname.startsWith(child.path));
     }
     // Regular item: match if pathname starts with path
+    // Special handling: don't match /enablement/admin/learning/* when checking /enablement/learn/*
+    if (path.startsWith('/enablement/learn/')) {
+      return location.pathname.startsWith(path) && !location.pathname.startsWith('/enablement/admin/learning/');
+    }
     return location.pathname.startsWith(path);
   };
 
@@ -268,15 +242,8 @@ export function SideNav() {
     }));
   };
 
-  // Toggle nested item expansion (e.g., Learning Admin)
-  const handleNestedItemToggle = (itemLabel: string) => {
-    setExpandedGroups((prev) => ({
-      ...prev,
-      [itemLabel]: !prev[itemLabel],
-    }));
-  };
 
-  // Render a single nav item (supports nested children)
+  // Render a single nav item
   const renderNavItem = (item: NavItem, indent: boolean = false) => {
     // Handle subsection headers
     if (item.isHeader) {
@@ -301,13 +268,7 @@ export function SideNav() {
       );
     }
 
-    // Check if item has children (nested items)
-    const hasChildren = item.children && item.children.length > 0;
-    const isNestedExpanded = hasChildren ? expandedGroups[item.label] ?? false : false;
-    
-    // Check if any child is active
-    const hasActiveChild = hasChildren && item.children!.some((child) => isActive(child.path));
-    const itemIsActive = isActive(item.path) || hasActiveChild;
+    const itemIsActive = isActive(item.path);
     
     if (isCollapsed) {
       return (
@@ -315,13 +276,7 @@ export function SideNav() {
           <ListItem disablePadding>
             <ListItemButton
               selected={itemIsActive}
-              onClick={() => {
-                if (hasChildren) {
-                  handleNestedItemToggle(item.label);
-                } else {
-                  handleNavClick(item.path);
-                }
-              }}
+              onClick={() => handleNavClick(item.path)}
               sx={{
                 justifyContent: 'center',
                 px: 1,
@@ -346,48 +301,7 @@ export function SideNav() {
       );
     }
 
-    // Render parent item with children (collapsible)
-    if (hasChildren) {
-      return (
-        <Box key={item.path}>
-          <ListItem disablePadding>
-            <ListItemButton
-              selected={itemIsActive}
-              onClick={() => {
-                // Toggle expansion (don't navigate for parent items with children)
-                handleNestedItemToggle(item.label);
-              }}
-              sx={{
-                pl: indent ? 4 : 2,
-                '&.Mui-selected': {
-                  bgcolor: 'primary.main',
-                  color: 'primary.contrastText',
-                  '&:hover': {
-                    bgcolor: 'primary.dark',
-                  },
-                  '& .MuiListItemIcon-root': {
-                    color: 'primary.contrastText',
-                  },
-                },
-              }}
-            >
-              <ListItemIcon sx={{ minWidth: 40 }}>
-                {item.icon}
-              </ListItemIcon>
-              <ListItemText primary={item.label} />
-              {isNestedExpanded ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
-            </ListItemButton>
-          </ListItem>
-          <Collapse in={isNestedExpanded} timeout="auto" unmountOnExit>
-            <List component="div" disablePadding>
-              {item.children!.map((child) => renderNavItem(child, true))}
-            </List>
-          </Collapse>
-        </Box>
-      );
-    }
-
-    // Render regular item (no children)
+    // Render regular item
     return (
       <ListItem key={item.path} disablePadding>
         <ListItemButton

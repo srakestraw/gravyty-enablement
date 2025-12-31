@@ -49,6 +49,7 @@ export const CourseSummarySchema = z.object({
   product_suite: z.string().optional(), // Was "product_concept"
   topic_tags: z.array(z.string()).default([]),
   estimated_duration_minutes: z.number().int().min(0).optional(),
+  estimated_minutes: z.number().int().min(1).max(600).optional(),
   difficulty_level: z.enum(['beginner', 'intermediate', 'advanced']).optional(),
   status: z.enum(['draft', 'published', 'archived']),
   published_at: z.string().optional(),

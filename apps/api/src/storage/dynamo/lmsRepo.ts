@@ -30,6 +30,7 @@ import type {
   CertificateSummary,
   CertificateTemplate,
   CertificateTemplateSummary,
+  Transcript,
 } from '@gravyty/domain';
 
 /**
@@ -41,6 +42,7 @@ export const LMS_PATHS_TABLE = process.env.LMS_PATHS_TABLE || 'lms_paths';
 export const LMS_PROGRESS_TABLE = process.env.LMS_PROGRESS_TABLE || 'lms_progress';
 export const LMS_ASSIGNMENTS_TABLE = process.env.LMS_ASSIGNMENTS_TABLE || 'lms_assignments';
 export const LMS_CERTIFICATES_TABLE = process.env.LMS_CERTIFICATES_TABLE || 'lms_certificates';
+export const LMS_TRANSCRIPTS_TABLE = process.env.LMS_TRANSCRIPTS_TABLE || 'lms_transcripts';
 
 /**
  * LMS S3 Bucket Name
@@ -715,6 +717,7 @@ export class LmsRepo {
       product_suite: course.product_suite, // Was product_concept
       topic_tags: course.topic_tags || [],
       estimated_duration_minutes: course.estimated_duration_minutes,
+      estimated_minutes: course.estimated_minutes,
       difficulty_level: course.difficulty_level,
       status: course.status,
       published_at: course.published_at,
@@ -1109,7 +1112,7 @@ export class LmsRepo {
   async updateCourseDraft(
     courseId: string,
     userId: string,
-    updates: Partial<Pick<Course, 'title' | 'description' | 'short_description' | 'product' | 'product_suite' | 'topic_tags' | 'product_id' | 'product_suite_id' | 'topic_tag_ids' | 'badges' | 'badge_ids' | 'cover_image'>>
+    updates: Partial<Pick<Course, 'title' | 'description' | 'short_description' | 'product' | 'product_suite' | 'topic_tags' | 'product_id' | 'product_suite_id' | 'topic_tag_ids' | 'badges' | 'badge_ids' | 'cover_image' | 'estimated_minutes'>>
   ): Promise<Course> {
     const now = new Date().toISOString();
     
@@ -1807,6 +1810,91 @@ export class LmsRepo {
     await dynamoDocClient.send(updateCommand);
     
     return assignment;
+  }
+
+  /**
+   * Update lesson transcript
+   * Updates only the transcript field in lesson content, preserving other data
+   */
+  async updateLessonTranscript(lessonId: string, transcript: string): Promise<void> {
+    // First, get the lesson to preserve all other fields
+    const lesson = await this.getLesson('', lessonId); // courseId not needed for GetItem
+    if (!lesson) {
+      throw new Error(`Lesson not found: ${lessonId}`);
+    }
+
+    // Update only the transcript field in content
+    if (lesson.content.kind === 'video') {
+      lesson.content.transcript = transcript;
+      lesson.content.transcript_status = 'complete';
+    } else {
+      throw new Error(`Lesson ${lessonId} is not a video lesson`);
+    }
+
+    // Save updated lesson
+    const command = new PutCommand({
+      TableName: LMS_LESSONS_TABLE,
+      Item: lesson,
+    });
+    await dynamoDocClient.send(command);
+  }
+
+  /**
+   * Create transcript record
+   */
+  async createTranscript(transcript: Transcript): Promise<void> {
+    const command = new PutCommand({
+      TableName: LMS_TRANSCRIPTS_TABLE,
+      Item: {
+        transcript_id: transcript.transcript_id,
+        lesson_id: transcript.lesson_id,
+        video_media_id: transcript.video_media_id,
+        segments: transcript.segments,
+        full_text: transcript.full_text,
+        language: transcript.language || 'en',
+        created_at: transcript.created_at,
+        created_by: transcript.created_by,
+        updated_at: transcript.updated_at,
+        // GSI key
+        'lesson_id#created_at': `${transcript.lesson_id}#${transcript.created_at}`,
+      },
+    });
+    await dynamoDocClient.send(command);
+  }
+
+  /**
+   * Get transcript by lesson ID
+   * Returns the most recent transcript for a lesson
+   */
+  async getTranscriptByLessonId(lessonId: string): Promise<Transcript | null> {
+    const command = new QueryCommand({
+      TableName: LMS_TRANSCRIPTS_TABLE,
+      IndexName: 'by_lesson_id',
+      KeyConditionExpression: 'lesson_id = :lessonId',
+      ExpressionAttributeValues: {
+        ':lessonId': lessonId,
+      },
+      ScanIndexForward: false, // Descending order (most recent first)
+      Limit: 1,
+    });
+
+    const { Items = [] } = await dynamoDocClient.send(command);
+    if (Items.length === 0) {
+      return null;
+    }
+
+    const item = Items[0] as any;
+    return {
+      transcript_id: item.transcript_id,
+      lesson_id: item.lesson_id,
+      video_media_id: item.video_media_id,
+      segments: item.segments,
+      full_text: item.full_text,
+      language: item.language || 'en',
+      created_at: item.created_at,
+      created_by: item.created_by,
+      updated_at: item.updated_at,
+    };
   }
 }
 

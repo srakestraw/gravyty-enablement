@@ -159,28 +159,28 @@ export function AdminHubPage() {
 
       <Box sx={{ mb: 3 }}>
         <Typography variant="h5" component="h2" gutterBottom sx={{ fontWeight: 600 }}>
-          Learning Admin
+          Governance
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-          Manage courses, learning paths, assignments, certificates, and media assets
+          Manage taxonomy, media assets, assignments, and certificate templates
         </Typography>
       </Box>
 
       <Grid container spacing={3}>
         <Grid item xs={12} sm={6} md={4}>
           <HubTile
-            title="Courses"
-            description="Manage courses, create new content, and configure course settings"
-            icon={<MenuBookOutlined />}
-            path="/enablement/admin/learning/courses"
+            title="Taxonomy"
+            description="Manage controlled values used across Courses and Resources"
+            icon={<CategoryOutlined />}
+            path="/enablement/admin/taxonomy"
           />
         </Grid>
         <Grid item xs={12} sm={6} md={4}>
           <HubTile
-            title="Learning Paths"
-            description="Create and manage structured learning paths"
-            icon={<AltRouteOutlined />}
-            path="/enablement/admin/learning/paths"
+            title="Media Library"
+            description="Manage media assets for courses and learning content"
+            icon={<PermMediaOutlined />}
+            path="/enablement/admin/learning/media"
           />
         </Grid>
         <Grid item xs={12} sm={6} md={4}>
@@ -197,22 +197,6 @@ export function AdminHubPage() {
             description="Design and manage certificate templates"
             icon={<WorkspacePremiumOutlined />}
             path="/enablement/admin/learning/certificates"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={4}>
-          <HubTile
-            title="Media Library"
-            description="Manage media assets for courses and learning content"
-            icon={<PermMediaOutlined />}
-            path="/enablement/admin/learning/media"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={4}>
-          <HubTile
-            title="Taxonomy"
-            description="Manage controlled values used across Courses and Resources"
-            icon={<CategoryOutlined />}
-            path="/enablement/admin/taxonomy"
           />
         </Grid>
       </Grid>

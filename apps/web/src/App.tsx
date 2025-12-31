@@ -59,6 +59,7 @@ import { AdminLearningCertificatesPage } from './pages/admin/learning/AdminLearn
 import { AdminLearningMediaPage } from './pages/admin/learning/AdminLearningMediaPage';
 import { AdminTaxonomyPage } from './pages/admin/learning/AdminTaxonomyPage';
 import { AdminTaxonomyDetailPage } from './pages/admin/learning/AdminTaxonomyDetailPage';
+import { RequireLearningPermission } from './components/auth/RequireLearningPermission';
 
 const RETURN_TO_KEY = 'enablement_return_to';
 
@@ -83,6 +84,28 @@ function RootRoute() {
   }
 
   return <LandingPage />;
+}
+
+/**
+ * Redirect component for old admin learning courses route
+ */
+function RedirectToLearnCourses() {
+  const navigate = useNavigate();
+  useEffect(() => {
+    navigate('/enablement/learn/courses', { replace: true });
+  }, [navigate]);
+  return null;
+}
+
+/**
+ * Redirect component for old admin learning paths route
+ */
+function RedirectToLearnPaths() {
+  const navigate = useNavigate();
+  useEffect(() => {
+    navigate('/enablement/learn/paths', { replace: true });
+  }, [navigate]);
+  return null;
 }
 
 function App() {
@@ -528,28 +551,14 @@ function App() {
           </RequireAuth>
         }
       />
-      {/* Admin Learning routes (Admin only) */}
+      {/* Redirects from old admin learning routes to new learn routes */}
       <Route
         path="/enablement/admin/learning/courses"
         element={
           <RequireAuth>
-            <RequireAdmin>
-              <AppShell>
-                <AdminLearningCoursesPage />
-              </AppShell>
-            </RequireAdmin>
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/enablement/admin/learning/courses/:courseId"
-        element={
-          <RequireAuth>
-            <RequireAdmin>
-              <AppShell>
-                <AdminCourseEditorPage />
-              </AppShell>
-            </RequireAdmin>
+            <AppShell>
+              <RedirectToLearnCourses />
+            </AppShell>
           </RequireAuth>
         }
       />
@@ -557,11 +566,28 @@ function App() {
         path="/enablement/admin/learning/paths"
         element={
           <RequireAuth>
-            <RequireAdmin>
+            <AppShell>
+              <RedirectToLearnPaths />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      
+      {/* Admin Learning editor routes (require learning edit permissions) */}
+      {/* Note: Route-level check is for edit.own or edit.any; component-level checks handle ownership */}
+      <Route
+        path="/enablement/admin/learning/courses/:courseId"
+        element={
+          <RequireAuth>
+            <RequireLearningPermission 
+              permission="learning.course.edit.own"
+              redirectTo="/enablement/learn/courses"
+              redirectMessage="You do not have permission to edit courses."
+            >
               <AppShell>
-                <AdminLearningPathsPage />
+                <AdminCourseEditorPage />
               </AppShell>
-            </RequireAdmin>
+            </RequireLearningPermission>
           </RequireAuth>
         }
       />
@@ -569,11 +595,15 @@ function App() {
         path="/enablement/admin/learning/paths/:pathId"
         element={
           <RequireAuth>
-            <RequireAdmin>
+            <RequireLearningPermission 
+              permission="learning.path.edit.own"
+              redirectTo="/enablement/learn/paths"
+              redirectMessage="You do not have permission to edit learning paths."
+            >
               <AppShell>
                 <AdminPathEditorPage />
               </AppShell>
-            </RequireAdmin>
+            </RequireLearningPermission>
           </RequireAuth>
         }
       />

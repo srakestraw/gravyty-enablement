@@ -57,6 +57,7 @@ export function DetailsTabContent({
   const [title, setTitle] = useState('');
   const [shortDescription, setShortDescription] = useState('');
   const [description, setDescription] = useState('');
+  const [estimatedMinutes, setEstimatedMinutes] = useState<string>('');
 
   // Refs for focus registry
   const productRef = useRef<HTMLDivElement>(null);
@@ -78,9 +79,10 @@ export function DetailsTabContent({
       setTitle(course.title || '');
       setShortDescription(course.short_description || '');
       setDescription(course.description || '');
+      setEstimatedMinutes(course.estimated_minutes?.toString() || '');
       lastSyncedCourseIdRef.current = course.course_id;
     }
-  }, [course?.course_id, course?.title, course?.short_description, course?.description, course?.product_id, course?.product_suite_id, course?.topic_tag_ids, course?.badge_ids]);
+  }, [course?.course_id, course?.title, course?.short_description, course?.description, course?.product_id, course?.product_suite_id, course?.topic_tag_ids, course?.badge_ids, course?.estimated_minutes]);
 
   // Register fields with focus registry
   useEffect(() => {
@@ -290,6 +292,63 @@ export function DetailsTabContent({
                   error={shouldShowError && shouldShowError('course', course.course_id, 'topic_tag_ids')}
                 />
               </Box>
+            </Grid>
+
+            {/* Estimated Time */}
+            <Grid item xs={12} sm={6}>
+              <TextField
+                label="Estimated time"
+                type="number"
+                value={estimatedMinutes}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setEstimatedMinutes(value);
+                  // Parse and validate
+                  if (value === '' || value === null || value === undefined) {
+                    handleCourseFieldChange('estimated_minutes', undefined);
+                  } else {
+                    const parsed = parseInt(value, 10);
+                    if (!isNaN(parsed) && parsed >= 1 && parsed <= 600) {
+                      handleCourseFieldChange('estimated_minutes', parsed);
+                    } else if (value !== '') {
+                      // Invalid value, but keep it in the field for user to correct
+                      handleCourseFieldChange('estimated_minutes', undefined);
+                    }
+                  }
+                }}
+                onBlur={() => {
+                  if (markFieldTouched) {
+                    markFieldTouched('course', course.course_id, 'estimated_minutes');
+                  }
+                }}
+                inputProps={{
+                  min: 1,
+                  max: 600,
+                  step: 1,
+                }}
+                fullWidth
+                helperText={
+                  shouldShowError &&
+                  estimatedMinutes !== '' &&
+                  (isNaN(parseInt(estimatedMinutes, 10)) ||
+                    parseInt(estimatedMinutes, 10) < 1 ||
+                    parseInt(estimatedMinutes, 10) > 600) &&
+                  shouldShowError('course', course.course_id, 'estimated_minutes')
+                    ? 'Must be an integer between 1 and 600'
+                    : 'Displayed on course cards. Use the total time to complete this course.'
+                }
+                error={
+                  shouldShowError &&
+                  estimatedMinutes !== '' &&
+                  (isNaN(parseInt(estimatedMinutes, 10)) ||
+                    parseInt(estimatedMinutes, 10) < 1 ||
+                    parseInt(estimatedMinutes, 10) > 600) &&
+                  shouldShowError('course', course.course_id, 'estimated_minutes')
+                }
+                InputProps={{
+                  endAdornment: <Typography variant="body2" color="text.secondary" sx={{ ml: 1, mr: 1 }}>minutes</Typography>,
+                }}
+              />
             </Grid>
           </Grid>
         </Paper>

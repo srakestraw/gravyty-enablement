@@ -19,7 +19,7 @@ import { z } from 'zod';
  * - "product_suite" (was "product_concept")
  * - "topic_tag" (unchanged)
  */
-export declare const TaxonomyGroupKeySchema: z.ZodEnum<["product", "product_suite", "topic_tag"]>;
+export declare const TaxonomyGroupKeySchema: z.ZodEnum<["product", "product_suite", "topic_tag", "badge"]>;
 export type TaxonomyGroupKey = z.infer<typeof TaxonomyGroupKeySchema>;
 /**
  * Taxonomy Option
@@ -29,7 +29,7 @@ export type TaxonomyGroupKey = z.infer<typeof TaxonomyGroupKeySchema>;
  */
 export declare const TaxonomyOptionSchema: z.ZodObject<{
     option_id: z.ZodString;
-    group_key: z.ZodEnum<["product", "product_suite", "topic_tag"]>;
+    group_key: z.ZodEnum<["product", "product_suite", "topic_tag", "badge"]>;
     label: z.ZodString;
     slug: z.ZodString;
     sort_order: z.ZodDefault<z.ZodNumber>;
@@ -38,6 +38,7 @@ export declare const TaxonomyOptionSchema: z.ZodObject<{
     deleted_at: z.ZodNullable<z.ZodOptional<z.ZodString>>;
     parent_id: z.ZodOptional<z.ZodString>;
     color: z.ZodOptional<z.ZodString>;
+    short_description: z.ZodOptional<z.ZodString>;
     created_at: z.ZodString;
     created_by: z.ZodString;
     updated_at: z.ZodString;
@@ -49,10 +50,11 @@ export declare const TaxonomyOptionSchema: z.ZodObject<{
     updated_at: string;
     updated_by: string;
     option_id: string;
-    group_key: "product" | "product_suite" | "topic_tag";
+    group_key: "product" | "product_suite" | "topic_tag" | "badge";
     label: string;
     slug: string;
     sort_order: number;
+    short_description?: string | undefined;
     archived_at?: string | undefined;
     deleted_at?: string | null | undefined;
     parent_id?: string | undefined;
@@ -63,10 +65,11 @@ export declare const TaxonomyOptionSchema: z.ZodObject<{
     updated_at: string;
     updated_by: string;
     option_id: string;
-    group_key: "product" | "product_suite" | "topic_tag";
+    group_key: "product" | "product_suite" | "topic_tag" | "badge";
     label: string;
     slug: string;
     status?: "archived" | "active" | undefined;
+    short_description?: string | undefined;
     sort_order?: number | undefined;
     archived_at?: string | undefined;
     deleted_at?: string | null | undefined;
@@ -78,22 +81,25 @@ export type TaxonomyOption = z.infer<typeof TaxonomyOptionSchema>;
  * Create Taxonomy Option Request
  */
 export declare const CreateTaxonomyOptionSchema: z.ZodObject<{
-    group_key: z.ZodEnum<["product", "product_suite", "topic_tag"]>;
+    group_key: z.ZodEnum<["product", "product_suite", "topic_tag", "badge"]>;
     label: z.ZodString;
     slug: z.ZodOptional<z.ZodString>;
     sort_order: z.ZodOptional<z.ZodNumber>;
     parent_id: z.ZodOptional<z.ZodString>;
     color: z.ZodOptional<z.ZodString>;
+    short_description: z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
-    group_key: "product" | "product_suite" | "topic_tag";
+    group_key: "product" | "product_suite" | "topic_tag" | "badge";
     label: string;
+    short_description?: string | undefined;
     slug?: string | undefined;
     sort_order?: number | undefined;
     parent_id?: string | undefined;
     color?: string | undefined;
 }, {
-    group_key: "product" | "product_suite" | "topic_tag";
+    group_key: "product" | "product_suite" | "topic_tag" | "badge";
     label: string;
+    short_description?: string | undefined;
     slug?: string | undefined;
     sort_order?: number | undefined;
     parent_id?: string | undefined;
@@ -111,8 +117,10 @@ export declare const UpdateTaxonomyOptionSchema: z.ZodObject<{
     status: z.ZodOptional<z.ZodEnum<["active", "archived"]>>;
     deleted_at: z.ZodNullable<z.ZodOptional<z.ZodString>>;
     color: z.ZodNullable<z.ZodOptional<z.ZodString>>;
+    short_description: z.ZodNullable<z.ZodOptional<z.ZodString>>;
 }, "strip", z.ZodTypeAny, {
     status?: "archived" | "active" | undefined;
+    short_description?: string | null | undefined;
     label?: string | undefined;
     slug?: string | undefined;
     sort_order?: number | undefined;
@@ -121,6 +129,7 @@ export declare const UpdateTaxonomyOptionSchema: z.ZodObject<{
     color?: string | null | undefined;
 }, {
     status?: "archived" | "active" | undefined;
+    short_description?: string | null | undefined;
     label?: string | undefined;
     slug?: string | undefined;
     sort_order?: number | undefined;

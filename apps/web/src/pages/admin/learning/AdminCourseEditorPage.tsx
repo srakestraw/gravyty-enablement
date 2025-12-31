@@ -815,6 +815,7 @@ export function AdminCourseEditorPage() {
           product_suite_id: course.product_suite_id,
           topic_tag_ids: course.topic_tag_ids,
           badges: course.badges,
+          estimated_minutes: course.estimated_minutes,
         });
 
         if ('data' in response) {
@@ -833,6 +834,7 @@ export function AdminCourseEditorPage() {
           topic_tag_ids: course.topic_tag_ids,
           badges: course.badges,
           cover_image: course.cover_image,
+          estimated_minutes: course.estimated_minutes,
         });
         await saveLessonsStructure(true); // Immediate save on explicit Save Draft
         await refetch();

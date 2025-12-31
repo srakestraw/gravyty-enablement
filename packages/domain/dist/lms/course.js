@@ -63,7 +63,8 @@ export const CourseSchema = z.object({
     // Media
     cover_image: MediaRefSchema.optional(),
     // Badges
-    badges: z.array(CourseBadgeSchema).default([]),
+    badges: z.array(CourseBadgeSchema).default([]), // Legacy badges (kept for backward compatibility)
+    badge_ids: z.array(z.string()).default([]), // New taxonomy-based badge IDs
     // Structure
     sections: z.array(CourseSectionSchema).default([]),
     // Versioning and publishing
@@ -74,6 +75,7 @@ export const CourseSchema = z.object({
     published_by: z.string().optional(), // User ID
     // Metadata
     estimated_duration_minutes: z.number().int().min(0).optional(),
+    estimated_minutes: z.number().int().min(1).max(600).optional(),
     difficulty_level: z.enum(['beginner', 'intermediate', 'advanced']).optional(),
     // Timestamps
     created_at: z.string(), // ISO datetime

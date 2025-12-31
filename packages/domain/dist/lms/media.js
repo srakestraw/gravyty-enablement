@@ -28,6 +28,11 @@ export const MediaRefSchema = z.object({
     height: z.number().optional(), // For images/videos
     duration_ms: z.number().optional(), // For videos/audio
     thumbnail_url: z.string().url().optional(), // For videos
+    // Transcription fields
+    transcription_job_id: z.string().optional(),
+    transcription_status: z.enum(['queued', 'processing', 'complete', 'failed']).optional(),
+    transcription_language: z.string().optional(), // Default: 'en-US'
+    transcription_error: z.string().optional(),
     created_at: z.string(), // ISO datetime
     created_by: z.string(), // User ID
 });

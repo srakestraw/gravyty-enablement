@@ -91,6 +91,7 @@ export const CourseSchema = z.object({
   
   // Metadata
   estimated_duration_minutes: z.number().int().min(0).optional(),
+  estimated_minutes: z.number().int().min(1).max(600).optional(),
   difficulty_level: z.enum(['beginner', 'intermediate', 'advanced']).optional(),
   
   // Timestamps

@@ -25,7 +25,18 @@ cdk bootstrap
 
 This creates the CDK bootstrap stack in your AWS account (one-time setup).
 
-### 3. Deploy Stack
+### 3. Import Existing Resources (If Needed)
+
+If you have existing resources (like `lms_transcripts` table) that need to be imported:
+
+```bash
+# Import existing lms_transcripts table
+./scripts/import-transcripts-table.sh
+```
+
+See [docs/import-lms-transcripts-table.md](./docs/import-lms-transcripts-table.md) for detailed instructions.
+
+### 4. Deploy Stack
 
 ```bash
 # Synthesize CloudFormation template
@@ -41,7 +52,7 @@ The stack will create:
 - **S3 bucket** for content storage (with CORS, encryption, versioning)
 - **CloudFormation outputs** with all resource names
 
-### 4. Update API Environment
+### 5. Update API Environment
 
 **Option 1: Automatic (Recommended)**
 

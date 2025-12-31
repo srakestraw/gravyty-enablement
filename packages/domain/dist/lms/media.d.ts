@@ -29,6 +29,10 @@ export declare const MediaRefSchema: z.ZodObject<{
     height: z.ZodOptional<z.ZodNumber>;
     duration_ms: z.ZodOptional<z.ZodNumber>;
     thumbnail_url: z.ZodOptional<z.ZodString>;
+    transcription_job_id: z.ZodOptional<z.ZodString>;
+    transcription_status: z.ZodOptional<z.ZodEnum<["queued", "processing", "complete", "failed"]>>;
+    transcription_language: z.ZodOptional<z.ZodString>;
+    transcription_error: z.ZodOptional<z.ZodString>;
     created_at: z.ZodString;
     created_by: z.ZodString;
 }, "strip", z.ZodTypeAny, {
@@ -46,6 +50,10 @@ export declare const MediaRefSchema: z.ZodObject<{
     height?: number | undefined;
     duration_ms?: number | undefined;
     thumbnail_url?: string | undefined;
+    transcription_job_id?: string | undefined;
+    transcription_status?: "queued" | "processing" | "complete" | "failed" | undefined;
+    transcription_language?: string | undefined;
+    transcription_error?: string | undefined;
 }, {
     type: "image" | "video" | "document" | "audio" | "other";
     created_at: string;
@@ -61,6 +69,10 @@ export declare const MediaRefSchema: z.ZodObject<{
     height?: number | undefined;
     duration_ms?: number | undefined;
     thumbnail_url?: string | undefined;
+    transcription_job_id?: string | undefined;
+    transcription_status?: "queued" | "processing" | "complete" | "failed" | undefined;
+    transcription_language?: string | undefined;
+    transcription_error?: string | undefined;
 }>;
 export type MediaRef = z.infer<typeof MediaRefSchema>;
 //# sourceMappingURL=media.d.ts.map

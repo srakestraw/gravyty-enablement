@@ -12,6 +12,12 @@ export default defineConfig({
   server: {
     port: 3000,
     open: true,
+    proxy: {
+      '/v1': {
+        target: 'http://localhost:4000',
+        changeOrigin: true,
+      },
+    },
   },
   // Optimize workspace package resolution
   optimizeDeps: {

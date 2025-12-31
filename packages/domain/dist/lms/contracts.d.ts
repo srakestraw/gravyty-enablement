@@ -19,6 +19,7 @@ export declare const CourseSummarySchema: z.ZodObject<{
     product_suite: z.ZodOptional<z.ZodString>;
     topic_tags: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
     estimated_duration_minutes: z.ZodOptional<z.ZodNumber>;
+    estimated_minutes: z.ZodOptional<z.ZodNumber>;
     difficulty_level: z.ZodOptional<z.ZodEnum<["beginner", "intermediate", "advanced"]>>;
     status: z.ZodEnum<["draft", "published", "archived"]>;
     published_at: z.ZodOptional<z.ZodString>;
@@ -32,6 +33,7 @@ export declare const CourseSummarySchema: z.ZodObject<{
     short_description?: string | undefined;
     published_at?: string | undefined;
     estimated_duration_minutes?: number | undefined;
+    estimated_minutes?: number | undefined;
     difficulty_level?: "beginner" | "intermediate" | "advanced" | undefined;
     cover_image_url?: string | undefined;
 }, {
@@ -44,6 +46,7 @@ export declare const CourseSummarySchema: z.ZodObject<{
     topic_tags?: string[] | undefined;
     published_at?: string | undefined;
     estimated_duration_minutes?: number | undefined;
+    estimated_minutes?: number | undefined;
     difficulty_level?: "beginner" | "intermediate" | "advanced" | undefined;
     cover_image_url?: string | undefined;
 }>;
@@ -82,6 +85,10 @@ export declare const CourseDetailSchema: z.ZodObject<{
         height: z.ZodOptional<z.ZodNumber>;
         duration_ms: z.ZodOptional<z.ZodNumber>;
         thumbnail_url: z.ZodOptional<z.ZodString>;
+        transcription_job_id: z.ZodOptional<z.ZodString>;
+        transcription_status: z.ZodOptional<z.ZodEnum<["queued", "processing", "complete", "failed"]>>;
+        transcription_language: z.ZodOptional<z.ZodString>;
+        transcription_error: z.ZodOptional<z.ZodString>;
         created_at: z.ZodString;
         created_by: z.ZodString;
     }, "strip", z.ZodTypeAny, {
@@ -99,6 +106,10 @@ export declare const CourseDetailSchema: z.ZodObject<{
         height?: number | undefined;
         duration_ms?: number | undefined;
         thumbnail_url?: string | undefined;
+        transcription_job_id?: string | undefined;
+        transcription_status?: "queued" | "processing" | "complete" | "failed" | undefined;
+        transcription_language?: string | undefined;
+        transcription_error?: string | undefined;
     }, {
         type: "image" | "video" | "document" | "audio" | "other";
         created_at: string;
@@ -114,6 +125,10 @@ export declare const CourseDetailSchema: z.ZodObject<{
         height?: number | undefined;
         duration_ms?: number | undefined;
         thumbnail_url?: string | undefined;
+        transcription_job_id?: string | undefined;
+        transcription_status?: "queued" | "processing" | "complete" | "failed" | undefined;
+        transcription_language?: string | undefined;
+        transcription_error?: string | undefined;
     }>>;
     badges: z.ZodDefault<z.ZodArray<z.ZodObject<{
         badge_id: z.ZodString;
@@ -131,12 +146,14 @@ export declare const CourseDetailSchema: z.ZodObject<{
         description?: string | undefined;
         icon_url?: string | undefined;
     }>, "many">>;
+    badge_ids: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
     status: z.ZodEnum<["draft", "published", "archived"]>;
     version: z.ZodDefault<z.ZodNumber>;
     published_version: z.ZodOptional<z.ZodNumber>;
     published_at: z.ZodOptional<z.ZodString>;
     published_by: z.ZodOptional<z.ZodString>;
     estimated_duration_minutes: z.ZodOptional<z.ZodNumber>;
+    estimated_minutes: z.ZodOptional<z.ZodNumber>;
     difficulty_level: z.ZodOptional<z.ZodEnum<["beginner", "intermediate", "advanced"]>>;
     created_at: z.ZodString;
     created_by: z.ZodString;
@@ -217,6 +234,7 @@ export declare const CourseDetailSchema: z.ZodObject<{
         description?: string | undefined;
         icon_url?: string | undefined;
     }[];
+    badge_ids: string[];
     sections: {
         title: string;
         section_id: string;
@@ -259,11 +277,16 @@ export declare const CourseDetailSchema: z.ZodObject<{
         height?: number | undefined;
         duration_ms?: number | undefined;
         thumbnail_url?: string | undefined;
+        transcription_job_id?: string | undefined;
+        transcription_status?: "queued" | "processing" | "complete" | "failed" | undefined;
+        transcription_language?: string | undefined;
+        transcription_error?: string | undefined;
     } | undefined;
     published_version?: number | undefined;
     published_at?: string | undefined;
     published_by?: string | undefined;
     estimated_duration_minutes?: number | undefined;
+    estimated_minutes?: number | undefined;
     difficulty_level?: "beginner" | "intermediate" | "advanced" | undefined;
 }, {
     status: "draft" | "published" | "archived";
@@ -317,6 +340,10 @@ export declare const CourseDetailSchema: z.ZodObject<{
         height?: number | undefined;
         duration_ms?: number | undefined;
         thumbnail_url?: string | undefined;
+        transcription_job_id?: string | undefined;
+        transcription_status?: "queued" | "processing" | "complete" | "failed" | undefined;
+        transcription_language?: string | undefined;
+        transcription_error?: string | undefined;
     } | undefined;
     badges?: {
         name: string;
@@ -324,10 +351,12 @@ export declare const CourseDetailSchema: z.ZodObject<{
         description?: string | undefined;
         icon_url?: string | undefined;
     }[] | undefined;
+    badge_ids?: string[] | undefined;
     published_version?: number | undefined;
     published_at?: string | undefined;
     published_by?: string | undefined;
     estimated_duration_minutes?: number | undefined;
+    estimated_minutes?: number | undefined;
     difficulty_level?: "beginner" | "intermediate" | "advanced" | undefined;
 }>;
 export type CourseDetail = z.infer<typeof CourseDetailSchema>;
@@ -350,16 +379,19 @@ export declare const LessonDetailSchema: z.ZodObject<{
         video_id: z.ZodString;
         duration_seconds: z.ZodNumber;
         transcript: z.ZodOptional<z.ZodString>;
+        transcript_status: z.ZodOptional<z.ZodEnum<["queued", "processing", "complete", "failed"]>>;
     }, "strip", z.ZodTypeAny, {
         kind: "video";
         video_id: string;
         duration_seconds: number;
         transcript?: string | undefined;
+        transcript_status?: "queued" | "processing" | "complete" | "failed" | undefined;
     }, {
         kind: "video";
         video_id: string;
         duration_seconds: number;
         transcript?: string | undefined;
+        transcript_status?: "queued" | "processing" | "complete" | "failed" | undefined;
     }>, z.ZodObject<{
         kind: z.ZodLiteral<"reading">;
         format: z.ZodLiteral<"markdown">;
@@ -499,6 +531,10 @@ export declare const LessonDetailSchema: z.ZodObject<{
         height: z.ZodOptional<z.ZodNumber>;
         duration_ms: z.ZodOptional<z.ZodNumber>;
         thumbnail_url: z.ZodOptional<z.ZodString>;
+        transcription_job_id: z.ZodOptional<z.ZodString>;
+        transcription_status: z.ZodOptional<z.ZodEnum<["queued", "processing", "complete", "failed"]>>;
+        transcription_language: z.ZodOptional<z.ZodString>;
+        transcription_error: z.ZodOptional<z.ZodString>;
         created_at: z.ZodString;
         created_by: z.ZodString;
     }, "strip", z.ZodTypeAny, {
@@ -516,6 +552,10 @@ export declare const LessonDetailSchema: z.ZodObject<{
         height?: number | undefined;
         duration_ms?: number | undefined;
         thumbnail_url?: string | undefined;
+        transcription_job_id?: string | undefined;
+        transcription_status?: "queued" | "processing" | "complete" | "failed" | undefined;
+        transcription_language?: string | undefined;
+        transcription_error?: string | undefined;
     }, {
         type: "image" | "video" | "document" | "audio" | "other";
         created_at: string;
@@ -531,6 +571,10 @@ export declare const LessonDetailSchema: z.ZodObject<{
         height?: number | undefined;
         duration_ms?: number | undefined;
         thumbnail_url?: string | undefined;
+        transcription_job_id?: string | undefined;
+        transcription_status?: "queued" | "processing" | "complete" | "failed" | undefined;
+        transcription_language?: string | undefined;
+        transcription_error?: string | undefined;
     }>, "many">>;
 }, "strip", z.ZodTypeAny, {
     type: "video" | "reading" | "quiz" | "assignment" | "interactive";
@@ -548,6 +592,7 @@ export declare const LessonDetailSchema: z.ZodObject<{
         video_id: string;
         duration_seconds: number;
         transcript?: string | undefined;
+        transcript_status?: "queued" | "processing" | "complete" | "failed" | undefined;
     } | {
         kind: "reading";
         format: "markdown";
@@ -595,6 +640,10 @@ export declare const LessonDetailSchema: z.ZodObject<{
         height?: number | undefined;
         duration_ms?: number | undefined;
         thumbnail_url?: string | undefined;
+        transcription_job_id?: string | undefined;
+        transcription_status?: "queued" | "processing" | "complete" | "failed" | undefined;
+        transcription_language?: string | undefined;
+        transcription_error?: string | undefined;
     }[];
     required: boolean;
     description?: string | undefined;
@@ -614,6 +663,7 @@ export declare const LessonDetailSchema: z.ZodObject<{
         video_id: string;
         duration_seconds: number;
         transcript?: string | undefined;
+        transcript_status?: "queued" | "processing" | "complete" | "failed" | undefined;
     } | {
         kind: "reading";
         format: "markdown";
@@ -662,6 +712,10 @@ export declare const LessonDetailSchema: z.ZodObject<{
         height?: number | undefined;
         duration_ms?: number | undefined;
         thumbnail_url?: string | undefined;
+        transcription_job_id?: string | undefined;
+        transcription_status?: "queued" | "processing" | "complete" | "failed" | undefined;
+        transcription_language?: string | undefined;
+        transcription_error?: string | undefined;
     }[] | undefined;
     required?: boolean | undefined;
 }>;
@@ -842,6 +896,7 @@ export declare const LearningPathDetailSchema: z.ZodObject<{
             product_suite: z.ZodOptional<z.ZodString>;
             topic_tags: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
             estimated_duration_minutes: z.ZodOptional<z.ZodNumber>;
+            estimated_minutes: z.ZodOptional<z.ZodNumber>;
             difficulty_level: z.ZodOptional<z.ZodEnum<["beginner", "intermediate", "advanced"]>>;
             status: z.ZodEnum<["draft", "published", "archived"]>;
             published_at: z.ZodOptional<z.ZodString>;
@@ -855,6 +910,7 @@ export declare const LearningPathDetailSchema: z.ZodObject<{
             short_description?: string | undefined;
             published_at?: string | undefined;
             estimated_duration_minutes?: number | undefined;
+            estimated_minutes?: number | undefined;
             difficulty_level?: "beginner" | "intermediate" | "advanced" | undefined;
             cover_image_url?: string | undefined;
         }, {
@@ -867,6 +923,7 @@ export declare const LearningPathDetailSchema: z.ZodObject<{
             topic_tags?: string[] | undefined;
             published_at?: string | undefined;
             estimated_duration_minutes?: number | undefined;
+            estimated_minutes?: number | undefined;
             difficulty_level?: "beginner" | "intermediate" | "advanced" | undefined;
             cover_image_url?: string | undefined;
         }>>;
@@ -885,6 +942,7 @@ export declare const LearningPathDetailSchema: z.ZodObject<{
             short_description?: string | undefined;
             published_at?: string | undefined;
             estimated_duration_minutes?: number | undefined;
+            estimated_minutes?: number | undefined;
             difficulty_level?: "beginner" | "intermediate" | "advanced" | undefined;
             cover_image_url?: string | undefined;
         } | undefined;
@@ -903,6 +961,7 @@ export declare const LearningPathDetailSchema: z.ZodObject<{
             topic_tags?: string[] | undefined;
             published_at?: string | undefined;
             estimated_duration_minutes?: number | undefined;
+            estimated_minutes?: number | undefined;
             difficulty_level?: "beginner" | "intermediate" | "advanced" | undefined;
             cover_image_url?: string | undefined;
         } | undefined;
@@ -934,6 +993,7 @@ export declare const LearningPathDetailSchema: z.ZodObject<{
             short_description?: string | undefined;
             published_at?: string | undefined;
             estimated_duration_minutes?: number | undefined;
+            estimated_minutes?: number | undefined;
             difficulty_level?: "beginner" | "intermediate" | "advanced" | undefined;
             cover_image_url?: string | undefined;
         } | undefined;
@@ -975,6 +1035,7 @@ export declare const LearningPathDetailSchema: z.ZodObject<{
             topic_tags?: string[] | undefined;
             published_at?: string | undefined;
             estimated_duration_minutes?: number | undefined;
+            estimated_minutes?: number | undefined;
             difficulty_level?: "beginner" | "intermediate" | "advanced" | undefined;
             cover_image_url?: string | undefined;
         } | undefined;
@@ -1046,6 +1107,7 @@ export declare const PathDetailSchema: z.ZodObject<{
             product_suite: z.ZodOptional<z.ZodString>;
             topic_tags: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
             estimated_duration_minutes: z.ZodOptional<z.ZodNumber>;
+            estimated_minutes: z.ZodOptional<z.ZodNumber>;
             difficulty_level: z.ZodOptional<z.ZodEnum<["beginner", "intermediate", "advanced"]>>;
             status: z.ZodEnum<["draft", "published", "archived"]>;
             published_at: z.ZodOptional<z.ZodString>;
@@ -1059,6 +1121,7 @@ export declare const PathDetailSchema: z.ZodObject<{
             short_description?: string | undefined;
             published_at?: string | undefined;
             estimated_duration_minutes?: number | undefined;
+            estimated_minutes?: number | undefined;
             difficulty_level?: "beginner" | "intermediate" | "advanced" | undefined;
             cover_image_url?: string | undefined;
         }, {
@@ -1071,6 +1134,7 @@ export declare const PathDetailSchema: z.ZodObject<{
             topic_tags?: string[] | undefined;
             published_at?: string | undefined;
             estimated_duration_minutes?: number | undefined;
+            estimated_minutes?: number | undefined;
             difficulty_level?: "beginner" | "intermediate" | "advanced" | undefined;
             cover_image_url?: string | undefined;
         }>>;
@@ -1089,6 +1153,7 @@ export declare const PathDetailSchema: z.ZodObject<{
             short_description?: string | undefined;
             published_at?: string | undefined;
             estimated_duration_minutes?: number | undefined;
+            estimated_minutes?: number | undefined;
             difficulty_level?: "beginner" | "intermediate" | "advanced" | undefined;
             cover_image_url?: string | undefined;
         } | undefined;
@@ -1107,6 +1172,7 @@ export declare const PathDetailSchema: z.ZodObject<{
             topic_tags?: string[] | undefined;
             published_at?: string | undefined;
             estimated_duration_minutes?: number | undefined;
+            estimated_minutes?: number | undefined;
             difficulty_level?: "beginner" | "intermediate" | "advanced" | undefined;
             cover_image_url?: string | undefined;
         } | undefined;
@@ -1168,6 +1234,7 @@ export declare const PathDetailSchema: z.ZodObject<{
             short_description?: string | undefined;
             published_at?: string | undefined;
             estimated_duration_minutes?: number | undefined;
+            estimated_minutes?: number | undefined;
             difficulty_level?: "beginner" | "intermediate" | "advanced" | undefined;
             cover_image_url?: string | undefined;
         } | undefined;
@@ -1220,6 +1287,7 @@ export declare const PathDetailSchema: z.ZodObject<{
             topic_tags?: string[] | undefined;
             published_at?: string | undefined;
             estimated_duration_minutes?: number | undefined;
+            estimated_minutes?: number | undefined;
             difficulty_level?: "beginner" | "intermediate" | "advanced" | undefined;
             cover_image_url?: string | undefined;
         } | undefined;

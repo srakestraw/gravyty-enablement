@@ -47,7 +47,7 @@ export function useLmsCourses(params?: ListCoursesParams, options?: LmsClientOpt
   useEffect(() => {
     fetchCourses();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params?.q, params?.product_suite, params?.product_concept, params?.badge, params?.topic, params?.limit]);
+  }, [params?.q, params?.product, params?.product_suite, params?.badge, params?.topic, params?.topics, params?.limit]);
 
   return {
     courses,

@@ -168,16 +168,19 @@ export declare const LessonContentSchema: z.ZodDiscriminatedUnion<"kind", [z.Zod
     video_id: z.ZodString;
     duration_seconds: z.ZodNumber;
     transcript: z.ZodOptional<z.ZodString>;
+    transcript_status: z.ZodOptional<z.ZodEnum<["queued", "processing", "complete", "failed"]>>;
 }, "strip", z.ZodTypeAny, {
     kind: "video";
     video_id: string;
     duration_seconds: number;
     transcript?: string | undefined;
+    transcript_status?: "queued" | "processing" | "complete" | "failed" | undefined;
 }, {
     kind: "video";
     video_id: string;
     duration_seconds: number;
     transcript?: string | undefined;
+    transcript_status?: "queued" | "processing" | "complete" | "failed" | undefined;
 }>, z.ZodObject<{
     kind: z.ZodLiteral<"reading">;
     format: z.ZodLiteral<"markdown">;
@@ -322,16 +325,19 @@ export declare const LessonSchema: z.ZodObject<{
         video_id: z.ZodString;
         duration_seconds: z.ZodNumber;
         transcript: z.ZodOptional<z.ZodString>;
+        transcript_status: z.ZodOptional<z.ZodEnum<["queued", "processing", "complete", "failed"]>>;
     }, "strip", z.ZodTypeAny, {
         kind: "video";
         video_id: string;
         duration_seconds: number;
         transcript?: string | undefined;
+        transcript_status?: "queued" | "processing" | "complete" | "failed" | undefined;
     }, {
         kind: "video";
         video_id: string;
         duration_seconds: number;
         transcript?: string | undefined;
+        transcript_status?: "queued" | "processing" | "complete" | "failed" | undefined;
     }>, z.ZodObject<{
         kind: z.ZodLiteral<"reading">;
         format: z.ZodLiteral<"markdown">;
@@ -465,6 +471,10 @@ export declare const LessonSchema: z.ZodObject<{
         height: z.ZodOptional<z.ZodNumber>;
         duration_ms: z.ZodOptional<z.ZodNumber>;
         thumbnail_url: z.ZodOptional<z.ZodString>;
+        transcription_job_id: z.ZodOptional<z.ZodString>;
+        transcription_status: z.ZodOptional<z.ZodEnum<["queued", "processing", "complete", "failed"]>>;
+        transcription_language: z.ZodOptional<z.ZodString>;
+        transcription_error: z.ZodOptional<z.ZodString>;
         created_at: z.ZodString;
         created_by: z.ZodString;
     }, "strip", z.ZodTypeAny, {
@@ -482,6 +492,10 @@ export declare const LessonSchema: z.ZodObject<{
         height?: number | undefined;
         duration_ms?: number | undefined;
         thumbnail_url?: string | undefined;
+        transcription_job_id?: string | undefined;
+        transcription_status?: "queued" | "processing" | "complete" | "failed" | undefined;
+        transcription_language?: string | undefined;
+        transcription_error?: string | undefined;
     }, {
         type: "image" | "video" | "document" | "audio" | "other";
         created_at: string;
@@ -497,6 +511,10 @@ export declare const LessonSchema: z.ZodObject<{
         height?: number | undefined;
         duration_ms?: number | undefined;
         thumbnail_url?: string | undefined;
+        transcription_job_id?: string | undefined;
+        transcription_status?: "queued" | "processing" | "complete" | "failed" | undefined;
+        transcription_language?: string | undefined;
+        transcription_error?: string | undefined;
     }>, "many">>;
     required: z.ZodDefault<z.ZodBoolean>;
     created_at: z.ZodString;
@@ -519,6 +537,7 @@ export declare const LessonSchema: z.ZodObject<{
         video_id: string;
         duration_seconds: number;
         transcript?: string | undefined;
+        transcript_status?: "queued" | "processing" | "complete" | "failed" | undefined;
     } | {
         kind: "reading";
         format: "markdown";
@@ -568,6 +587,10 @@ export declare const LessonSchema: z.ZodObject<{
         height?: number | undefined;
         duration_ms?: number | undefined;
         thumbnail_url?: string | undefined;
+        transcription_job_id?: string | undefined;
+        transcription_status?: "queued" | "processing" | "complete" | "failed" | undefined;
+        transcription_language?: string | undefined;
+        transcription_error?: string | undefined;
     }[] | undefined;
 }, {
     type: "video" | "reading" | "quiz" | "assignment" | "interactive";
@@ -585,6 +608,7 @@ export declare const LessonSchema: z.ZodObject<{
         video_id: string;
         duration_seconds: number;
         transcript?: string | undefined;
+        transcript_status?: "queued" | "processing" | "complete" | "failed" | undefined;
     } | {
         kind: "reading";
         format: "markdown";
@@ -633,6 +657,10 @@ export declare const LessonSchema: z.ZodObject<{
         height?: number | undefined;
         duration_ms?: number | undefined;
         thumbnail_url?: string | undefined;
+        transcription_job_id?: string | undefined;
+        transcription_status?: "queued" | "processing" | "complete" | "failed" | undefined;
+        transcription_language?: string | undefined;
+        transcription_error?: string | undefined;
     }[] | undefined;
     required?: boolean | undefined;
 }>;

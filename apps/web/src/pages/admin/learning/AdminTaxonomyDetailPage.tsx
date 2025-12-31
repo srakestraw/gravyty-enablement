@@ -60,6 +60,7 @@ const TAXONOMY_KEY_LABELS: Record<TaxonomyGroupKey, string> = {
   product: 'Product',
   product_suite: 'Product Suite',
   topic_tag: 'Topic Tags',
+  badge: 'Badges',
 };
 
 type SortOption = 'default' | 'alphabetical';
@@ -123,7 +124,7 @@ export function AdminTaxonomyDetailPage() {
     return /^#[0-9A-F]{6}$/i.test(hex);
   };
 
-  if (!key || !['product', 'product_suite', 'topic_tag'].includes(key)) {
+  if (!key || !['product', 'product_suite', 'topic_tag', 'badge'].includes(key)) {
     return (
       <Box sx={{ p: 3 }}>
         <Alert severity="error">Invalid taxonomy key</Alert>

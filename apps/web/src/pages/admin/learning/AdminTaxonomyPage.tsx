@@ -42,6 +42,11 @@ const TAXONOMY_KEYS: TaxonomyKeyInfo[] = [
     label: 'Topic Tags',
     description: 'Topic tags for content tagging',
   },
+  {
+    key: 'badge',
+    label: 'Badges',
+    description: 'Badges that can be earned by completing courses',
+  },
 ];
 
 export function AdminTaxonomyPage() {
@@ -51,14 +56,16 @@ export function AdminTaxonomyPage() {
   const productQuery = useTaxonomyOptions('product', { include_archived: true });
   const productSuiteQuery = useTaxonomyOptions('product_suite', { include_archived: true });
   const topicTagQuery = useTaxonomyOptions('topic_tag', { include_archived: true });
+  const badgeQuery = useTaxonomyOptions('badge', { include_archived: true });
 
-  const loading = productQuery.loading || productSuiteQuery.loading || topicTagQuery.loading;
+  const loading = productQuery.loading || productSuiteQuery.loading || topicTagQuery.loading || badgeQuery.loading;
 
   const getCounts = (key: TaxonomyGroupKey) => {
     let options: typeof productQuery.options = [];
     if (key === 'product') options = productQuery.options;
     else if (key === 'product_suite') options = productSuiteQuery.options;
     else if (key === 'topic_tag') options = topicTagQuery.options;
+    else if (key === 'badge') options = badgeQuery.options;
 
     const active = options.filter((opt) => !opt.archived_at).length;
     const archived = options.filter((opt) => opt.archived_at).length;

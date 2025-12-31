@@ -31,6 +31,7 @@ import { useLmsPath } from '../../hooks/useLmsPaths';
 import { track } from '../../lib/telemetry';
 import { useAuth } from '../../contexts/AuthContext';
 import type { CourseSummary } from '@gravyty/domain';
+import { formatDurationMinutes } from '../../utils/formatDuration';
 
 function CourseCard({ course, onResume }: { course: CourseSummary; onResume: () => void }) {
   return (
@@ -64,9 +65,9 @@ function CourseCard({ course, onResume }: { course: CourseSummary; onResume: () 
                 </Typography>
               )}
               <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 1 }}>
-                {course.estimated_duration_minutes && (
+                {course.estimated_minutes && (
                   <Chip
-                    label={`${course.estimated_duration_minutes} min`}
+                    label={formatDurationMinutes(course.estimated_minutes)}
                     size="small"
                     variant="outlined"
                   />

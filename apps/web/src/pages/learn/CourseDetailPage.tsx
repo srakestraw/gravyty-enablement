@@ -33,6 +33,7 @@ import { lmsApi } from '../../api/lmsClient';
 import { track } from '../../lib/telemetry';
 import { isErrorResponse } from '../../lib/apiClient';
 import { CourseCard } from '../../components/lms/CourseCard';
+import { formatDurationMinutes } from '../../utils/formatDuration';
 
 export function CourseDetailPage() {
   const { courseId } = useParams<{ courseId: string }>();
@@ -119,8 +120,8 @@ export function CourseDetailPage() {
           {course.product && <Chip label={course.product} />}
           {course.product_suite && <Chip label={course.product_suite} />}
           {course.difficulty_level && <Chip label={course.difficulty_level} />}
-          {course.estimated_duration_minutes && (
-            <Chip label={`${course.estimated_duration_minutes} min`} />
+          {course.estimated_minutes && (
+            <Chip label={formatDurationMinutes(course.estimated_minutes)} />
           )}
         </Box>
         <Button

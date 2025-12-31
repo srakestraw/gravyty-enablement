@@ -33,6 +33,9 @@ const EVENTS_TABLE = process.env.DDB_TABLE_EVENTS || 'events';
 
 const DOCUMENTS_TABLE = process.env.DDB_TABLE_BRAIN_DOCUMENTS || 'brain_documents';
 const CHUNKS_TABLE = process.env.DDB_TABLE_BRAIN_CHUNKS || 'brain_chunks';
+const LMS_TRANSCRIPTS_TABLE = process.env.LMS_TRANSCRIPTS_TABLE || 'lms_transcripts';
+const LMS_LESSONS_TABLE = process.env.LMS_LESSONS_TABLE || 'lms_lessons';
+const LMS_COURSES_TABLE = process.env.LMS_COURSES_TABLE || 'lms_courses';
 const S3_BUCKET = process.env.S3_BUCKET || '';
 const OPENSEARCH_COLLECTION_NAME = process.env.OPENSEARCH_COLLECTION_NAME || 'enablement-brain';
 const OPENSEARCH_INDEX_NAME = process.env.OPENSEARCH_INDEX_NAME || 'brain-chunks';
@@ -673,28 +676,176 @@ async function processDocument(docId: string, isReindex: boolean = false): Promi
   }
 }
 
+/**
+ * Process a transcript for RAG ingestion
+ */
+async function processTranscript(transcriptId: string, lessonId: string): Promise<void> {
+  console.log(`[${transcriptId}] Processing transcript for lesson ${lessonId}`);
+
+  // Get transcript from DynamoDB
+  const transcriptResponse = await dynamoDocClient.send(new GetCommand({
+    TableName: LMS_TRANSCRIPTS_TABLE,
+    Key: { transcript_id: transcriptId },
+  }));
+
+  if (!transcriptResponse.Item) {
+    throw new Error(`Transcript ${transcriptId} not found`);
+  }
+
+  const transcript = transcriptResponse.Item as any;
+  const transcriptText = transcript.full_text;
+
+  if (!transcriptText || transcriptText.length < MIN_EXTRACTED_TEXT_LENGTH) {
+    throw new Error(`Transcript ${transcriptId} has insufficient text (${transcriptText?.length || 0} chars)`);
+  }
+
+  // Get lesson and course metadata
+  let lessonTitle = 'Video Lesson';
+  let courseId = '';
+  let courseTitle = 'Course';
+
+  if (lessonId) {
+    try {
+      const lessonResponse = await dynamoDocClient.send(new GetCommand({
+        TableName: LMS_LESSONS_TABLE,
+        Key: { lesson_id: lessonId },
+      }));
+
+      if (lessonResponse.Item) {
+        lessonTitle = lessonResponse.Item.title || lessonTitle;
+        courseId = lessonResponse.Item.course_id || '';
+
+        if (courseId) {
+          const courseResponse = await dynamoDocClient.send(new GetCommand({
+            TableName: LMS_COURSES_TABLE,
+            Key: { course_id: courseId },
+          }));
+
+          if (courseResponse.Item) {
+            courseTitle = courseResponse.Item.title || courseTitle;
+          }
+        }
+      }
+    } catch (error) {
+      console.warn(`[${transcriptId}] Failed to fetch lesson/course metadata:`, error);
+      // Continue without metadata
+    }
+  }
+
+  // Chunk transcript text
+  const chunks = chunkText(transcriptText);
+  console.log(`[${transcriptId}] Chunked transcript into ${chunks.length} chunks`);
+
+  if (chunks.length === 0) {
+    throw new Error(`No chunks created for transcript ${transcriptId}`);
+  }
+
+  // Get OpenAI API key
+  const apiKey = await getOpenAiApiKey();
+  if (!apiKey) {
+    throw new Error('OpenAI API key not found');
+  }
+
+  // Get OpenSearch client
+  const osClient = getOpenSearchClient();
+
+  // Process chunks
+  let successCount = 0;
+  for (let i = 0; i < chunks.length; i++) {
+    const chunk = chunks[i];
+    const chunkId = `transcript_${transcriptId}_chunk_${i}`;
+    const tokenCount = estimateTokens(chunk.text);
+
+    try {
+      // Generate embedding
+      const embedding = await generateEmbedding(chunk.text, apiKey, 30000);
+
+      // Store in OpenSearch
+      await osClient.index({
+        index: OPENSEARCH_INDEX_NAME,
+        id: chunkId,
+        body: {
+          doc_id: `transcript_${transcriptId}`,
+          chunk_id: chunkId,
+          text: chunk.text,
+          title: lessonTitle,
+          tags: [],
+          product_suite: undefined, // Could be added from course metadata if needed
+          product_concept: undefined,
+          lesson_id: lessonId,
+          course_id: courseId,
+          course_title: courseTitle,
+          transcript_id: transcriptId,
+          embedding,
+        },
+      });
+
+      // Store metadata in DynamoDB (optional, for tracking)
+      await dynamoDocClient.send(new PutCommand({
+        TableName: CHUNKS_TABLE,
+        Item: {
+          doc_id: `transcript_${transcriptId}`,
+          chunk_id: chunkId,
+          token_count: tokenCount,
+          embedding_model: OPENAI_EMBEDDINGS_MODEL,
+          created_at: new Date().toISOString(),
+        },
+      }));
+
+      successCount++;
+    } catch (error) {
+      console.error(`[${transcriptId}] Failed to process chunk ${i}:`, error);
+      // Continue with other chunks
+    }
+  }
+
+  console.log(`[${transcriptId}] Successfully indexed ${successCount}/${chunks.length} chunks`);
+}
+
 export const handler: SQSHandler = async (event: SQSEvent) => {
   console.log('Received SQS event:', JSON.stringify(event, null, 2));
 
   for (const record of event.Records) {
     const messageBody = JSON.parse(record.body);
-    const docId = messageBody.doc_id;
-    const isReindex = messageBody.reindex === true;
-    const mode = messageBody.mode; // 'url' for URL ingestion
+    const messageType = messageBody.type; // 'transcript' or undefined (defaults to document)
     
-    if (!docId) {
-      console.error('Invalid message: missing doc_id');
-      continue;
-    }
+    if (messageType === 'transcript') {
+      // Process transcript
+      const transcriptId = messageBody.transcript_id;
+      const lessonId = messageBody.lesson_id;
+      
+      if (!transcriptId) {
+        console.error('Invalid transcript message: missing transcript_id');
+        continue;
+      }
 
-    try {
-      // For URL mode, the document should already exist with source_url set
-      // The processDocument function will handle fetching and extraction
-      await processDocument(docId, isReindex);
-    } catch (error) {
-      console.error(`Failed to process document ${docId}:`, error);
-      // Message will be retried or sent to DLQ
-      throw error;
+      try {
+        await processTranscript(transcriptId, lessonId);
+      } catch (error) {
+        console.error(`Failed to process transcript ${transcriptId}:`, error);
+        // Message will be retried or sent to DLQ
+        throw error;
+      }
+    } else {
+      // Process document (existing logic)
+      const docId = messageBody.doc_id;
+      const isReindex = messageBody.reindex === true;
+      const mode = messageBody.mode; // 'url' for URL ingestion
+      
+      if (!docId) {
+        console.error('Invalid message: missing doc_id');
+        continue;
+      }
+
+      try {
+        // For URL mode, the document should already exist with source_url set
+        // The processDocument function will handle fetching and extraction
+        await processDocument(docId, isReindex);
+      } catch (error) {
+        console.error(`Failed to process document ${docId}:`, error);
+        // Message will be retried or sent to DLQ
+        throw error;
+      }
     }
   }
 };

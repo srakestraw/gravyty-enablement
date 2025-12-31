@@ -45,6 +45,7 @@ router.post('/certificates/templates/:templateId/archive', requireRole('Approver
 // Media Library admin
 router.get('/media', requireRole('Admin'), lmsAdminHandlers.listMedia);
 router.post('/media/presign', requireRole('Admin'), lmsAdminHandlers.presignMediaUpload);
+router.post('/media/:media_id/transcribe', requireRole('Admin'), lmsAdminHandlers.startMediaTranscription);
 
 export default router;
 

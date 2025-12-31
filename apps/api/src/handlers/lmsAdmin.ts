@@ -31,6 +31,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { s3Client } from '../aws/s3Client';
+import { startTranscriptionJob, getMediaFormatFromContentType } from '../aws/transcribeClient';
 
 // ============================================================================
 // COURSES ADMIN
@@ -148,6 +149,7 @@ export async function createCourse(req: AuthenticatedRequest, res: Response) {
       icon_url: z.string().optional(),
     })).optional(),
     badge_ids: z.array(z.string()).optional(),
+    estimated_minutes: z.union([z.number(), z.string(), z.null()]).optional(),
   });
   
   const parsed = CreateCourseSchema.safeParse(req.body);
@@ -172,6 +174,25 @@ export async function createCourse(req: AuthenticatedRequest, res: Response) {
     const product_id = parsed.data.product_id ?? parsed.data.legacy_product_suite_id;
     const product_suite_id = parsed.data.product_suite_id ?? parsed.data.legacy_product_concept_id;
     
+    // Handle estimated_minutes: normalize null/empty string to undefined, validate range
+    let estimatedMinutes: number | undefined = undefined;
+    if (parsed.data.estimated_minutes !== undefined && parsed.data.estimated_minutes !== null && parsed.data.estimated_minutes !== '') {
+      const parsedValue = typeof parsed.data.estimated_minutes === 'string' 
+        ? parseInt(parsed.data.estimated_minutes, 10) 
+        : parsed.data.estimated_minutes;
+      if (isNaN(parsedValue) || parsedValue < 1 || parsedValue > 600) {
+        res.status(400).json({
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'estimated_minutes must be an integer between 1 and 600',
+          },
+          request_id: requestId,
+        });
+        return;
+      }
+      estimatedMinutes = parsedValue;
+    }
+    
     const course: Course = {
       course_id: courseId,
       title: parsed.data.title,
@@ -188,6 +209,7 @@ export async function createCourse(req: AuthenticatedRequest, res: Response) {
       topic_tag_ids: parsed.data.topic_tag_ids || [],
       badges: parsed.data.badges || [],
       badge_ids: parsed.data.badge_ids || [],
+      estimated_minutes: estimatedMinutes,
       sections: [],
       related_course_ids: [],
       created_at: now,
@@ -297,6 +319,7 @@ export async function updateCourse(req: AuthenticatedRequest, res: Response) {
       description: z.string().optional(),
       icon_url: z.string().optional(),
     })).optional(),
+    badge_ids: z.array(z.string()).optional(),
     cover_image: z.object({
       media_id: z.string(),
       type: z.enum(['image', 'video', 'document', 'audio', 'other']),
@@ -304,6 +327,7 @@ export async function updateCourse(req: AuthenticatedRequest, res: Response) {
       created_at: z.string(),
       created_by: z.string(),
     }).optional(),
+    estimated_minutes: z.union([z.number(), z.string(), z.null()]).optional(),
   });
   
   const parsed = UpdateCourseSchema.safeParse(req.body);
@@ -338,6 +362,28 @@ export async function updateCourse(req: AuthenticatedRequest, res: Response) {
     delete updates.legacy_product_concept;
     delete updates.legacy_product_suite_id;
     delete updates.legacy_product_concept_id;
+    
+    // Handle estimated_minutes: normalize null/empty string to undefined, validate range
+    if ('estimated_minutes' in updates) {
+      if (updates.estimated_minutes === null || updates.estimated_minutes === '' || updates.estimated_minutes === undefined) {
+        updates.estimated_minutes = undefined;
+      } else {
+        const parsedValue = typeof updates.estimated_minutes === 'string' 
+          ? parseInt(updates.estimated_minutes, 10) 
+          : updates.estimated_minutes;
+        if (isNaN(parsedValue) || parsedValue < 1 || parsedValue > 600) {
+          res.status(400).json({
+            error: {
+              code: 'VALIDATION_ERROR',
+              message: 'estimated_minutes must be an integer between 1 and 600',
+            },
+            request_id: requestId,
+          });
+          return;
+        }
+        updates.estimated_minutes = parsedValue;
+      }
+    }
     
     const course = await lmsRepo.updateCourseDraft(courseId, userId, updates);
     
@@ -784,10 +830,11 @@ export async function getAdminPath(req: AuthenticatedRequest, res: Response) {
               title: course.title,
               short_description: course.short_description,
               cover_image_url: course.cover_image?.url,
+              product: course.product,
               product_suite: course.product_suite,
-              product_concept: course.product_concept,
               topic_tags: course.topic_tags || [],
               estimated_duration_minutes: course.estimated_duration_minutes,
+              estimated_minutes: course.estimated_minutes,
               difficulty_level: course.difficulty_level,
               status: course.status,
               published_at: course.published_at,
@@ -1652,6 +1699,142 @@ export async function presignMediaUpload(req: AuthenticatedRequest, res: Respons
       error: {
         code: 'INTERNAL_ERROR',
         message: error instanceof Error ? error.message : 'Failed to generate presigned URL',
+      },
+      request_id: requestId,
+    });
+  }
+}
+
+/**
+ * POST /v1/lms/admin/media/:media_id/transcribe
+ * Start transcription job for a video media file
+ */
+export async function startMediaTranscription(req: AuthenticatedRequest, res: Response) {
+  const requestId = req.headers['x-request-id'] as string;
+  const userId = req.user?.user_id;
+  const mediaId = req.params.media_id;
+
+  if (!userId) {
+    res.status(401).json({
+      error: { code: 'UNAUTHORIZED', message: 'User ID required' },
+      request_id: requestId,
+    });
+    return;
+  }
+
+  if (!mediaId) {
+    res.status(400).json({
+      error: { code: 'VALIDATION_ERROR', message: 'media_id is required' },
+      request_id: requestId,
+    });
+    return;
+  }
+
+  try {
+    // Find media record
+    const { GetCommand } = await import('@aws-sdk/lib-dynamodb');
+    const mediaCommand = new GetCommand({
+      TableName: LMS_CERTIFICATES_TABLE,
+      Key: {
+        PK: 'MEDIA',
+        SK: mediaId,
+      },
+    });
+
+    const { Item: mediaItem } = await dynamoDocClient.send(mediaCommand);
+    if (!mediaItem || mediaItem.entity_type !== 'MEDIA') {
+      res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Media not found' },
+        request_id: requestId,
+      });
+      return;
+    }
+
+    const media = mediaItem as any as MediaRef;
+
+    // Validate it's a video
+    if (media.type !== 'video') {
+      res.status(400).json({
+        error: { code: 'VALIDATION_ERROR', message: 'Transcription is only available for video media' },
+        request_id: requestId,
+      });
+      return;
+    }
+
+    // Validate S3 location exists
+    if (!media.s3_bucket || !media.s3_key) {
+      res.status(400).json({
+        error: { code: 'VALIDATION_ERROR', message: 'Media must have S3 bucket and key' },
+        request_id: requestId,
+      });
+      return;
+    }
+
+    // Check if transcription already in progress or complete
+    if (media.transcription_status === 'processing' || media.transcription_status === 'queued') {
+      res.status(400).json({
+        error: { code: 'VALIDATION_ERROR', message: 'Transcription already in progress' },
+        request_id: requestId,
+      });
+      return;
+    }
+
+    // Generate job name (must be unique, use media_id + timestamp)
+    const jobName = `transcribe_${mediaId}_${Date.now()}`;
+    const mediaFileUri = `s3://${media.s3_bucket}/${media.s3_key}`;
+    const outputKey = `transcripts/${jobName}.json`;
+    const mediaFormat = media.content_type ? getMediaFormatFromContentType(media.content_type) : undefined;
+
+    // Start transcription job
+    const { status } = await startTranscriptionJob({
+      jobName,
+      mediaFileUri,
+      outputBucket: media.s3_bucket,
+      outputKey,
+      languageCode: 'en-US',
+      mediaFormat,
+    });
+
+    // Update media record with transcription job info
+    const { UpdateCommand } = await import('@aws-sdk/lib-dynamodb');
+    const updateCommand = new UpdateCommand({
+      TableName: LMS_CERTIFICATES_TABLE,
+      Key: {
+        PK: 'MEDIA',
+        SK: mediaId,
+      },
+      UpdateExpression: 'SET transcription_job_id = :jobId, transcription_status = :status, transcription_language = :lang',
+      ExpressionAttributeValues: {
+        ':jobId': jobName,
+        ':status': status === 'IN_PROGRESS' ? 'processing' : 'queued',
+        ':lang': 'en-US',
+      },
+    });
+    await dynamoDocClient.send(updateCommand);
+
+    // Emit telemetry
+    await emitLmsEvent(req, 'lms_admin_media_transcription_started' as any, {
+      media_id: mediaId,
+      transcription_job_id: jobName,
+    });
+
+    const response: ApiSuccessResponse<{
+      transcription_job_id: string;
+      status: string;
+    }> = {
+      data: {
+        transcription_job_id: jobName,
+        status: status === 'IN_PROGRESS' ? 'processing' : 'queued',
+      },
+      request_id: requestId,
+    };
+    res.json(response);
+  } catch (error) {
+    console.error(`[${requestId}] Error starting transcription:`, error);
+    res.status(500).json({
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: error instanceof Error ? error.message : 'Failed to start transcription',
       },
       request_id: requestId,
     });

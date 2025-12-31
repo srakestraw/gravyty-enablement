@@ -92,6 +92,7 @@ export const LessonContentSchema = z.discriminatedUnion('kind', [
     video_id: z.string(), // Media ID reference
     duration_seconds: z.number().int().min(1),
     transcript: z.string().optional(),
+    transcript_status: z.enum(['queued', 'processing', 'complete', 'failed']).optional(),
   }),
   // Reading lesson content
   z.object({

@@ -93,6 +93,10 @@ export declare const CourseSchema: z.ZodObject<{
         height: z.ZodOptional<z.ZodNumber>;
         duration_ms: z.ZodOptional<z.ZodNumber>;
         thumbnail_url: z.ZodOptional<z.ZodString>;
+        transcription_job_id: z.ZodOptional<z.ZodString>;
+        transcription_status: z.ZodOptional<z.ZodEnum<["queued", "processing", "complete", "failed"]>>;
+        transcription_language: z.ZodOptional<z.ZodString>;
+        transcription_error: z.ZodOptional<z.ZodString>;
         created_at: z.ZodString;
         created_by: z.ZodString;
     }, "strip", z.ZodTypeAny, {
@@ -110,6 +114,10 @@ export declare const CourseSchema: z.ZodObject<{
         height?: number | undefined;
         duration_ms?: number | undefined;
         thumbnail_url?: string | undefined;
+        transcription_job_id?: string | undefined;
+        transcription_status?: "queued" | "processing" | "complete" | "failed" | undefined;
+        transcription_language?: string | undefined;
+        transcription_error?: string | undefined;
     }, {
         type: "image" | "video" | "document" | "audio" | "other";
         created_at: string;
@@ -125,6 +133,10 @@ export declare const CourseSchema: z.ZodObject<{
         height?: number | undefined;
         duration_ms?: number | undefined;
         thumbnail_url?: string | undefined;
+        transcription_job_id?: string | undefined;
+        transcription_status?: "queued" | "processing" | "complete" | "failed" | undefined;
+        transcription_language?: string | undefined;
+        transcription_error?: string | undefined;
     }>>;
     badges: z.ZodDefault<z.ZodArray<z.ZodObject<{
         badge_id: z.ZodString;
@@ -142,6 +154,7 @@ export declare const CourseSchema: z.ZodObject<{
         description?: string | undefined;
         icon_url?: string | undefined;
     }>, "many">>;
+    badge_ids: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
     sections: z.ZodDefault<z.ZodArray<z.ZodObject<{
         section_id: z.ZodString;
         title: z.ZodString;
@@ -167,6 +180,7 @@ export declare const CourseSchema: z.ZodObject<{
     published_at: z.ZodOptional<z.ZodString>;
     published_by: z.ZodOptional<z.ZodString>;
     estimated_duration_minutes: z.ZodOptional<z.ZodNumber>;
+    estimated_minutes: z.ZodOptional<z.ZodNumber>;
     difficulty_level: z.ZodOptional<z.ZodEnum<["beginner", "intermediate", "advanced"]>>;
     created_at: z.ZodString;
     created_by: z.ZodString;
@@ -188,6 +202,7 @@ export declare const CourseSchema: z.ZodObject<{
         description?: string | undefined;
         icon_url?: string | undefined;
     }[];
+    badge_ids: string[];
     sections: {
         title: string;
         section_id: string;
@@ -222,11 +237,16 @@ export declare const CourseSchema: z.ZodObject<{
         height?: number | undefined;
         duration_ms?: number | undefined;
         thumbnail_url?: string | undefined;
+        transcription_job_id?: string | undefined;
+        transcription_status?: "queued" | "processing" | "complete" | "failed" | undefined;
+        transcription_language?: string | undefined;
+        transcription_error?: string | undefined;
     } | undefined;
     published_version?: number | undefined;
     published_at?: string | undefined;
     published_by?: string | undefined;
     estimated_duration_minutes?: number | undefined;
+    estimated_minutes?: number | undefined;
     difficulty_level?: "beginner" | "intermediate" | "advanced" | undefined;
 }, {
     status: "draft" | "published" | "archived";
@@ -265,6 +285,10 @@ export declare const CourseSchema: z.ZodObject<{
         height?: number | undefined;
         duration_ms?: number | undefined;
         thumbnail_url?: string | undefined;
+        transcription_job_id?: string | undefined;
+        transcription_status?: "queued" | "processing" | "complete" | "failed" | undefined;
+        transcription_language?: string | undefined;
+        transcription_error?: string | undefined;
     } | undefined;
     badges?: {
         name: string;
@@ -272,6 +296,7 @@ export declare const CourseSchema: z.ZodObject<{
         description?: string | undefined;
         icon_url?: string | undefined;
     }[] | undefined;
+    badge_ids?: string[] | undefined;
     sections?: {
         title: string;
         section_id: string;
@@ -283,6 +308,7 @@ export declare const CourseSchema: z.ZodObject<{
     published_at?: string | undefined;
     published_by?: string | undefined;
     estimated_duration_minutes?: number | undefined;
+    estimated_minutes?: number | undefined;
     difficulty_level?: "beginner" | "intermediate" | "advanced" | undefined;
 }>;
 export type Course = z.infer<typeof CourseSchema>;
