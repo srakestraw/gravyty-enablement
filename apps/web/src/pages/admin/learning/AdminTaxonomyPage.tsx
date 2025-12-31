@@ -14,6 +14,7 @@ import {
   CardActionArea,
   CircularProgress,
   Alert,
+  Button,
 } from '@mui/material';
 import { CategoryOutlined } from '@mui/icons-material';
 import { useTaxonomyOptions } from '../../../hooks/useTaxonomyOptions';
