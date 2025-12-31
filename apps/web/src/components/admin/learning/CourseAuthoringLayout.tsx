@@ -7,11 +7,7 @@
  */
 
 import React, { ReactNode } from 'react';
-import { Box, Drawer, IconButton, Tooltip, useTheme, useMediaQuery } from '@mui/material';
-import {
-  ChevronLeft as ChevronLeftIcon,
-  ChevronRight as ChevronRightIcon,
-} from '@mui/icons-material';
+import { Box, Drawer, useTheme, useMediaQuery } from '@mui/material';
 
 export interface CourseAuthoringLayoutProps {
   outline: ReactNode;
@@ -24,7 +20,6 @@ export interface CourseAuthoringLayoutProps {
 
 const DEFAULT_CONTEXT_PANEL_WIDTH = 360;
 const OUTLINE_WIDTH = 300;
-const TOGGLE_BUTTON_WIDTH = 40; // Space reserved for toggle button when panel is closed
 
 export function CourseAuthoringLayout({
   outline,
@@ -37,13 +32,10 @@ export function CourseAuthoringLayout({
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
-  // Calculate right column width: panel width when open, toggle button width when closed
-  // Always reserve space for the toggle button, even when closed
-  const rightColumnWidth = contextPanelOpen ? contextPanelWidth : TOGGLE_BUTTON_WIDTH;
-
   // Build grid template columns string
-  const gridColumns = contextPanel
-    ? `${OUTLINE_WIDTH}px minmax(0, 1fr) ${rightColumnWidth}px`
+  // When inspector is closed, it doesn't reserve space (editor expands)
+  const gridColumns = contextPanel && contextPanelOpen
+    ? `${OUTLINE_WIDTH}px minmax(0, 1fr) ${contextPanelWidth}px`
     : `${OUTLINE_WIDTH}px minmax(0, 1fr)`;
 
   return (
@@ -107,43 +99,12 @@ export function CourseAuthoringLayout({
                 <Box
                   sx={{
                     height: '100%',
-                    overflow: 'auto',
-                    p: 2,
+                    overflow: 'hidden',
                     width: '100%',
                   }}
                 >
                   {contextPanel}
                 </Box>
-              )}
-
-              {/* Toggle button - always visible */}
-              {onContextPanelToggle && (
-                <Tooltip title={contextPanelOpen ? 'Close Inspector' : 'Open Inspector'}>
-                  <IconButton
-                    onClick={onContextPanelToggle}
-                    sx={{
-                      position: 'absolute',
-                      right: contextPanelOpen ? contextPanelWidth - 20 : TOGGLE_BUTTON_WIDTH / 2 - 16,
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      zIndex: 10,
-                      bgcolor: 'background.paper',
-                      border: 1,
-                      borderColor: 'divider',
-                      boxShadow: 1,
-                      width: 32,
-                      height: 32,
-                      '&:hover': { bgcolor: 'action.hover' },
-                      transition: theme.transitions.create('right', {
-                        easing: theme.transitions.easing.sharp,
-                        duration: theme.transitions.duration.enteringScreen,
-                      }),
-                    }}
-                    aria-label={contextPanelOpen ? 'Close Inspector' : 'Open Inspector'}
-                  >
-                    {contextPanelOpen ? <ChevronRightIcon /> : <ChevronLeftIcon />}
-                  </IconButton>
-                </Tooltip>
               )}
             </Box>
           )}
@@ -163,7 +124,7 @@ export function CourseAuthoringLayout({
                 },
               }}
             >
-              <Box sx={{ p: 2, height: '100%', overflow: 'auto' }}>
+              <Box sx={{ height: '100%', overflow: 'hidden' }}>
                 {contextPanel}
               </Box>
             </Drawer>

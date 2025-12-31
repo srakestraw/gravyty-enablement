@@ -60,6 +60,8 @@ export interface EditorPanelProps {
   onCancel?: () => void;
   issuesCount?: number;
   onOpenInspector?: () => void;
+  inspectorOpen?: boolean;
+  inspectorActiveTab?: 'issues' | 'properties';
 }
 
 export function EditorPanel({
@@ -84,6 +86,8 @@ export function EditorPanel({
   onCancel,
   issuesCount = 0,
   onOpenInspector,
+  inspectorOpen = false,
+  inspectorActiveTab = 'issues',
 }: EditorPanelProps) {
   const [detailsDrawerOpen, setDetailsDrawerOpen] = useState(false);
   
@@ -308,14 +312,15 @@ export function EditorPanel({
                 />
               )}
 
-              {/* Issues Chip */}
-              {issuesCount > 0 && onOpenInspector && (
-                <Tooltip title={`${issuesCount} issue${issuesCount !== 1 ? 's' : ''} - Click to view`}>
+              {/* Issues Chip - always visible */}
+              {onOpenInspector && (
+                <Tooltip title={issuesCount > 0 ? `${issuesCount} error${issuesCount !== 1 ? 's' : ''} - Click to view` : 'View issues'}>
                   <Chip
                     icon={<ErrorIcon />}
-                    label={`Issues (${issuesCount})`}
+                    label={issuesCount > 0 ? `Issues (${issuesCount})` : 'Issues'}
                     size="small"
-                    color="error"
+                    color={issuesCount > 0 ? 'error' : 'default'}
+                    variant={inspectorOpen && inspectorActiveTab === 'issues' ? 'filled' : 'outlined'}
                     onClick={() => onOpenInspector()}
                     sx={{ cursor: 'pointer', flexShrink: 0, minWidth: 'fit-content' }}
                   />

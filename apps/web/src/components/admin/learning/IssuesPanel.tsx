@@ -1,24 +1,22 @@
 /**
  * Issues Panel
  * 
- * Shows validation issues grouped by node
+ * Shows validation issues grouped by severity (Errors/Warnings) with collapsible accordion groups
  * Clicking an issue navigates to the node and focuses the field
  */
 
+import { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Typography,
-  List,
-  ListItem,
-  ListItemIcon,
-  ListItemText,
-  Chip,
-  Divider,
-  Button,
+  Collapse,
+  IconButton,
+  FormControlLabel,
+  Switch,
 } from '@mui/material';
 import {
-  Error as ErrorIcon,
-  Warning as WarningIcon,
+  ExpandMore as ExpandMoreIcon,
+  ExpandLess as ExpandLessIcon,
   NavigateNext as NavigateNextIcon,
 } from '@mui/icons-material';
 import type { ValidationIssue } from '../../../validations/lmsValidations';
@@ -28,6 +26,7 @@ import { focusRegistry } from '../../../utils/focusRegistry';
 export interface IssuesPanelProps {
   validationIssues: ValidationIssue[];
   courseTree: CourseTreeNode | null;
+  courseId?: string;
   onSelectCourseDetails: () => void;
   onSelectNode: (nodeId: string) => void; // For sections/lessons
 }
@@ -35,51 +34,87 @@ export interface IssuesPanelProps {
 export function IssuesPanel({
   validationIssues,
   courseTree,
+  courseId,
   onSelectCourseDetails,
   onSelectNode,
 }: IssuesPanelProps) {
-  // Group issues by node
-  const groupedIssues = (() => {
-    const grouped: Record<string, { node: CourseTreeNode | null; errors: ValidationIssue[]; warnings: ValidationIssue[] }> = {};
+  // Separate errors and warnings
+  const errors = validationIssues.filter((i) => i.severity === 'error');
+  const warnings = validationIssues.filter((i) => i.severity === 'warning');
 
-    validationIssues.forEach((issue) => {
-      const key = issue.entityType && issue.entityId
-        ? `${issue.entityType}:${issue.entityId}`
-        : 'course:root';
+  // Accordion state - persist in sessionStorage
+  // Default: collapse errors and warnings
+  const [errorsExpanded, setErrorsExpanded] = useState(() => {
+    // Always collapse for new courses
+    if (courseId === 'new') return false;
+    // If errors exist, collapse by default unless user explicitly expanded
+    if (errors.length === 0) return false;
+    const stored = sessionStorage.getItem('inspector-errors-expanded');
+    // If no stored preference, collapse by default
+    return stored !== null ? stored === 'true' : false;
+  });
+  const [warningsExpanded, setWarningsExpanded] = useState(() => {
+    // Always collapse for new courses
+    if (courseId === 'new') return false;
+    const stored = sessionStorage.getItem('inspector-warnings-expanded');
+    return stored !== null ? stored === 'true' : false;
+  });
+  const [showWarnings, setShowWarnings] = useState(() => {
+    const stored = sessionStorage.getItem('inspector-show-warnings');
+    return stored !== null ? stored === 'true' : true;
+  });
 
-      if (!grouped[key]) {
-        // Find node in tree
-        let node: CourseTreeNode | null = null;
-        if (courseTree && issue.entityType && issue.entityId) {
-          const findNode = (n: CourseTreeNode): CourseTreeNode | null => {
-            if (n.id === issue.entityId && n.type === issue.entityType) return n;
-            if (n.children) {
-              for (const child of n.children) {
-                const found = findNode(child);
-                if (found) return found;
-              }
-            }
-            return null;
-          };
-          node = findNode(courseTree);
-        }
+  // Track if errors have been seen before (to avoid auto-expanding on every render)
+  const [hasSeenErrors, setHasSeenErrors] = useState(false);
+  const lastCourseIdRef = useRef<string | undefined>(undefined);
 
-        grouped[key] = {
-          node,
-          errors: [],
-          warnings: [],
-        };
+  // Reset state when opening a new course
+  useEffect(() => {
+    if (courseId === 'new' && lastCourseIdRef.current !== 'new') {
+      // Reset all expanded states when opening a new course
+      setErrorsExpanded(false);
+      setWarningsExpanded(false);
+      setHasSeenErrors(false);
+    }
+    lastCourseIdRef.current = courseId;
+  }, [courseId]);
+
+  // Update errors expanded state when errors change
+  useEffect(() => {
+    if (errors.length === 0) {
+      // If errors are cleared, collapse
+      setErrorsExpanded(false);
+      setHasSeenErrors(false);
+    } else if (errors.length > 0 && !hasSeenErrors && courseId !== 'new') {
+      // First time seeing errors - respect stored preference or default to collapsed
+      // Skip this for new courses (they should stay collapsed)
+      const stored = sessionStorage.getItem('inspector-errors-expanded');
+      // Only set if there's a stored preference (user has explicitly set it)
+      if (stored !== null) {
+        setErrorsExpanded(stored === 'true');
       }
+      setHasSeenErrors(true);
+    }
+  }, [errors.length, hasSeenErrors, courseId]);
 
-      if (issue.severity === 'error') {
-        grouped[key].errors.push(issue);
-      } else {
-        grouped[key].warnings.push(issue);
-      }
-    });
+  // Persist state changes (but not for new courses)
+  useEffect(() => {
+    if (courseId !== 'new') {
+      sessionStorage.setItem('inspector-errors-expanded', String(errorsExpanded));
+    }
+  }, [errorsExpanded, courseId]);
 
-    return Object.values(grouped);
-  })();
+  useEffect(() => {
+    if (courseId !== 'new') {
+      sessionStorage.setItem('inspector-warnings-expanded', String(warningsExpanded));
+    }
+  }, [warningsExpanded, courseId]);
+
+  useEffect(() => {
+    if (courseId !== 'new') {
+      sessionStorage.setItem('inspector-show-warnings', String(showWarnings));
+    }
+  }, [showWarnings, courseId]);
 
   const handleNavigateToIssue = (issue: ValidationIssue) => {
     if (!issue.entityType || !issue.entityId || !issue.fieldKey) return;
@@ -104,8 +139,30 @@ export function IssuesPanel({
     }, 100);
   };
 
-  const errorCount = validationIssues.filter((i) => i.severity === 'error').length;
-  const warningCount = validationIssues.filter((i) => i.severity === 'warning').length;
+  // Helper to get node label for an issue
+  const getNodeLabel = (issue: ValidationIssue): string => {
+    if (!issue.entityType || !issue.entityId || !courseTree) return '';
+    
+    if (issue.entityType === 'course') return 'Course details';
+    
+    const findNode = (n: CourseTreeNode): CourseTreeNode | null => {
+      if (n.id === issue.entityId && n.type === issue.entityType) return n;
+      if (n.children) {
+        for (const child of n.children) {
+          const found = findNode(child);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+    
+    const node = findNode(courseTree);
+    if (!node) return '';
+    
+    if (node.type === 'section') return `Section: ${node.title}`;
+    if (node.type === 'lesson') return `Lesson: ${node.title}`;
+    return '';
+  };
 
   if (validationIssues.length === 0) {
     return (
@@ -118,95 +175,316 @@ export function IssuesPanel({
   }
 
   return (
-    <Box>
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-        <Typography variant="h6">Issues</Typography>
-        {errorCount > 0 && (
-          <Chip
-            label={`${errorCount} error${errorCount !== 1 ? 's' : ''}`}
-            color="error"
-            size="small"
+    <Box sx={{ p: 2 }}>
+      {/* Hide Warnings Toggle */}
+      {warnings.length > 0 && (
+        <Box sx={{ mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
+          <FormControlLabel
+            control={
+              <Switch
+                size="small"
+                checked={showWarnings}
+                onChange={(e) => setShowWarnings(e.target.checked)}
+              />
+            }
+            label={
+              <Typography variant="caption" color="text.secondary">
+                Show warnings
+              </Typography>
+            }
+            sx={{ m: 0 }}
           />
-        )}
-      </Box>
-      <Divider sx={{ mb: 2 }} />
-
-      {groupedIssues.map((group) => (
-        <Box key={group.node?.id || 'course'} sx={{ mb: 2 }}>
-          {group.node && group.node.type === 'course' && (
-            <Typography variant="caption" color="text.secondary" sx={{ ml: 2, display: 'block', mb: 0.5, fontWeight: 500 }}>
-              Course details
-            </Typography>
-          )}
-          {group.node && group.node.type !== 'course' && (
-            <Typography variant="caption" color="text.secondary" sx={{ ml: 2, display: 'block', mb: 0.5, fontWeight: 500 }}>
-              {group.node.type === 'section' ? `Section: ${group.node.title}` : `Lesson: ${group.node.title}`}
-            </Typography>
-          )}
-
-          {group.errors.length > 0 && (
-            <Box sx={{ mb: 1 }}>
-              <Typography variant="subtitle2" color="error" sx={{ ml: 2, mb: 0.5 }}>
-                Errors ({group.errors.length})
-              </Typography>
-              <List dense>
-                {group.errors.map((error, index) => (
-                  <ListItem
-                    key={index}
-                    sx={{
-                      py: 0.5,
-                      cursor: 'pointer',
-                      '&:hover': { bgcolor: 'action.hover' },
-                    }}
-                    onClick={() => handleNavigateToIssue(error)}
-                  >
-                    <ListItemIcon sx={{ minWidth: 32 }}>
-                      <ErrorIcon color="error" fontSize="small" />
-                    </ListItemIcon>
-                    <ListItemText
-                      primary={error.message}
-                      primaryTypographyProps={{ variant: 'body2' }}
-                    />
-                    <NavigateNextIcon fontSize="small" color="action" />
-                  </ListItem>
-                ))}
-              </List>
-            </Box>
-          )}
-
-          {group.warnings.length > 0 && (
-            <Box>
-              <Typography variant="subtitle2" color="warning.main" sx={{ ml: 2, mb: 0.5 }}>
-                Warnings ({group.warnings.length})
-              </Typography>
-              <List dense>
-                {group.warnings.map((warning, index) => (
-                  <ListItem
-                    key={index}
-                    sx={{
-                      py: 0.5,
-                      cursor: warning.entityType && warning.entityId && warning.fieldKey ? 'pointer' : 'default',
-                      '&:hover': warning.entityType && warning.entityId && warning.fieldKey ? { bgcolor: 'action.hover' } : {},
-                    }}
-                    onClick={() => warning.entityType && warning.entityId && warning.fieldKey && handleNavigateToIssue(warning)}
-                  >
-                    <ListItemIcon sx={{ minWidth: 32 }}>
-                      <WarningIcon color="warning" fontSize="small" />
-                    </ListItemIcon>
-                    <ListItemText
-                      primary={warning.message}
-                      primaryTypographyProps={{ variant: 'body2', color: 'text.secondary' }}
-                    />
-                    {warning.entityType && warning.entityId && warning.fieldKey && (
-                      <NavigateNextIcon fontSize="small" color="action" />
-                    )}
-                  </ListItem>
-                ))}
-              </List>
-            </Box>
-          )}
         </Box>
-      ))}
+      )}
+
+      {/* Errors Group */}
+      {errors.length > 0 && (
+        <Box sx={{ mb: showWarnings && warnings.length > 0 ? 2 : 0 }}>
+          {/* Accordion Header */}
+          <Box
+            component="button"
+            onClick={() => setErrorsExpanded(!errorsExpanded)}
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              width: '100%',
+              p: 0.75,
+              border: 'none',
+              bgcolor: 'transparent',
+              cursor: 'pointer',
+              borderRadius: 1,
+              '&:hover': { bgcolor: 'action.hover' },
+              '&:focus': {
+                outline: '2px solid',
+                outlineColor: 'primary.main',
+                outlineOffset: 2,
+              },
+            }}
+            aria-expanded={errorsExpanded}
+            aria-label={`${errorsExpanded ? 'Collapse' : 'Expand'} errors`}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <IconButton
+                size="small"
+                sx={{ p: 0, width: 20, height: 20 }}
+                aria-hidden="true"
+              >
+                {errorsExpanded ? (
+                  <ExpandLessIcon fontSize="small" />
+                ) : (
+                  <ExpandMoreIcon fontSize="small" />
+                )}
+              </IconButton>
+              <Typography
+                variant="caption"
+                sx={{
+                  fontSize: '0.8125rem',
+                  fontWeight: 500,
+                  color: 'text.secondary',
+                }}
+              >
+                Errors ({errors.length})
+              </Typography>
+            </Box>
+          </Box>
+
+          {/* Errors List */}
+          <Collapse in={errorsExpanded}>
+            <Box sx={{ pl: 3.5, pt: 0.5 }}>
+              {errors.map((error, index) => {
+                const nodeLabel = getNodeLabel(error);
+                const isClickable = !!(error.entityType && error.entityId && error.fieldKey);
+                
+                return (
+                  <Box
+                    key={index}
+                    component={isClickable ? 'button' : 'div'}
+                    data-issue-item={index === 0 ? 'true' : undefined}
+                    onClick={() => isClickable && handleNavigateToIssue(error)}
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: 1,
+                      width: '100%',
+                      p: 1,
+                      border: 'none',
+                      bgcolor: 'transparent',
+                      cursor: isClickable ? 'pointer' : 'default',
+                      borderRadius: 1,
+                      textAlign: 'left',
+                      '&:hover': isClickable
+                        ? { bgcolor: 'action.hover' }
+                        : {},
+                      '&:focus': isClickable
+                        ? {
+                            outline: '2px solid',
+                            outlineColor: 'primary.main',
+                            outlineOffset: 2,
+                          }
+                        : {},
+                    }}
+                  >
+                    {/* Small error indicator */}
+                    <Box
+                      sx={{
+                        width: 3,
+                        height: 3,
+                        borderRadius: '50%',
+                        bgcolor: 'error.main',
+                        mt: 0.75,
+                        flexShrink: 0,
+                      }}
+                    />
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      {nodeLabel && (
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            display: 'block',
+                            color: 'text.secondary',
+                            fontSize: '0.75rem',
+                            mb: 0.25,
+                          }}
+                        >
+                          {nodeLabel}
+                        </Typography>
+                      )}
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          fontSize: '0.875rem',
+                          color: 'text.primary',
+                          lineHeight: 1.4,
+                        }}
+                      >
+                        {error.message}
+                      </Typography>
+                    </Box>
+                    {isClickable && (
+                      <NavigateNextIcon
+                        fontSize="small"
+                        sx={{
+                          color: 'action.active',
+                          opacity: 0.4,
+                          flexShrink: 0,
+                          mt: 0.5,
+                          'button:hover &': { opacity: 0.7 },
+                        }}
+                      />
+                    )}
+                  </Box>
+                );
+              })}
+            </Box>
+          </Collapse>
+        </Box>
+      )}
+
+      {/* Warnings Group */}
+      {showWarnings && warnings.length > 0 && (
+        <Box>
+          {/* Accordion Header */}
+          <Box
+            component="button"
+            onClick={() => setWarningsExpanded(!warningsExpanded)}
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              width: '100%',
+              p: 0.75,
+              border: 'none',
+              bgcolor: 'transparent',
+              cursor: 'pointer',
+              borderRadius: 1,
+              '&:hover': { bgcolor: 'action.hover' },
+              '&:focus': {
+                outline: '2px solid',
+                outlineColor: 'primary.main',
+                outlineOffset: 2,
+              },
+            }}
+            aria-expanded={warningsExpanded}
+            aria-label={`${warningsExpanded ? 'Collapse' : 'Expand'} warnings`}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <IconButton
+                size="small"
+                sx={{ p: 0, width: 20, height: 20 }}
+                aria-hidden="true"
+              >
+                {warningsExpanded ? (
+                  <ExpandLessIcon fontSize="small" />
+                ) : (
+                  <ExpandMoreIcon fontSize="small" />
+                )}
+              </IconButton>
+              <Typography
+                variant="caption"
+                sx={{
+                  fontSize: '0.8125rem',
+                  fontWeight: 500,
+                  color: 'text.secondary',
+                }}
+              >
+                Warnings ({warnings.length})
+              </Typography>
+            </Box>
+          </Box>
+
+          {/* Warnings List */}
+          <Collapse in={warningsExpanded}>
+            <Box sx={{ pl: 3.5, pt: 0.5 }}>
+              {warnings.map((warning, index) => {
+                const nodeLabel = getNodeLabel(warning);
+                const isClickable = !!(
+                  warning.entityType &&
+                  warning.entityId &&
+                  warning.fieldKey
+                );
+
+                return (
+                  <Box
+                    key={index}
+                    component={isClickable ? 'button' : 'div'}
+                    onClick={() => isClickable && handleNavigateToIssue(warning)}
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: 1,
+                      width: '100%',
+                      p: 1,
+                      border: 'none',
+                      bgcolor: 'transparent',
+                      cursor: isClickable ? 'pointer' : 'default',
+                      borderRadius: 1,
+                      textAlign: 'left',
+                      '&:hover': isClickable ? { bgcolor: 'action.hover' } : {},
+                      '&:focus': isClickable
+                        ? {
+                            outline: '2px solid',
+                            outlineColor: 'primary.main',
+                            outlineOffset: 2,
+                          }
+                        : {},
+                    }}
+                  >
+                    {/* Small warning indicator */}
+                    <Box
+                      sx={{
+                        width: 3,
+                        height: 3,
+                        borderRadius: '50%',
+                        bgcolor: '#d4a574', // Muted amber
+                        mt: 0.75,
+                        flexShrink: 0,
+                      }}
+                    />
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      {nodeLabel && (
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            display: 'block',
+                            color: 'text.secondary',
+                            fontSize: '0.75rem',
+                            mb: 0.25,
+                          }}
+                        >
+                          {nodeLabel}
+                        </Typography>
+                      )}
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          fontSize: '0.875rem',
+                          color: 'text.secondary',
+                          lineHeight: 1.4,
+                        }}
+                      >
+                        {warning.message}
+                      </Typography>
+                    </Box>
+                    {isClickable && (
+                      <NavigateNextIcon
+                        fontSize="small"
+                        sx={{
+                          color: 'action.active',
+                          opacity: 0.4,
+                          flexShrink: 0,
+                          mt: 0.5,
+                          'button:hover &': { opacity: 0.7 },
+                        }}
+                      />
+                    )}
+                  </Box>
+                );
+              })}
+            </Box>
+          </Collapse>
+        </Box>
+      )}
     </Box>
   );
 }

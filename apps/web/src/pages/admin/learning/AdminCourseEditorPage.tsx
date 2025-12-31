@@ -54,8 +54,69 @@ export function AdminCourseEditorPage() {
   const [course, setCourse] = useState<Course | null>(null);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   
-  // Inspector panel state
+  // Inspector panel state - persist in localStorage
+  // Always default to closed, only restore from localStorage for existing courses
   const [inspectorOpen, setInspectorOpen] = useState(false);
+  const [inspectorActiveTab, setInspectorActiveTab] = useState<'issues' | 'properties'>('issues');
+  
+  // Restore inspector state from localStorage only for existing courses (not new)
+  useEffect(() => {
+    if (!isNew && courseId) {
+      const storedOpen = localStorage.getItem('lms.courseEditor.inspectorOpen');
+      if (storedOpen === 'true') {
+        setInspectorOpen(true);
+      }
+      const storedTab = localStorage.getItem('lms.courseEditor.inspectorTab');
+      if (storedTab === 'issues' || storedTab === 'properties') {
+        setInspectorActiveTab(storedTab);
+      }
+    } else {
+      // Explicitly close for new courses
+      setInspectorOpen(false);
+      setInspectorActiveTab('issues');
+    }
+  }, [isNew, courseId]);
+  
+  // Persist inspector state to localStorage (but not for new courses)
+  useEffect(() => {
+    if (!isNew) {
+      localStorage.setItem('lms.courseEditor.inspectorOpen', String(inspectorOpen));
+    }
+  }, [inspectorOpen, isNew]);
+  
+  useEffect(() => {
+    if (!isNew) {
+      localStorage.setItem('lms.courseEditor.inspectorTab', inspectorActiveTab);
+    }
+  }, [inspectorActiveTab, isNew]);
+  
+  // Handler to open inspector to Issues tab (called from Issues chip)
+  const handleOpenInspectorToIssues = () => {
+    // If inspector is already open and on Issues tab, do nothing
+    if (inspectorOpen && inspectorActiveTab === 'issues') {
+      return;
+    }
+    
+    // Switch to Issues tab (or open if closed)
+    setInspectorActiveTab('issues');
+    setInspectorOpen(true);
+    
+    // Scroll to first issue after a brief delay to allow panel to open and errors to expand
+    setTimeout(() => {
+      // Expand errors section if collapsed
+      const errorsButton = document.querySelector('[aria-label*="Expand errors"]');
+      if (errorsButton) {
+        (errorsButton as HTMLElement).click();
+      }
+      // Then scroll to first issue
+      setTimeout(() => {
+        const firstIssue = document.querySelector('[data-issue-item]');
+        if (firstIssue) {
+          firstIssue.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      }, 150);
+    }, 100);
+  };
   
   // Selection state - what is currently being edited
   const [selection, setSelection] = useState<CourseSelection | null>(() => {
@@ -230,12 +291,7 @@ export function AdminCourseEditorPage() {
     // Otherwise, no default selection (user must select section/lesson or click "Edit details")
   }, [course?.course_id]); // Only run on initial load
   
-  // Show inspector when there are validation errors
-  useEffect(() => {
-    if (draftValidation.errors.length > 0) {
-      setInspectorOpen(true);
-    }
-  }, [draftValidation.errors.length]);
+  // Removed auto-open on errors - inspector should only open when user clicks Issues chip
 
   // Helper to determine if inline error should be shown (only for selected node)
   const shouldShowError = useCallback((entityType: 'course' | 'section' | 'lesson', entityId: string, fieldKey: string): boolean => {
@@ -319,16 +375,23 @@ export function AdminCourseEditorPage() {
           description: l.description,
           type: l.type,
           order: l.order,
-          content: l.content || {
-            kind: l.type,
-            ...(l.type === 'video' ? { video_id: '', duration_seconds: 0 } :
-                l.type === 'reading' ? { format: 'markdown' as const, markdown: '' } :
-                l.type === 'quiz' ? { questions: [] } :
-                l.type === 'assignment' ? { instructions_markdown: '', submission_type: 'none' as const } :
-                { provider: 'embed' as const, embed_url: '' }),
-          },
+          content: l.content || (() => {
+            switch (l.type) {
+              case 'video':
+                return { kind: 'video' as const, video_id: '', duration_seconds: 0 };
+              case 'reading':
+                return { kind: 'reading' as const, format: 'markdown' as const, markdown: '' };
+              case 'quiz':
+                return { kind: 'quiz' as const, questions: [], passing_score_percent: 70, allow_retry: false, show_answers_after_submit: false };
+              case 'assignment':
+                return { kind: 'assignment' as const, instructions_markdown: '', submission_type: 'none' as const };
+              case 'interactive':
+                return { kind: 'interactive' as const, provider: 'embed' as const, embed_url: '', height_px: 600, allow_fullscreen: true };
+              default:
+                return { kind: 'video' as const, video_id: '', duration_seconds: 0 };
+            }
+          })(),
           resources: l.resources || [],
-          estimated_duration_minutes: l.estimated_duration_minutes,
           required: l.required,
         }));
 
@@ -983,9 +1046,9 @@ export function AdminCourseEditorPage() {
                 onDiscardChanges={() => setDiscardDialogOpen(true)}
                 onCancel={() => navigate('/enablement/admin/learning/courses')}
                 issuesCount={draftValidation.errors.length}
-                onOpenInspector={() => {
-                  setInspectorOpen(true);
-                }}
+                onOpenInspector={handleOpenInspectorToIssues}
+                inspectorOpen={inspectorOpen}
+                inspectorActiveTab={inspectorActiveTab}
               />
             </Box>
           }
@@ -994,8 +1057,12 @@ export function AdminCourseEditorPage() {
               selectedNode={selection?.kind === 'course_details' ? courseTree : selectedNode}
               validationIssues={[...draftValidation.errors, ...draftValidation.warnings]}
               courseTree={courseTree}
+              course={course}
               onSelectCourseDetails={handleSelectCourseDetails}
               onSelectNode={handleSelectNode}
+              onClose={() => setInspectorOpen(false)}
+              activeTab={inspectorActiveTab}
+              onTabChange={setInspectorActiveTab}
             />
           }
           contextPanelOpen={inspectorOpen}
