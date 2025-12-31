@@ -74,7 +74,7 @@ export const UpdateTaxonomyOptionSchema = z.object({
   archived_at: z.string().optional(), // Set to ISO datetime to archive, undefined to unarchive (legacy)
   status: z.enum(['active', 'archived']).optional(), // active | archived
   deleted_at: z.string().optional().nullable(), // Set to ISO datetime to soft-delete, null to restore
-  color: z.string().optional(),
+  color: z.string().optional().nullable(), // Set to null to clear color
 });
 
 export type UpdateTaxonomyOption = z.infer<typeof UpdateTaxonomyOptionSchema>;

@@ -35,6 +35,8 @@ import {
   InputAdornment,
   Tooltip,
   Autocomplete,
+  Select,
+  FormControl,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -47,6 +49,7 @@ import {
   ArrowUpward as ArrowUpwardIcon,
   ArrowDownward as ArrowDownwardIcon,
   DragHandle as DragHandleIcon,
+  Palette as PaletteIcon,
 } from '@mui/icons-material';
 import { useTaxonomyOptions } from '../../../hooks/useTaxonomyOptions';
 import { taxonomyApi } from '../../../api/taxonomyClient';
@@ -71,10 +74,16 @@ export function AdminTaxonomyDetailPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingLabel, setEditingLabel] = useState('');
   const [editingParentId, setEditingParentId] = useState<string | null>(null);
+  const [editingColor, setEditingColor] = useState<string | null | undefined>(undefined);
+  const [editingCustomColor, setEditingCustomColor] = useState<string>('#000000');
+  const [showEditingColorPicker, setShowEditingColorPicker] = useState(false);
   const [menuAnchor, setMenuAnchor] = useState<{ element: HTMLElement; optionId: string } | null>(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [newLabel, setNewLabel] = useState('');
   const [newParentId, setNewParentId] = useState<string | null>(null);
+  const [newColor, setNewColor] = useState<string | undefined>(undefined);
+  const [newCustomColor, setNewCustomColor] = useState<string>('#000000');
+  const [showNewColorPicker, setShowNewColorPicker] = useState(false);
   const [creating, setCreating] = useState(false);
   const [saving, setSaving] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState<string | null>(null);
@@ -86,6 +95,31 @@ export function AdminTaxonomyDetailPage() {
   } | null>(null);
   const [checkingUsage, setCheckingUsage] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [colorMenuAnchor, setColorMenuAnchor] = useState<{ element: HTMLElement; optionId: string } | null>(null);
+  const [menuCustomColor, setMenuCustomColor] = useState<string>('#000000');
+  const [showMenuColorPicker, setShowMenuColorPicker] = useState(false);
+
+  const COLOR_PALETTE = [
+    '#1976d2', // blue
+    '#388e3c', // green
+    '#f57c00', // orange
+    '#d32f2f', // red
+    '#7b1fa2', // purple
+    '#0288d1', // light blue
+    '#c2185b', // pink
+    '#5d4037', // brown
+  ];
+
+  // Helper to check if a color is in the palette
+  const isPaletteColor = (color: string | undefined): boolean => {
+    if (!color) return false;
+    return COLOR_PALETTE.includes(color);
+  };
+
+  // Helper to validate hex color
+  const isValidHexColor = (hex: string): boolean => {
+    return /^#[0-9A-F]{6}$/i.test(hex);
+  };
 
   if (!key || !['product', 'product_suite', 'topic_tag'].includes(key)) {
     return (
@@ -160,6 +194,7 @@ export function AdminTaxonomyDetailPage() {
       const response = await taxonomyApi.createOption(key, {
         label: newLabel.trim(),
         parent_id: key === 'product' ? (newParentId || undefined) : undefined,
+        color: newColor,
       });
 
       if ('error' in response) {
@@ -170,6 +205,9 @@ export function AdminTaxonomyDetailPage() {
       track('lms_taxonomy_option_created', { key, option_id: response.data.option.option_id });
       setNewLabel('');
       setNewParentId(null);
+      setNewColor(undefined);
+      setNewCustomColor('#000000');
+      setShowNewColorPicker(false);
       setCreateDialogOpen(false);
       refetch();
     } catch (err) {
@@ -184,6 +222,10 @@ export function AdminTaxonomyDetailPage() {
     setEditingId(option.option_id);
     setEditingLabel(option.label);
     setEditingParentId(option.parent_id || null);
+    // Use null to represent "no color", undefined means "don't update"
+    setEditingColor(option.color ?? null);
+    setEditingCustomColor(option.color && !isPaletteColor(option.color) ? option.color : '#000000');
+    setShowEditingColorPicker(false);
   };
 
   const handleSaveEdit = async (optionId: string) => {
@@ -205,6 +247,7 @@ export function AdminTaxonomyDetailPage() {
     try {
       const updates: any = {
         label: editingLabel.trim(),
+        color: editingColor, // null to clear, string to set
       };
       if (key === 'product') {
         updates.parent_id = editingParentId || null;
@@ -220,6 +263,7 @@ export function AdminTaxonomyDetailPage() {
       setEditingId(null);
       setEditingLabel('');
       setEditingParentId(null);
+      setEditingColor(undefined);
       refetch();
     } catch (err) {
       console.error('Error updating option:', err);
@@ -233,6 +277,9 @@ export function AdminTaxonomyDetailPage() {
     setEditingId(null);
     setEditingLabel('');
     setEditingParentId(null);
+    setEditingColor(undefined); // Reset to undefined (not editing)
+    setEditingCustomColor('#000000');
+    setShowEditingColorPicker(false);
   };
 
   const handleArchive = async (optionId: string) => {
@@ -307,6 +354,27 @@ export function AdminTaxonomyDetailPage() {
     } catch (err) {
       console.error('Error reordering option:', err);
       alert('Failed to reorder option');
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  const handleColorChange = async (optionId: string, color: string | undefined) => {
+    setSaving(optionId);
+    setColorMenuAnchor(null);
+    try {
+      const response = await taxonomyApi.updateOption(optionId, { color });
+
+      if ('error' in response) {
+        alert(`Failed to update color: ${response.error.message}`);
+        return;
+      }
+
+      track('lms_taxonomy_option_color_changed', { key, option_id: optionId });
+      refetch();
+    } catch (err) {
+      console.error('Error updating color:', err);
+      alert('Failed to update color');
     } finally {
       setSaving(null);
     }
@@ -479,6 +547,7 @@ export function AdminTaxonomyDetailPage() {
                     </TableCell>
                     <TableCell>
                       {isEditing ? (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <TextField
                           value={editingLabel}
                           onChange={(e) => setEditingLabel(e.target.value)}
@@ -492,8 +561,120 @@ export function AdminTaxonomyDetailPage() {
                           autoFocus
                           size="small"
                           disabled={isSaving}
-                          sx={{ minWidth: 200 }}
-                        />
+                            sx={{ minWidth: 200, flex: 1 }}
+                          />
+                          <FormControl size="small" sx={{ minWidth: 120 }}>
+                            <Select
+                              value={editingColor === null ? '' : (editingColor && !isPaletteColor(editingColor) ? 'custom' : (editingColor || ''))}
+                              onChange={(e) => {
+                                if (e.target.value === 'custom') {
+                                  setShowEditingColorPicker(true);
+                                  if (!editingColor || editingColor === null || isPaletteColor(editingColor)) {
+                                    setEditingColor(editingCustomColor);
+                                  }
+                                } else {
+                                  setShowEditingColorPicker(false);
+                                  // Empty string means "no color" -> set to null
+                                  setEditingColor(e.target.value === '' ? null : (e.target.value || null));
+                                }
+                              }}
+                              disabled={isSaving}
+                              renderValue={(value) => {
+                                const displayColor = value === 'custom' ? (editingColor && editingColor !== null && !isPaletteColor(editingColor) ? editingColor : null) : (value || null);
+                                if (!displayColor || displayColor === '') {
+                                  return (
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                      <Box sx={{ width: 14, height: 14, border: 1, borderColor: 'divider' }} />
+                                      <Typography variant="body2">No color</Typography>
+                                    </Box>
+                                  );
+                                }
+                                return (
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                    <Box
+                                      sx={{
+                                        width: 14,
+                                        height: 14,
+                                        borderRadius: '50%',
+                                        bgcolor: displayColor,
+                                      }}
+                                    />
+                                    <Typography variant="body2">{displayColor}</Typography>
+                                  </Box>
+                                );
+                              }}
+                            >
+                              <MenuItem value="">
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                  <Box sx={{ width: 16, height: 16, border: 1, borderColor: 'divider' }} />
+                                  <Typography>No color</Typography>
+                                </Box>
+                              </MenuItem>
+                              {COLOR_PALETTE.map((color) => (
+                                <MenuItem key={color} value={color}>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <Box
+                                      sx={{
+                                        width: 16,
+                                        height: 16,
+                                        borderRadius: '50%',
+                                        bgcolor: color,
+                                      }}
+                                    />
+                                    <Typography>{color}</Typography>
+                                  </Box>
+                                </MenuItem>
+                              ))}
+                              <MenuItem value="custom">
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                  <Box sx={{ width: 16, height: 16, border: 1, borderColor: 'divider', borderRadius: '50%' }} />
+                                  <Typography>Custom...</Typography>
+                                </Box>
+                              </MenuItem>
+                            </Select>
+                          </FormControl>
+                          {showEditingColorPicker && (
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <input
+                                type="color"
+                                value={editingColor && editingColor !== null && !isPaletteColor(editingColor) ? editingColor : editingCustomColor}
+                                onChange={(e) => {
+                                  const hex = e.target.value.toUpperCase();
+                                  setEditingColor(hex);
+                                  setEditingCustomColor(hex);
+                                }}
+                                style={{
+                                  width: 40,
+                                  height: 32,
+                                  border: '1px solid #ccc',
+                                  borderRadius: '4px',
+                                  cursor: 'pointer',
+                                }}
+                                disabled={isSaving}
+                              />
+                              <TextField
+                                size="small"
+                                value={editingColor && editingColor !== null && !isPaletteColor(editingColor) ? editingColor : editingCustomColor}
+                                onChange={(e) => {
+                                  const hex = e.target.value.toUpperCase();
+                                  if (hex.startsWith('#') && hex.length <= 7) {
+                                    setEditingCustomColor(hex);
+                                    if (hex.length === 7 && isValidHexColor(hex)) {
+                                      setEditingColor(hex);
+                                    }
+                                  }
+                                }}
+                                placeholder="#000000"
+                                disabled={isSaving}
+                                sx={{ width: 90 }}
+                                inputProps={{
+                                  maxLength: 7,
+                                  pattern: '#[0-9A-Fa-f]{6}',
+                                }}
+                              />
+                            </Box>
+                          )}
+                        </Box>
                       ) : (
                         <Box
                           sx={{
@@ -505,6 +686,17 @@ export function AdminTaxonomyDetailPage() {
                           }}
                           onClick={() => handleStartEdit(option)}
                         >
+                          {option.color && (
+                            <Box
+                              sx={{
+                                width: 12,
+                                height: 12,
+                                borderRadius: '50%',
+                                bgcolor: option.color,
+                                flexShrink: 0,
+                              }}
+                            />
+                          )}
                           {option.label}
                         </Box>
                       )}
@@ -520,6 +712,24 @@ export function AdminTaxonomyDetailPage() {
                             onChange={(_, newValue) => {
                               setEditingParentId(newValue?.option_id || null);
                             }}
+                            renderOption={(props, suite) => (
+                              <Box component="li" {...props}>
+                                {suite.color && (
+                                  <Box
+                                    sx={{
+                                      width: 12,
+                                      height: 12,
+                                      borderRadius: '50%',
+                                      bgcolor: suite.color,
+                                      display: 'inline-block',
+                                      mr: 1,
+                                      verticalAlign: 'middle',
+                                    }}
+                                  />
+                                )}
+                                {suite.label}
+                              </Box>
+                            )}
                             renderInput={(params) => (
                               <TextField
                                 {...params}
@@ -530,11 +740,26 @@ export function AdminTaxonomyDetailPage() {
                             disabled={isSaving}
                           />
                         ) : (
-                          <Typography variant="body2" color="text.secondary">
-                            {option.parent_id
-                              ? productSuites.find((ps) => ps.option_id === option.parent_id)?.label || 'Unknown'
-                              : 'None'}
-                          </Typography>
+                          option.parent_id ? (
+                            (() => {
+                              const parentSuite = productSuites.find((ps) => ps.option_id === option.parent_id);
+                              return parentSuite ? (
+                                <Chip
+                                  label={parentSuite.label}
+                                  size="small"
+                                  sx={{
+                                    bgcolor: parentSuite.color || 'action.selected',
+                                    color: parentSuite.color ? '#fff' : 'text.primary',
+                                    fontWeight: 500,
+                                  }}
+                                />
+                              ) : (
+                                <Typography variant="body2" color="text.secondary">Unknown</Typography>
+                              );
+                            })()
+                          ) : (
+                            <Typography variant="body2" color="text.secondary">None</Typography>
+                          )
                         )}
                       </TableCell>
                     )}
@@ -608,6 +833,15 @@ export function AdminTaxonomyDetailPage() {
                 >
                   <EditIcon fontSize="small" sx={{ mr: 1 }} />
                   Rename
+                </MenuItem>
+                <MenuItem
+                  onClick={(e) => {
+                    setColorMenuAnchor({ element: e.currentTarget, optionId: menuAnchor.optionId });
+                    setMenuAnchor(null);
+                  }}
+                >
+                  <PaletteIcon fontSize="small" sx={{ mr: 1 }} />
+                  Set Color
                 </MenuItem>
                 <MenuItem
                   onClick={() => {
@@ -752,6 +986,9 @@ export function AdminTaxonomyDetailPage() {
           setCreateDialogOpen(false);
           setNewLabel('');
           setNewParentId(null);
+          setNewColor(undefined);
+          setNewCustomColor('#000000');
+          setShowNewColorPicker(false);
         }}
         maxWidth="sm"
         fullWidth
@@ -779,6 +1016,24 @@ export function AdminTaxonomyDetailPage() {
               onChange={(_, newValue) => {
                 setNewParentId(newValue?.option_id || null);
               }}
+              renderOption={(props, suite) => (
+                <Box component="li" {...props}>
+                  {suite.color && (
+                    <Box
+                      sx={{
+                        width: 12,
+                        height: 12,
+                        borderRadius: '50%',
+                        bgcolor: suite.color,
+                        display: 'inline-block',
+                        mr: 1,
+                        verticalAlign: 'middle',
+                      }}
+                    />
+                  )}
+                  {suite.label}
+                </Box>
+              )}
               renderInput={(params) => (
                 <TextField
                   {...params}
@@ -789,6 +1044,114 @@ export function AdminTaxonomyDetailPage() {
               )}
             />
           )}
+          <Box sx={{ mt: 2 }}>
+            <Typography variant="body2" sx={{ mb: 1 }}>
+              Color (optional)
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
+              <Box
+                onClick={() => {
+                  setNewColor(undefined);
+                  setShowNewColorPicker(false);
+                }}
+                sx={{
+                  width: 32,
+                  height: 32,
+                  border: 2,
+                  borderColor: newColor === undefined ? 'primary.main' : 'divider',
+                  borderRadius: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  '&:hover': { borderColor: 'primary.main' },
+                }}
+              >
+                <Box sx={{ width: 16, height: 16, border: 1, borderColor: 'divider' }} />
+              </Box>
+              {COLOR_PALETTE.map((color) => (
+                <Box
+                  key={color}
+                  onClick={() => {
+                    setNewColor(color);
+                    setShowNewColorPicker(false);
+                  }}
+                  sx={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 1,
+                    bgcolor: color,
+                    border: 2,
+                    borderColor: newColor === color ? 'primary.main' : 'transparent',
+                    cursor: 'pointer',
+                    '&:hover': { borderColor: 'primary.main' },
+                  }}
+                />
+              ))}
+              <Box
+                onClick={() => {
+                  setShowNewColorPicker(true);
+                  if (!newColor || isPaletteColor(newColor)) {
+                    setNewColor(newCustomColor);
+                  }
+                }}
+                sx={{
+                  width: 32,
+                  height: 32,
+                  border: 2,
+                  borderColor: showNewColorPicker || (newColor && !isPaletteColor(newColor)) ? 'primary.main' : 'divider',
+                  borderRadius: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  '&:hover': { borderColor: 'primary.main' },
+                  bgcolor: showNewColorPicker || (newColor && !isPaletteColor(newColor)) ? (newColor || '#f5f5f5') : 'transparent',
+                }}
+              >
+                <Typography variant="caption" sx={{ fontSize: '0.7rem' }}>+</Typography>
+              </Box>
+            </Box>
+            {showNewColorPicker && (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
+                <input
+                  type="color"
+                  value={newColor && !isPaletteColor(newColor) ? newColor : newCustomColor}
+                  onChange={(e) => {
+                    const hex = e.target.value.toUpperCase();
+                    setNewColor(hex);
+                    setNewCustomColor(hex);
+                  }}
+                  style={{
+                    width: 50,
+                    height: 36,
+                    border: '1px solid #ccc',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                  }}
+                />
+                <TextField
+                  size="small"
+                  value={newColor && !isPaletteColor(newColor) ? newColor : newCustomColor}
+                  onChange={(e) => {
+                    const hex = e.target.value.toUpperCase();
+                    if (hex.startsWith('#') && hex.length <= 7) {
+                      setNewCustomColor(hex);
+                      if (hex.length === 7 && isValidHexColor(hex)) {
+                        setNewColor(hex);
+                      }
+                    }
+                  }}
+                  placeholder="#000000"
+                  sx={{ width: 100 }}
+                  inputProps={{
+                    maxLength: 7,
+                    pattern: '#[0-9A-Fa-f]{6}',
+                  }}
+                />
+              </Box>
+            )}
+          </Box>
         </DialogContent>
         <DialogActions>
           <Button
@@ -796,6 +1159,7 @@ export function AdminTaxonomyDetailPage() {
               setCreateDialogOpen(false);
               setNewLabel('');
               setNewParentId(null);
+              setNewColor(undefined);
             }}
             disabled={creating}
           >
@@ -806,6 +1170,106 @@ export function AdminTaxonomyDetailPage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Color Picker Menu */}
+      <Menu
+        anchorEl={colorMenuAnchor?.element}
+        open={!!colorMenuAnchor}
+        onClose={() => {
+          setColorMenuAnchor(null);
+          setShowMenuColorPicker(false);
+        }}
+      >
+        <MenuItem onClick={() => colorMenuAnchor && handleColorChange(colorMenuAnchor.optionId, undefined)}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box sx={{ width: 16, height: 16, border: 1, borderColor: 'divider' }} />
+            <Typography>No color</Typography>
+          </Box>
+        </MenuItem>
+        {COLOR_PALETTE.map((color) => (
+          <MenuItem
+            key={color}
+            onClick={() => {
+              if (colorMenuAnchor) {
+                handleColorChange(colorMenuAnchor.optionId, color);
+                setShowMenuColorPicker(false);
+              }
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Box sx={{ width: 16, height: 16, borderRadius: '50%', bgcolor: color }} />
+              <Typography>{color}</Typography>
+            </Box>
+          </MenuItem>
+        ))}
+        <MenuItem
+          onClick={() => {
+            setShowMenuColorPicker(true);
+            if (colorMenuAnchor) {
+              const option = filteredOptions.find((o) => o.option_id === colorMenuAnchor.optionId);
+              if (option?.color && !isPaletteColor(option.color)) {
+                setMenuCustomColor(option.color);
+              }
+            }
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box sx={{ width: 16, height: 16, border: 1, borderColor: 'divider', borderRadius: '50%' }} />
+            <Typography>Custom...</Typography>
+          </Box>
+        </MenuItem>
+        {showMenuColorPicker && colorMenuAnchor && (
+          <Box sx={{ p: 1.5, borderTop: 1, borderColor: 'divider' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+              <input
+                type="color"
+                value={menuCustomColor}
+                onChange={(e) => {
+                  const hex = e.target.value.toUpperCase();
+                  setMenuCustomColor(hex);
+                }}
+                style={{
+                  width: 40,
+                  height: 32,
+                  border: '1px solid #ccc',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                }}
+              />
+              <TextField
+                size="small"
+                value={menuCustomColor}
+                onChange={(e) => {
+                  const hex = e.target.value.toUpperCase();
+                  if (hex.startsWith('#') && hex.length <= 7) {
+                    setMenuCustomColor(hex);
+                  }
+                }}
+                placeholder="#000000"
+                sx={{ flex: 1 }}
+                inputProps={{
+                  maxLength: 7,
+                  pattern: '#[0-9A-Fa-f]{6}',
+                }}
+              />
+            </Box>
+            <Button
+              size="small"
+              variant="contained"
+              fullWidth
+              onClick={() => {
+                if (colorMenuAnchor && isValidHexColor(menuCustomColor)) {
+                  handleColorChange(colorMenuAnchor.optionId, menuCustomColor);
+                  setShowMenuColorPicker(false);
+                }
+              }}
+              disabled={!isValidHexColor(menuCustomColor)}
+            >
+              Apply
+            </Button>
+          </Box>
+        )}
+      </Menu>
     </Box>
   );
 }

@@ -177,7 +177,7 @@ export async function updateTaxonomyOption(req: AuthenticatedRequest, res: Respo
       archived_at: z.string().optional(), // ISO datetime to archive, undefined/null to unarchive (legacy)
       status: z.enum(['active', 'archived']).optional(), // active | archived
       deleted_at: z.string().optional().nullable(), // ISO datetime to soft-delete, null to restore
-      color: z.string().optional(),
+      color: z.string().optional().nullable(), // Set to null to clear color
     });
 
     const parsed = UpdateSchema.safeParse(req.body);
