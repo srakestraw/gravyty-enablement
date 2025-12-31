@@ -13,6 +13,7 @@ export interface FocusableField {
   entityId: string;
   fieldKey: FieldKey;
   ref: React.RefObject<HTMLElement>;
+  onFocus?: () => void; // Callback to open drawer/panel before focusing
 }
 
 class FocusRegistry {
@@ -38,23 +39,46 @@ class FocusRegistry {
     const key = this.getKey(entityType, entityId, fieldKey);
     const field = this.fields.get(key);
     
-    if (field && field.ref.current) {
-      // Scroll into view first
-      field.ref.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      
-      // Focus the element
-      if (field.ref.current instanceof HTMLInputElement || 
-          field.ref.current instanceof HTMLTextAreaElement) {
-        field.ref.current.focus();
-        return true;
+    if (field) {
+      // Call onFocus callback first (e.g., to open drawer)
+      if (field.onFocus) {
+        field.onFocus();
       }
       
-      // If it's a container, try to find an input/textarea inside
-      const input = field.ref.current.querySelector('input, textarea') as HTMLElement;
-      if (input) {
-        input.focus();
-        return true;
-      }
+      // Small delay to allow UI to update (drawer opening, etc.)
+      setTimeout(() => {
+        if (field.ref.current) {
+          // Scroll into view first
+          field.ref.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          
+          // Focus the element
+          if (field.ref.current instanceof HTMLInputElement || 
+              field.ref.current instanceof HTMLTextAreaElement) {
+            field.ref.current.focus();
+            return;
+          }
+          
+          // If it's a container, try to find an input/textarea inside
+          const input = field.ref.current.querySelector('input, textarea') as HTMLElement;
+          if (input) {
+            input.focus();
+            return;
+          }
+          
+          // For rich text editors, focus the container and add highlight
+          if (field.ref.current.querySelector('[contenteditable="true"]')) {
+            field.ref.current.style.outline = '2px solid';
+            field.ref.current.style.outlineColor = 'rgb(25, 118, 210)';
+            field.ref.current.style.outlineOffset = '2px';
+            setTimeout(() => {
+              field.ref.current!.style.outline = '';
+            }, 2000);
+            field.ref.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }
+      }, 100);
+      
+      return true;
     }
     
     return false;

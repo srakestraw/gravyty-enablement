@@ -75,7 +75,7 @@ export function AdminTaxonomyPage() {
 
   const handleCardClick = (key: TaxonomyGroupKey) => {
     track('lms_taxonomy_options_viewed', { key });
-    navigate(`/enablement/admin/learning/taxonomy/${key}`);
+    navigate(`/enablement/admin/taxonomy/${key}`);
   };
 
   if (loading) {
@@ -91,7 +91,7 @@ export function AdminTaxonomyPage() {
       <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <Box>
           <Typography variant="h4" gutterBottom>
-            Taxonomy
+            Lists
           </Typography>
           <Typography variant="body2" color="text.secondary">
             Manage controlled values used across Courses and Resources.
@@ -99,7 +99,7 @@ export function AdminTaxonomyPage() {
         </Box>
         <Button
           variant="outlined"
-          onClick={() => navigate('/enablement/admin/learning/taxonomy/migration')}
+          onClick={() => navigate('/enablement/admin/taxonomy/migration')}
         >
           Migration & Cleanup
         </Button>

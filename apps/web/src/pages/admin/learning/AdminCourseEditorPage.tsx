@@ -56,7 +56,6 @@ export function AdminCourseEditorPage() {
   
   // Inspector panel state
   const [inspectorOpen, setInspectorOpen] = useState(false);
-  const [inspectorTab, setInspectorTab] = useState<'issues' | 'properties'>('issues');
   
   // Selection state - what is currently being edited
   const [selection, setSelection] = useState<CourseSelection | null>(() => {
@@ -234,12 +233,9 @@ export function AdminCourseEditorPage() {
   // Show inspector when there are validation errors
   useEffect(() => {
     if (draftValidation.errors.length > 0) {
-      setInspectorTab('issues');
       setInspectorOpen(true);
-    } else if (inspectorTab === 'issues' && draftValidation.errors.length === 0) {
-      // Keep inspector open but don't force it closed
     }
-  }, [draftValidation.errors.length, inspectorTab]);
+  }, [draftValidation.errors.length]);
 
   // Helper to determine if inline error should be shown (only for selected node)
   const shouldShowError = useCallback((entityType: 'course' | 'section' | 'lesson', entityId: string, fieldKey: string): boolean => {
@@ -282,20 +278,24 @@ export function AdminCourseEditorPage() {
 
   // Course update handlers with debounced autosave
   const handleUpdateCourse = useCallback((updates: Partial<Course>) => {
-    if (!course || isNew) return;
+    if (!course) return;
 
+    // Always update the course state immediately for validation
     const updatedCourse = { ...course, ...updates };
     setCourse(updatedCourse);
 
-    // Clear existing timeout
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
+    // Only auto-save to backend if not a new course
+    if (!isNew) {
+      // Clear existing timeout
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
 
-    // Debounce auto-save (1000ms)
-    saveTimeoutRef.current = setTimeout(() => {
-      debouncedSaveCourse(updates);
-    }, 1000);
+      // Debounce auto-save (1000ms)
+      saveTimeoutRef.current = setTimeout(() => {
+        debouncedSaveCourse(updates);
+      }, 1000);
+    }
   }, [course, isNew, debouncedSaveCourse]);
 
   // Save lessons structure to backend (with debouncing and refetch)
@@ -319,20 +319,17 @@ export function AdminCourseEditorPage() {
           description: l.description,
           type: l.type,
           order: l.order,
+          content: l.content || {
+            kind: l.type,
+            ...(l.type === 'video' ? { video_id: '', duration_seconds: 0 } :
+                l.type === 'reading' ? { format: 'markdown' as const, markdown: '' } :
+                l.type === 'quiz' ? { questions: [] } :
+                l.type === 'assignment' ? { instructions_markdown: '', submission_type: 'none' as const } :
+                { provider: 'embed' as const, embed_url: '' }),
+          },
+          resources: l.resources || [],
           estimated_duration_minutes: l.estimated_duration_minutes,
           required: l.required,
-          video_media: l.video_media ? {
-            media_id: l.video_media.media_id,
-            url: l.video_media.url,
-          } : undefined,
-          transcript: l.transcript ? {
-            segments: l.transcript.segments?.map((s) => ({
-              start_ms: s.start_ms,
-              end_ms: s.end_ms,
-              text: s.text,
-            })) || [],
-            full_text: l.transcript.full_text,
-          } : undefined,
         }));
 
         await lmsAdminApi.updateCourseLessons(course.course_id, {
@@ -422,7 +419,19 @@ export function AdminCourseEditorPage() {
 
     const updatedSections = [...course.sections, newSection];
     setCourse({ ...course, sections: updatedSections });
-    handleSelectNode(newSection.section_id);
+    
+    // Set selection directly since the section isn't in courseTree yet
+    const newSelection: CourseSelection = { kind: 'section', id: newSection.section_id };
+    setSelection(newSelection);
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set('selected', selectionToUrlParam(newSelection)!);
+    setSearchParams(newParams, { replace: true });
+    
+    // Focus the section title field after the tree updates
+    setTimeout(() => {
+      focusRegistry.focus('section', newSection.section_id, 'title');
+    }, 100);
+    
     saveLessonsStructure(false);
   };
 
@@ -529,12 +538,17 @@ export function AdminCourseEditorPage() {
       title: 'New Lesson',
       type: 'video',
       order: section.lesson_ids.length,
+      content: {
+        kind: 'video',
+        video_id: '',
+        duration_seconds: 0,
+      },
+      resources: [],
       required: true,
       created_at: new Date().toISOString(),
       created_by: '',
       updated_at: new Date().toISOString(),
       updated_by: '',
-      resource_refs: [],
     };
 
     const updatedLessons = [...lessons, newLesson];
@@ -549,7 +563,18 @@ export function AdminCourseEditorPage() {
     );
     setCourse({ ...course, sections: updatedSections });
 
-    handleSelectNode(newLesson.lesson_id);
+    // Set selection directly since the lesson might not be in courseTree yet
+    const newSelection: CourseSelection = { kind: 'lesson', id: newLesson.lesson_id };
+    setSelection(newSelection);
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set('selected', selectionToUrlParam(newSelection)!);
+    setSearchParams(newParams, { replace: true });
+    
+    // Focus the lesson title field after the tree updates
+    setTimeout(() => {
+      focusRegistry.focus('lesson', newLesson.lesson_id, 'title');
+    }, 100);
+    
     saveLessonsStructure(false);
   };
 
@@ -738,8 +763,7 @@ export function AdminCourseEditorPage() {
 
     // Don't proceed if validation fails
     if (!validationResult.valid) {
-      // Show inspector with issues tab and scroll to first error
-      setInspectorTab('issues');
+      // Show inspector and scroll to first error
       setInspectorOpen(true);
       
       // Find first error and navigate to it
@@ -767,8 +791,7 @@ export function AdminCourseEditorPage() {
       navigate('/enablement/admin/learning/courses');
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Failed to publish course');
-      // Show inspector with issues tab on publish failure
-      setInspectorTab('issues');
+      // Show inspector on publish failure
       setInspectorOpen(true);
     } finally {
       setPublishing(false);
@@ -894,7 +917,6 @@ export function AdminCourseEditorPage() {
             <Button
               size="small"
               onClick={() => {
-                setInspectorTab('issues');
                 setInspectorOpen(true);
               }}
             >
@@ -961,25 +983,20 @@ export function AdminCourseEditorPage() {
                 onDiscardChanges={() => setDiscardDialogOpen(true)}
                 onCancel={() => navigate('/enablement/admin/learning/courses')}
                 issuesCount={draftValidation.errors.length}
-                onOpenInspector={(tab) => {
-                  setInspectorTab(tab);
+                onOpenInspector={() => {
                   setInspectorOpen(true);
                 }}
               />
             </Box>
           }
           contextPanel={
-            inspectorOpen ? (
-              <Inspector
-                selectedNode={selection?.kind === 'course_details' ? courseTree : selectedNode}
-                course={course}
-                validationIssues={[...draftValidation.errors, ...draftValidation.warnings]}
-                courseTree={courseTree}
-                onSelectCourseDetails={handleSelectCourseDetails}
-                onSelectNode={handleSelectNode}
-                defaultTab={inspectorTab}
-              />
-            ) : null
+            <Inspector
+              selectedNode={selection?.kind === 'course_details' ? courseTree : selectedNode}
+              validationIssues={[...draftValidation.errors, ...draftValidation.warnings]}
+              courseTree={courseTree}
+              onSelectCourseDetails={handleSelectCourseDetails}
+              onSelectNode={handleSelectNode}
+            />
           }
           contextPanelOpen={inspectorOpen}
           onContextPanelToggle={() => setInspectorOpen(!inspectorOpen)}

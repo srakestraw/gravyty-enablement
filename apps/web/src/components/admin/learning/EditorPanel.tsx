@@ -31,10 +31,10 @@ import {
   Error as ErrorIcon,
 } from '@mui/icons-material';
 import { LessonEditor } from './LessonEditor';
-import { MediaSelectModal } from './MediaSelectModal';
-import { TaxonomySelect, TaxonomyMultiSelect } from '../../taxonomy';
+import { DetailsDrawer } from './DetailsDrawer';
+import { RichTextEditor } from '../../common/RichTextEditor';
 import { focusRegistry } from '../../../utils/focusRegistry';
-import type { Course, CourseSection, Lesson, MediaRef, CourseBadge } from '@gravyty/domain';
+import type { Course, CourseSection, Lesson } from '@gravyty/domain';
 import type { CourseTreeNode, NodeType } from '../../../types/courseTree';
 
 export interface EditorPanelProps {
@@ -59,7 +59,7 @@ export interface EditorPanelProps {
   onDiscardChanges?: () => void;
   onCancel?: () => void;
   issuesCount?: number;
-  onOpenInspector?: (tab: 'issues' | 'properties') => void;
+  onOpenInspector?: () => void;
 }
 
 export function EditorPanel({
@@ -85,13 +85,12 @@ export function EditorPanel({
   issuesCount = 0,
   onOpenInspector,
 }: EditorPanelProps) {
-  const [coverModalOpen, setCoverModalOpen] = useState(false);
+  const [detailsDrawerOpen, setDetailsDrawerOpen] = useState(false);
   
   // Refs for focus registry
   const titleRef = useRef<HTMLInputElement>(null);
   const shortDescriptionRef = useRef<HTMLInputElement>(null);
-  const descriptionRef = useRef<HTMLInputElement>(null);
-  const coverImageRef = useRef<HTMLDivElement>(null);
+  const descriptionRef = useRef<HTMLDivElement>(null);
 
   // Register course fields with focus registry
   useEffect(() => {
@@ -126,15 +125,6 @@ export function EditorPanel({
       }));
     }
 
-    if (coverImageRef.current) {
-      unregisters.push(focusRegistry.register({
-        entityType: 'course',
-        entityId: course.course_id,
-        fieldKey: 'cover_image',
-        ref: coverImageRef,
-      }));
-    }
-
     return () => {
       unregisters.forEach((unregister) => unregister());
     };
@@ -144,11 +134,7 @@ export function EditorPanel({
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [shortDescription, setShortDescription] = useState('');
-  const [productId, setProductId] = useState<string | undefined>(undefined); // Was product_suite_id
-  const [productSuiteId, setProductSuiteId] = useState<string | undefined>(undefined); // Was product_concept_id
-  const [topicTagIds, setTopicTagIds] = useState<string[]>([]);
   const [relatedCourseIds, setRelatedCourseIds] = useState<string[]>([]);
-  const [badges, setBadges] = useState<CourseBadge[]>([]);
 
   // Track the last synced course ID to avoid overwriting user input
   const lastSyncedCourseIdRef = useRef<string | null>(null);
@@ -159,14 +145,7 @@ export function EditorPanel({
       setTitle(course.title || '');
       setDescription(course.description || '');
       setShortDescription(course.short_description || '');
-      // Prefer taxonomy IDs, fall back to legacy strings (for backward compatibility)
-      // Normalize: course.product_id (new) or course.product_suite_id (legacy) -> productId
-      setProductId(course.product_id || course.product_suite_id || undefined);
-      // Normalize: course.product_suite_id (new) or course.product_concept_id (legacy) -> productSuiteId
-      setProductSuiteId(course.product_suite_id || course.product_concept_id || undefined);
-      setTopicTagIds(course.topic_tag_ids && course.topic_tag_ids.length > 0 ? course.topic_tag_ids : []);
       setRelatedCourseIds(course.related_course_ids || []);
-      setBadges(course.badges || []);
       lastSyncedCourseIdRef.current = course.course_id;
     }
   }, [course?.course_id]);
@@ -202,26 +181,6 @@ export function EditorPanel({
     onUpdateCourse({ [field]: value });
   };
 
-  const handleCoverSelect = (mediaRef: MediaRef) => {
-    handleCourseFieldChange('cover_image', mediaRef);
-  };
-
-  const handleAddBadge = () => {
-    const badgeId = prompt('Enter badge ID:');
-    const badgeName = prompt('Enter badge name:');
-    if (badgeId && badgeName) {
-      const newBadges = [...badges, { badge_id: badgeId, name: badgeName }];
-      setBadges(newBadges);
-      handleCourseFieldChange('badges', newBadges);
-    }
-  };
-
-  const handleRemoveBadge = (badgeId: string) => {
-    const newBadges = badges.filter((b) => b.badge_id !== badgeId);
-    setBadges(newBadges);
-    handleCourseFieldChange('badges', newBadges);
-  };
-
   if (!course) {
     return (
       <Box sx={{ p: 3, textAlign: 'center' }}>
@@ -250,11 +209,29 @@ export function EditorPanel({
           p: 2,
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
-          {/* Left: Title + Status + Issues */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1, minWidth: 0 }}>
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 2,
+            flexWrap: 'wrap',
+          }}
+        >
+          {/* Left: Title + Chips (can wrap) */}
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1,
+              flex: 1,
+              minWidth: 240, // Minimum width for title
+              flexWrap: 'wrap',
+            }}
+          >
+            {/* Title */}
             {selection?.kind === 'course_details' && course ? (
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flex: 1, minWidth: 0 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flex: '1 1 auto', minWidth: 200 }}>
                 {isEditingTitle ? (
                   <InputBase
                     value={editingTitle}
@@ -265,6 +242,7 @@ export function EditorPanel({
                       fontSize: '1.5rem',
                       fontWeight: 500,
                       flex: 1,
+                      minWidth: 0,
                       '& input': { p: 0 },
                     }}
                     autoFocus
@@ -289,62 +267,87 @@ export function EditorPanel({
                 )}
               </Box>
             ) : selectedNode ? (
-              <Typography variant="h6" sx={{ fontWeight: 500 }}>
+              <Typography variant="h6" sx={{ fontWeight: 500, flex: '0 0 auto' }}>
                 {selectedNode.title || 'Untitled'}
               </Typography>
             ) : (
-              <Typography variant="h6" color="text.secondary">
+              <Typography variant="h6" color="text.secondary" sx={{ flex: '0 0 auto' }}>
                 Select a node to edit
               </Typography>
             )}
 
-            {/* Status Chip */}
-            {course && (
-              <Chip
-                label={statusLabel}
-                size="small"
-                color={statusColor}
-                variant={status === 'published' ? 'filled' : 'outlined'}
-              />
-            )}
-
-            {/* Issues Badge */}
-            {issuesCount > 0 && onOpenInspector && (
-              <Tooltip title={`${issuesCount} issue${issuesCount !== 1 ? 's' : ''} - Click to view`}>
+            {/* Chips group - can wrap */}
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+                flexWrap: 'wrap',
+                flex: '0 0 auto',
+              }}
+            >
+              {/* Status Chip */}
+              {course && (
                 <Chip
-                  icon={<ErrorIcon />}
-                  label={issuesCount}
+                  label={statusLabel}
                   size="small"
-                  color="error"
-                  onClick={() => onOpenInspector('issues')}
-                  sx={{ cursor: 'pointer' }}
+                  color={statusColor}
+                  variant={status === 'published' ? 'filled' : 'outlined'}
+                  sx={{ flexShrink: 0 }}
                 />
-              </Tooltip>
-            )}
+              )}
 
-            {/* Save Status */}
-            {saving && (
-              <Chip
-                icon={<CircularProgress size={16} />}
-                label="Saving..."
-                size="small"
-                color="primary"
-              />
-            )}
-            {!saving && lastSaved && (
-              <Chip
-                icon={<SavedIcon />}
-                label={`Saved ${lastSaved.toLocaleTimeString()}`}
-                size="small"
-                color="success"
-                variant="outlined"
-              />
-            )}
+              {/* Details Chip - only show for course details */}
+              {selection?.kind === 'course_details' && course && (
+                <Chip
+                  label="Details"
+                  size="small"
+                  variant={detailsDrawerOpen ? 'filled' : 'outlined'}
+                  onClick={() => setDetailsDrawerOpen(!detailsDrawerOpen)}
+                  sx={{ cursor: 'pointer', flexShrink: 0 }}
+                />
+              )}
+
+              {/* Issues Chip */}
+              {issuesCount > 0 && onOpenInspector && (
+                <Tooltip title={`${issuesCount} issue${issuesCount !== 1 ? 's' : ''} - Click to view`}>
+                  <Chip
+                    icon={<ErrorIcon />}
+                    label={`Issues (${issuesCount})`}
+                    size="small"
+                    color="error"
+                    onClick={() => onOpenInspector()}
+                    sx={{ cursor: 'pointer', flexShrink: 0, minWidth: 'fit-content' }}
+                  />
+                </Tooltip>
+              )}
+
+              {/* Save Status */}
+              {saving && (
+                <Chip
+                  icon={<CircularProgress size={16} />}
+                  label="Saving..."
+                  size="small"
+                  color="primary"
+                  sx={{ flexShrink: 0 }}
+                />
+              )}
+              {!saving && lastSaved && (
+                <Chip
+                  icon={<SavedIcon />}
+                  label={`Saved ${lastSaved.toLocaleTimeString()}`}
+                  size="small"
+                  color="success"
+                  variant="outlined"
+                  sx={{ flexShrink: 0 }}
+                />
+              )}
+            </Box>
           </Box>
 
-          {/* Right: Actions */}
+          {/* Right: Actions (no wrap, always visible) */}
           {selection?.kind === 'course_details' && course && (
-            <Box sx={{ display: 'flex', gap: 1, flexShrink: 0 }}>
+            <Box sx={{ display: 'flex', gap: 1, flexShrink: 0, flexWrap: 'nowrap' }}>
               {course.status === 'published' ? (
                 <Tooltip title="Preview course as a learner">
                   <Button
@@ -416,6 +419,18 @@ export function EditorPanel({
         </Box>
       </Box>
 
+      {/* Details Drawer - only show for course details */}
+      {selection?.kind === 'course_details' && course && (
+        <DetailsDrawer
+          course={course}
+          open={detailsDrawerOpen}
+          onToggle={() => setDetailsDrawerOpen(!detailsDrawerOpen)}
+          onUpdateCourse={handleCourseFieldChange}
+          shouldShowError={shouldShowError}
+          markFieldTouched={markFieldTouched}
+        />
+      )}
+
       <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
         {!selection && (
           <Box sx={{ p: 3, textAlign: 'center' }}>
@@ -468,146 +483,18 @@ export function EditorPanel({
               helperText={course && shouldShowError && (!shortDescription || shortDescription.trim() === '') && shouldShowError('course', course.course_id, 'short_description') ? 'Short description is required' : 'Required: Brief description for course cards'}
             />
 
-            <TextField
+            <RichTextEditor
               inputRef={descriptionRef}
               label="Description"
               value={description}
-              onChange={(e) => {
-                setDescription(e.target.value);
-                handleCourseFieldChange('description', e.target.value);
+              onChange={(value) => {
+                setDescription(value);
+                handleCourseFieldChange('description', value);
               }}
-              multiline
               rows={4}
               fullWidth
               helperText="Optional: Full course description"
             />
-
-            <Box sx={{ display: 'flex', gap: 2 }}>
-              <TaxonomySelect
-                groupKey="product"
-                value={productId}
-                onChange={(optionId) => {
-                  setProductId(optionId);
-                  handleCourseFieldChange('product_id', optionId);
-                }}
-                label="Product"
-                placeholder="Select product"
-                fullWidth
-              />
-              <TaxonomySelect
-                groupKey="product_suite"
-                value={productSuiteId}
-                parentId={productId}
-                onChange={(optionId) => {
-                  setProductSuiteId(optionId);
-                  handleCourseFieldChange('product_suite_id', optionId);
-                }}
-                label="Product Suite"
-                placeholder="Select product suite"
-                fullWidth
-              />
-            </Box>
-
-            <TaxonomyMultiSelect
-              groupKey="topic_tag"
-              values={topicTagIds}
-              onChange={(optionIds) => {
-                setTopicTagIds(optionIds);
-                handleCourseFieldChange('topic_tag_ids', optionIds);
-              }}
-              label="Topic Tags"
-              placeholder="Add topic tags"
-              fullWidth
-            />
-
-            <Paper ref={coverImageRef} sx={{ p: 2 }}>
-              <Box sx={{ mb: 1.5 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
-                  <Typography variant="subtitle2">Cover Image</Typography>
-                  <Tooltip
-                    title={
-                      <Box>
-                        <Typography variant="body2" sx={{ mb: 0.5 }}>
-                          Used for course cards and may be cropped in some views.
-                        </Typography>
-                        <Typography variant="body2" sx={{ mb: 0.5 }}>
-                          Recommended: 16:9 aspect ratio (1600 x 900px). JPG or PNG format.
-                        </Typography>
-                        <Typography variant="body2" sx={{ mb: 0.5 }}>
-                          Keep the subject centered and avoid text near the edges.
-                        </Typography>
-                        <Typography variant="body2">
-                          If your image is larger, we'll downscale. If it's a different ratio, we'll center-crop.
-                        </Typography>
-                      </Box>
-                    }
-                    arrow
-                    placement="top"
-                  >
-                    <InfoIcon fontSize="small" sx={{ color: 'text.secondary', cursor: 'help' }} />
-                  </Tooltip>
-                </Box>
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
-                  Used for course cards and may be cropped in some views. Recommended 16:9 (1600 x 900). JPG or PNG. Keep the subject centered and avoid text near the edges.
-                </Typography>
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                  Best results: high-contrast image, no embedded titles. We'll crop to fit cards.
-                </Typography>
-              </Box>
-              <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: course.cover_image ? 1 : 0 }}>
-                <Button
-                  size="small"
-                  variant="outlined"
-                  startIcon={<ImageIcon />}
-                  onClick={() => setCoverModalOpen(true)}
-                >
-                  {course.cover_image ? 'Change Cover' : 'Attach Cover'}
-                </Button>
-              </Box>
-              {course.cover_image ? (
-                <Box>
-                  <Chip
-                    label={course.cover_image.filename || course.cover_image.media_id}
-                    onDelete={() => handleCourseFieldChange('cover_image', undefined)}
-                    color="primary"
-                    sx={{ mb: 1 }}
-                  />
-                  {course.cover_image.url && (
-                    <Typography variant="caption" color="text.secondary" display="block">
-                      {course.cover_image.url}
-                    </Typography>
-                  )}
-                </Box>
-              ) : (
-                <Typography variant="body2" color="text.secondary">
-                  No cover image attached
-                </Typography>
-              )}
-            </Paper>
-
-            <Paper sx={{ p: 2 }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                <Typography variant="subtitle2">Badges</Typography>
-                <Button size="small" variant="outlined" onClick={handleAddBadge}>
-                  Add Badge
-                </Button>
-              </Box>
-              {badges.length > 0 ? (
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                  {badges.map((badge) => (
-                    <Chip
-                      key={badge.badge_id}
-                      label={badge.name}
-                      onDelete={() => handleRemoveBadge(badge.badge_id)}
-                    />
-                  ))}
-                </Box>
-              ) : (
-                <Typography variant="body2" color="text.secondary">
-                  No badges added
-                </Typography>
-              )}
-            </Paper>
 
             <Autocomplete
               multiple
@@ -639,66 +526,75 @@ export function EditorPanel({
         )}
 
         {/* Section Editor */}
-        {selectedNode && selectedNode.type === 'section' && selectedNode.sectionData && (
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Typography variant="h6" gutterBottom>
-              Section: {selectedNode.title}
-            </Typography>
-            <TextField
-              label="Section Name"
-              value={selectedNode.sectionData.title || ''}
-              onChange={(e) => {
-                onUpdateSection(selectedNode.id, { title: e.target.value });
-              }}
-              onBlur={() => {
-                if (markFieldTouched) {
-                  markFieldTouched('section', selectedNode.id, 'title');
-                }
-              }}
-              required
-              fullWidth
-              error={shouldShowError && (!selectedNode.sectionData.title || selectedNode.sectionData.title.trim() === '') && shouldShowError('section', selectedNode.id, 'title')}
-              helperText={shouldShowError && (!selectedNode.sectionData.title || selectedNode.sectionData.title.trim() === '') && shouldShowError('section', selectedNode.id, 'title') ? 'Section name is required' : ''}
-            />
-            {selectedNode.sectionData.description !== undefined && (
-              <TextField
-                label="Description"
-                value={selectedNode.sectionData.description || ''}
-                onChange={(e) => {
-                  onUpdateSection(selectedNode.id, { description: e.target.value || undefined });
-                }}
-                multiline
-                rows={3}
-                fullWidth
-                helperText="Optional: Section description"
-              />
-            )}
-            <Box sx={{ mt: 2 }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                <Typography variant="subtitle2">
-                  Lessons in this section
-                </Typography>
-                {onAddLesson && (
-                  <Button
-                    size="small"
-                    variant="contained"
-                    startIcon={<AddIcon />}
-                    onClick={() => {
-                      if (selectedNode && selectedNode.type === 'section') {
-                        onAddLesson(selectedNode.id);
-                      }
-                    }}
-                  >
-                    Add Lesson
-                  </Button>
-                )}
-              </Box>
-              <Typography variant="body2" color="text.secondary">
-                Use the outline or the button above to add lessons to this section.
+        {((selectedNode && selectedNode.type === 'section' && selectedNode.sectionData) ||
+          (selection?.kind === 'section' && selection.id && course)) && (() => {
+          // Get section data from selectedNode if available, otherwise from course.sections
+          const sectionId = selectedNode?.id || selection?.id;
+          const sectionData = selectedNode?.sectionData || 
+            (course && sectionId ? course.sections.find(s => s.section_id === sectionId) : null);
+          const sectionTitle = selectedNode?.title || sectionData?.title || '';
+          
+          if (!sectionId || !sectionData) return null;
+          
+          return (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <Typography variant="h6" gutterBottom>
+                Section: {sectionTitle || 'Untitled section'}
               </Typography>
+              <TextField
+                label="Section Name"
+                value={sectionData.title || ''}
+                onChange={(e) => {
+                  onUpdateSection(sectionId, { title: e.target.value });
+                }}
+                onBlur={() => {
+                  if (markFieldTouched) {
+                    markFieldTouched('section', sectionId, 'title');
+                  }
+                }}
+                required
+                fullWidth
+                error={shouldShowError && (!sectionData.title || sectionData.title.trim() === '') && shouldShowError('section', sectionId, 'title')}
+                helperText={shouldShowError && (!sectionData.title || sectionData.title.trim() === '') && shouldShowError('section', sectionId, 'title') ? 'Section name is required' : ''}
+              />
+              {sectionData.description !== undefined && (
+                <TextField
+                  label="Description"
+                  value={sectionData.description || ''}
+                  onChange={(e) => {
+                    onUpdateSection(sectionId, { description: e.target.value || undefined });
+                  }}
+                  multiline
+                  rows={3}
+                  fullWidth
+                  helperText="Optional: Section description"
+                />
+              )}
+              <Box sx={{ mt: 2 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                  <Typography variant="subtitle2">
+                    Lessons in this section
+                  </Typography>
+                  {onAddLesson && (
+                    <Button
+                      size="small"
+                      variant="contained"
+                      startIcon={<AddIcon />}
+                      onClick={() => {
+                        onAddLesson(sectionId);
+                      }}
+                    >
+                      Add Lesson
+                    </Button>
+                  )}
+                </Box>
+                <Typography variant="body2" color="text.secondary">
+                  Use the outline or the button above to add lessons to this section.
+                </Typography>
+              </Box>
             </Box>
-          </Box>
-        )}
+          );
+        })()}
 
         {/* Lesson Editor */}
         {selectedNode && selectedNode.type === 'lesson' && selectedNode.lessonData && course && (
@@ -711,15 +607,6 @@ export function EditorPanel({
           />
         )}
       </Box>
-
-      <MediaSelectModal
-        open={coverModalOpen}
-        onClose={() => setCoverModalOpen(false)}
-        onSelect={handleCoverSelect}
-        mediaType="cover"
-        title="Select or Upload Cover Image"
-        courseId={course.course_id}
-      />
     </Box>
   );
 }

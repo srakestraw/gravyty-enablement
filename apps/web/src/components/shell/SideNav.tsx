@@ -151,7 +151,7 @@ export function SideNav() {
             { label: 'Media Library', path: '/enablement/admin/learning/media', icon: <PermMediaOutlined fontSize="small" /> },
           ],
         },
-        { label: 'Taxonomy', path: '/enablement/admin/learning/taxonomy', icon: <CategoryOutlined fontSize="small" /> },
+        { label: 'Lists', path: '/enablement/admin/taxonomy', icon: <CategoryOutlined fontSize="small" /> },
       ],
       adminOnly: true,
     },
@@ -203,7 +203,9 @@ export function SideNav() {
       group.items.forEach((item) => {
         if (item.children) {
           const hasActiveChild = item.children.some((child) => currentPath.startsWith(child.path));
-          if (hasActiveChild && !newExpanded[item.label]) {
+          // Also check if current path matches the parent path exactly or is a child route
+          const isParentRoute = currentPath === item.path || currentPath.startsWith(item.path + '/');
+          if ((hasActiveChild || isParentRoute) && !newExpanded[item.label]) {
             newExpanded[item.label] = true;
           }
         }
@@ -233,6 +235,20 @@ export function SideNav() {
     if (path === '/enablement') {
       return location.pathname === '/enablement' || location.pathname === '/enablement/';
     }
+    // For paths with children, check if pathname matches the parent path or one of its children
+    // This prevents parent items from matching sibling routes (e.g., Learning Admin matching Taxonomy)
+    const navItem = navGroups
+      .flatMap((group) => group.items)
+      .find((item) => item.path === path);
+    if (navItem?.children) {
+      // Parent item with children: match exact path or match one of its children
+      if (location.pathname === path) {
+        return true;
+      }
+      // Check if pathname matches any child path
+      return navItem.children.some((child) => location.pathname.startsWith(child.path));
+    }
+    // Regular item: match if pathname starts with path
     return location.pathname.startsWith(path);
   };
 

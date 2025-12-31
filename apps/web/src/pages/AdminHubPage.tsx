@@ -209,10 +209,10 @@ export function AdminHubPage() {
         </Grid>
         <Grid item xs={12} sm={6} md={4}>
           <HubTile
-            title="Taxonomy"
+            title="Lists"
             description="Manage controlled values used across Courses and Resources"
             icon={<CategoryOutlined />}
-            path="/enablement/admin/learning/taxonomy"
+            path="/enablement/admin/taxonomy"
           />
         </Grid>
       </Grid>
