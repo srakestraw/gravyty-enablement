@@ -261,25 +261,34 @@ export function TaxonomySelect({
 
         return (
           <Box component="li" {...props}>
-            {option.color && (
-              <Box
-                sx={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: '50%',
-                  bgcolor: option.color,
-                  display: 'inline-block',
-                  mr: 1,
-                  verticalAlign: 'middle',
-                }}
-              />
-            )}
-            {option.label}
-            {option.archived_at && (
-              <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
-                (archived)
-              </Typography>
-            )}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
+              {option.color && (
+                <Box
+                  sx={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: '50%',
+                    bgcolor: option.color,
+                    flexShrink: 0,
+                  }}
+                />
+              )}
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography variant="body2" noWrap>
+                  {option.label}
+                </Typography>
+                {option.short_description && (
+                  <Typography variant="caption" color="text.secondary" noWrap>
+                    {option.short_description}
+                  </Typography>
+                )}
+              </Box>
+              {option.archived_at && (
+                <Typography variant="caption" color="text.secondary" sx={{ ml: 1, flexShrink: 0 }}>
+                  (archived)
+                </Typography>
+              )}
+            </Box>
           </Box>
         );
       }}

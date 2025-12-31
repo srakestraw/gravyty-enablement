@@ -33,7 +33,7 @@ import {
 import { MediaSelectModal } from './MediaSelectModal';
 import { TaxonomySelect, TaxonomyMultiSelect } from '../../taxonomy';
 import { focusRegistry } from '../../../utils/focusRegistry';
-import type { Course, MediaRef, CourseBadge } from '@gravyty/domain';
+import type { Course, MediaRef } from '@gravyty/domain';
 
 export interface DetailsDrawerProps {
   course: Course | null;
@@ -56,7 +56,7 @@ export function DetailsDrawer({
   const [productId, setProductId] = useState<string | undefined>(undefined);
   const [productSuiteId, setProductSuiteId] = useState<string | undefined>(undefined);
   const [topicTagIds, setTopicTagIds] = useState<string[]>([]);
-  const [badges, setBadges] = useState<CourseBadge[]>([]);
+  const [badgeIds, setBadgeIds] = useState<string[]>([]);
 
   // Refs for focus registry
   const productRef = useRef<HTMLDivElement>(null);
@@ -74,10 +74,10 @@ export function DetailsDrawer({
       setProductId(course.product_id || course.product_suite_id || undefined);
       setProductSuiteId(course.product_suite_id || course.product_concept_id || undefined);
       setTopicTagIds(course.topic_tag_ids && course.topic_tag_ids.length > 0 ? course.topic_tag_ids : []);
-      setBadges(course.badges || []);
+      setBadgeIds(course.badge_ids && course.badge_ids.length > 0 ? course.badge_ids : []);
       lastSyncedCourseIdRef.current = course.course_id;
     }
-  }, [course?.course_id]);
+  }, [course?.course_id, course?.badge_ids]);
 
   // Register fields with focus registry
   useEffect(() => {
@@ -145,7 +145,7 @@ export function DetailsDrawer({
       unregisters.push(focusRegistry.register({
         entityType: 'course',
         entityId: course.course_id,
-        fieldKey: 'badges',
+        fieldKey: 'badge_ids',
         ref: badgesRef,
         onFocus: () => {
           if (!open) {
@@ -169,21 +169,6 @@ export function DetailsDrawer({
     handleCourseFieldChange('cover_image', mediaRef);
   };
 
-  const handleAddBadge = () => {
-    const badgeId = prompt('Enter badge ID:');
-    const badgeName = prompt('Enter badge name:');
-    if (badgeId && badgeName) {
-      const newBadges = [...badges, { badge_id: badgeId, name: badgeName }];
-      setBadges(newBadges);
-      handleCourseFieldChange('badges', newBadges);
-    }
-  };
-
-  const handleRemoveBadge = (badgeId: string) => {
-    const newBadges = badges.filter((b) => b.badge_id !== badgeId);
-    setBadges(newBadges);
-    handleCourseFieldChange('badges', newBadges);
-  };
 
   // Clear Product Suite when Product is cleared
   useEffect(() => {
@@ -362,27 +347,21 @@ export function DetailsDrawer({
               {/* Badges */}
               <Grid item xs={12}>
                 <Paper ref={badgesRef} sx={{ p: 2 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                    <Typography variant="subtitle2">Badges</Typography>
-                    <Button size="small" variant="outlined" onClick={handleAddBadge}>
-                      Add Badge
-                    </Button>
-                  </Box>
-                  {badges.length > 0 ? (
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                      {badges.map((badge) => (
-                        <Chip
-                          key={badge.badge_id}
-                          label={badge.name}
-                          onDelete={() => handleRemoveBadge(badge.badge_id)}
-                        />
-                      ))}
-                    </Box>
-                  ) : (
-                    <Typography variant="body2" color="text.secondary">
-                      No badges added
-                    </Typography>
-                  )}
+                  <TaxonomyMultiSelect
+                    groupKey="badge"
+                    values={badgeIds}
+                    onChange={(optionIds) => {
+                      setBadgeIds(optionIds);
+                      handleCourseFieldChange('badge_ids', optionIds);
+                      if (markFieldTouched) {
+                        markFieldTouched('course', course.course_id, 'badge_ids');
+                      }
+                    }}
+                    label="Badges"
+                    placeholder="Select badges"
+                    fullWidth
+                    error={shouldShowError && shouldShowError('course', course.course_id, 'badge_ids')}
+                  />
                 </Paper>
               </Grid>
             </Grid>

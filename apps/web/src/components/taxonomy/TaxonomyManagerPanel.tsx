@@ -65,7 +65,9 @@ export function TaxonomyManagerPanel({
 }: TaxonomyManagerPanelProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState('');
+  const [editShortDescription, setEditShortDescription] = useState('');
   const [newLabel, setNewLabel] = useState('');
+  const [newShortDescription, setNewShortDescription] = useState('');
   const [creating, setCreating] = useState(false);
   const [updating, setUpdating] = useState<Set<string>>(new Set());
   const [colorMenuAnchor, setColorMenuAnchor] = useState<{ id: string; anchor: HTMLElement } | null>(null);
@@ -79,12 +81,14 @@ export function TaxonomyManagerPanel({
   const handleStartEdit = (option: TaxonomyOption) => {
     setEditingId(option.option_id);
     setEditLabel(option.label);
+    setEditShortDescription(option.short_description || '');
   };
 
   // Cancel editing
   const handleCancelEdit = () => {
     setEditingId(null);
     setEditLabel('');
+    setEditShortDescription('');
   };
 
   // Save edit
@@ -97,13 +101,16 @@ export function TaxonomyManagerPanel({
 
     // Optimistic update
     const optimisticOptions = options.map((opt) =>
-      opt.option_id === optionId ? { ...opt, label: editLabel.trim() } : opt
+      opt.option_id === optionId
+        ? { ...opt, label: editLabel.trim(), short_description: editShortDescription.trim() || undefined }
+        : opt
     );
     onOptionsChange(optimisticOptions);
 
     try {
       const response = await taxonomyApi.updateOption(optionId, {
         label: editLabel.trim(),
+        short_description: editShortDescription.trim() || null,
       });
 
       if ('error' in response) {
@@ -129,6 +136,7 @@ export function TaxonomyManagerPanel({
       });
       setEditingId(null);
       setEditLabel('');
+      setEditShortDescription('');
     }
   };
 
@@ -141,6 +149,7 @@ export function TaxonomyManagerPanel({
       const response = await taxonomyApi.createOption(groupKey, {
         label: newLabel.trim(),
         parent_id: parentId,
+        short_description: newShortDescription.trim() || undefined,
       });
 
       if ('error' in response) {
@@ -149,6 +158,7 @@ export function TaxonomyManagerPanel({
         // Add new option to list
         onOptionsChange([...options, response.data.option]);
         setNewLabel('');
+        setNewShortDescription('');
       }
     } catch (err) {
       console.error('Error creating option:', err);
@@ -300,7 +310,7 @@ export function TaxonomyManagerPanel({
       </Box>
 
       {/* Add new option */}
-      <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
+      <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider', display: 'flex', flexDirection: 'column', gap: 1 }}>
         <TextField
           size="small"
           fullWidth
@@ -308,7 +318,8 @@ export function TaxonomyManagerPanel({
           value={newLabel}
           onChange={(e) => setNewLabel(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
               handleCreate();
             }
           }}
@@ -322,6 +333,20 @@ export function TaxonomyManagerPanel({
                 {creating ? <CircularProgress size={16} /> : <CheckIcon fontSize="small" />}
               </IconButton>
             ),
+          }}
+        />
+        <TextField
+          size="small"
+          fullWidth
+          placeholder="Short description (optional, max 140 chars)"
+          value={newShortDescription}
+          onChange={(e) => setNewShortDescription(e.target.value)}
+          inputProps={{ maxLength: 140 }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              handleCreate();
+            }
           }}
         />
       </Box>
@@ -358,39 +383,59 @@ export function TaxonomyManagerPanel({
 
                 {/* Edit input or label */}
                 {isEditing ? (
-                  <TextField
-                    size="small"
-                    fullWidth
-                    value={editLabel}
-                    onChange={(e) => setEditLabel(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        handleSaveEdit(option.option_id);
-                      } else if (e.key === 'Escape') {
-                        handleCancelEdit();
-                      }
-                    }}
-                    autoFocus
-                    disabled={isUpdating}
-                    InputProps={{
-                      endAdornment: isUpdating ? (
-                        <CircularProgress size={16} />
-                      ) : (
-                        <>
-                          <IconButton
-                            size="small"
-                            onClick={() => handleSaveEdit(option.option_id)}
-                            disabled={!editLabel.trim()}
-                          >
-                            <CheckIcon fontSize="small" />
-                          </IconButton>
-                          <IconButton size="small" onClick={handleCancelEdit}>
-                            <CloseIcon fontSize="small" />
-                          </IconButton>
-                        </>
-                      ),
-                    }}
-                  />
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, flex: 1 }}>
+                    <TextField
+                      size="small"
+                      fullWidth
+                      value={editLabel}
+                      onChange={(e) => setEditLabel(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          handleSaveEdit(option.option_id);
+                        } else if (e.key === 'Escape') {
+                          handleCancelEdit();
+                        }
+                      }}
+                      autoFocus
+                      disabled={isUpdating}
+                      InputProps={{
+                        endAdornment: isUpdating ? (
+                          <CircularProgress size={16} />
+                        ) : (
+                          <>
+                            <IconButton
+                              size="small"
+                              onClick={() => handleSaveEdit(option.option_id)}
+                              disabled={!editLabel.trim()}
+                            >
+                              <CheckIcon fontSize="small" />
+                            </IconButton>
+                            <IconButton size="small" onClick={handleCancelEdit}>
+                              <CloseIcon fontSize="small" />
+                            </IconButton>
+                          </>
+                        ),
+                      }}
+                    />
+                    <TextField
+                      size="small"
+                      fullWidth
+                      placeholder="Short description (optional, max 140 chars)"
+                      value={editShortDescription}
+                      onChange={(e) => setEditShortDescription(e.target.value)}
+                      inputProps={{ maxLength: 140 }}
+                      disabled={isUpdating}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          handleSaveEdit(option.option_id);
+                        } else if (e.key === 'Escape') {
+                          handleCancelEdit();
+                        }
+                      }}
+                    />
+                  </Box>
                 ) : (
                   <>
                     <ListItemText
@@ -402,6 +447,11 @@ export function TaxonomyManagerPanel({
                           )}
                         </Box>
                       }
+                      secondary={option.short_description ? (
+                        <Typography variant="caption" color="text.secondary">
+                          {option.short_description}
+                        </Typography>
+                      ) : undefined}
                     />
                     <ListItemSecondaryAction>
                       <Box sx={{ display: 'flex', gap: 0.5 }}>

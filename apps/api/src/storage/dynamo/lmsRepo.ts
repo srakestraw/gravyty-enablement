@@ -110,10 +110,15 @@ export class LmsRepo {
 
     if (params.badge || params.badges) {
       const badgeIds = params.badges || [params.badge!];
-      // Filter by badge - need to check original course data
-      const coursesWithBadges = (Items as Course[]).filter((c) =>
-        c.badges?.some((badge) => badgeIds.includes(badge.badge_id))
-      );
+      // Filter by badge - check both legacy badges and new badge_ids
+      const coursesWithBadges = (Items as Course[]).filter((c) => {
+        const normalizedCourse = normalizeTaxonomyFieldsFromStorage(c) as Course;
+        // Check new badge_ids first, fallback to legacy badges
+        if (normalizedCourse.badge_ids && normalizedCourse.badge_ids.length > 0) {
+          return normalizedCourse.badge_ids.some((id) => badgeIds.includes(id));
+        }
+        return c.badges?.some((badge) => badgeIds.includes(badge.badge_id));
+      });
       const courseIdsWithBadges = new Set(coursesWithBadges.map((c) => c.course_id));
       courses = courses.filter((c) => courseIdsWithBadges.has(c.course_id));
     }
@@ -1104,7 +1109,7 @@ export class LmsRepo {
   async updateCourseDraft(
     courseId: string,
     userId: string,
-    updates: Partial<Pick<Course, 'title' | 'description' | 'short_description' | 'product' | 'product_suite' | 'topic_tags' | 'product_id' | 'product_suite_id' | 'topic_tag_ids' | 'badges' | 'cover_image'>>
+    updates: Partial<Pick<Course, 'title' | 'description' | 'short_description' | 'product' | 'product_suite' | 'topic_tags' | 'product_id' | 'product_suite_id' | 'topic_tag_ids' | 'badges' | 'badge_ids' | 'cover_image'>>
   ): Promise<Course> {
     const now = new Date().toISOString();
     

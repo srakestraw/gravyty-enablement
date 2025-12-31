@@ -76,7 +76,8 @@ export const CourseSchema = z.object({
   cover_image: MediaRefSchema.optional(),
   
   // Badges
-  badges: z.array(CourseBadgeSchema).default([]),
+  badges: z.array(CourseBadgeSchema).default([]), // Legacy badges (kept for backward compatibility)
+  badge_ids: z.array(z.string()).default([]), // New taxonomy-based badge IDs
   
   // Structure
   sections: z.array(CourseSectionSchema).default([]),

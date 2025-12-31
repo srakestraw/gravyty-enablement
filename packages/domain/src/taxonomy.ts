@@ -21,7 +21,7 @@ import { z } from 'zod';
  * - "product_suite" (was "product_concept")
  * - "topic_tag" (unchanged)
  */
-export const TaxonomyGroupKeySchema = z.enum(['product', 'product_suite', 'topic_tag']);
+export const TaxonomyGroupKeySchema = z.enum(['product', 'product_suite', 'topic_tag', 'badge']);
 export type TaxonomyGroupKey = z.infer<typeof TaxonomyGroupKeySchema>;
 
 /**
@@ -41,6 +41,7 @@ export const TaxonomyOptionSchema = z.object({
   deleted_at: z.string().optional().nullable(), // ISO datetime if soft-deleted
   parent_id: z.string().optional(), // For hierarchical taxonomies (e.g., product_suite -> product)
   color: z.string().optional(), // Optional color for UI display
+  short_description: z.string().max(140).optional(), // Optional short description (max ~140 chars)
   // Timestamps
   created_at: z.string(), // ISO datetime
   created_by: z.string(), // User ID
@@ -60,6 +61,7 @@ export const CreateTaxonomyOptionSchema = z.object({
   sort_order: z.number().int().min(0).optional(),
   parent_id: z.string().optional(),
   color: z.string().optional(),
+  short_description: z.string().max(140).optional(),
 });
 
 export type CreateTaxonomyOption = z.infer<typeof CreateTaxonomyOptionSchema>;
@@ -75,6 +77,7 @@ export const UpdateTaxonomyOptionSchema = z.object({
   status: z.enum(['active', 'archived']).optional(), // active | archived
   deleted_at: z.string().optional().nullable(), // Set to ISO datetime to soft-delete, null to restore
   color: z.string().optional().nullable(), // Set to null to clear color
+  short_description: z.string().max(140).optional().nullable(), // Set to null to clear description
 });
 
 export type UpdateTaxonomyOption = z.infer<typeof UpdateTaxonomyOptionSchema>;

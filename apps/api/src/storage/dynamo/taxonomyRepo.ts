@@ -172,6 +172,7 @@ export class TaxonomyRepo {
       sort_order: sortOrder,
       parent_id: data.parent_id,
       color: data.color,
+      short_description: data.short_description,
       status: 'active',
       created_at: now,
       created_by: userId,
@@ -281,6 +282,12 @@ export class TaxonomyRepo {
       expressionAttributeValues[':color'] = updates.color || null;
     }
 
+    if (updates.short_description !== undefined) {
+      updateExpressions.push('#short_description = :short_description');
+      expressionAttributeNames['#short_description'] = 'short_description';
+      expressionAttributeValues[':short_description'] = updates.short_description || null;
+    }
+
     // Always update updated_at and updated_by
     updateExpressions.push('#updated_at = :updated_at');
     updateExpressions.push('#updated_by = :updated_by');
@@ -332,7 +339,19 @@ export class TaxonomyRepo {
       });
 
       const courseResult = await dynamoDocClient.send(courseCommand);
-      const courses = (courseResult.Items || []) as Course[];
+      let courses = (courseResult.Items || []) as Course[];
+      
+      // For badge group, also check legacy badges array (can't filter in DynamoDB for nested arrays)
+      if (groupKey === 'badge') {
+        courses = courses.filter((c) => {
+          // Check new badge_ids first
+          if (c.badge_ids && c.badge_ids.includes(optionId)) {
+            return true;
+          }
+          // Fallback to legacy badges
+          return c.badges?.some((badge) => badge.badge_id === optionId);
+        });
+      }
       
       courseCount += courses.length;
 
@@ -423,6 +442,10 @@ export class TaxonomyRepo {
         attributeNames,
         attributeValues,
       };
+    } else if (groupKey === 'badge') {
+      // For badges, we'll filter in memory after scanning (DynamoDB can't easily filter nested arrays)
+      // Return empty filter to scan all, then filter in memory
+      return { attributeNames, attributeValues };
     }
     
     return { attributeNames, attributeValues };

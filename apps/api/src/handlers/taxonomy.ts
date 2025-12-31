@@ -31,7 +31,7 @@ export async function listTaxonomyOptions(req: AuthenticatedRequest, res: Respon
     const cursor = req.query.cursor as string | undefined;
 
     // Validate group key
-    const validGroupKeys: TaxonomyGroupKey[] = ['product', 'product_suite', 'topic_tag'];
+    const validGroupKeys: TaxonomyGroupKey[] = ['product', 'product_suite', 'topic_tag', 'badge'];
     if (!validGroupKeys.includes(groupKey)) {
       res.status(400).json({
         error: {
@@ -93,7 +93,7 @@ export async function createTaxonomyOption(req: AuthenticatedRequest, res: Respo
     const groupKey = req.params.groupKey as TaxonomyGroupKey;
 
     // Validate group key
-    const validGroupKeys: TaxonomyGroupKey[] = ['product', 'product_suite', 'topic_tag'];
+    const validGroupKeys: TaxonomyGroupKey[] = ['product', 'product_suite', 'topic_tag', 'badge'];
     if (!validGroupKeys.includes(groupKey)) {
       res.status(400).json({
         error: {
@@ -111,6 +111,7 @@ export async function createTaxonomyOption(req: AuthenticatedRequest, res: Respo
       sort_order: z.number().int().min(0).optional(),
       parent_id: z.string().optional(),
       color: z.string().optional(),
+      short_description: z.string().max(140).optional(),
     });
 
     const parsed = CreateSchema.safeParse(req.body);
@@ -178,6 +179,7 @@ export async function updateTaxonomyOption(req: AuthenticatedRequest, res: Respo
       status: z.enum(['active', 'archived']).optional(), // active | archived
       deleted_at: z.string().optional().nullable(), // ISO datetime to soft-delete, null to restore
       color: z.string().optional().nullable(), // Set to null to clear color
+      short_description: z.string().max(140).optional().nullable(), // Set to null to clear description
     });
 
     const parsed = UpdateSchema.safeParse(req.body);
@@ -266,7 +268,7 @@ export async function getTaxonomyOptionUsage(req: AuthenticatedRequest, res: Res
     const optionId = req.params.optionId;
 
     // Validate group key
-    const validGroupKeys: TaxonomyGroupKey[] = ['product', 'product_suite', 'topic_tag'];
+    const validGroupKeys: TaxonomyGroupKey[] = ['product', 'product_suite', 'topic_tag', 'badge'];
     if (!validGroupKeys.includes(groupKey)) {
       res.status(400).json({
         error: {
@@ -336,7 +338,7 @@ export async function deleteTaxonomyOption(req: AuthenticatedRequest, res: Respo
     const force = req.query.force === 'true'; // Force delete even if in use (dangerous)
 
     // Validate group key
-    const validGroupKeys: TaxonomyGroupKey[] = ['product', 'product_suite', 'topic_tag'];
+    const validGroupKeys: TaxonomyGroupKey[] = ['product', 'product_suite', 'topic_tag', 'badge'];
     if (!validGroupKeys.includes(groupKey)) {
       res.status(400).json({
         error: {
@@ -433,7 +435,7 @@ export async function mergeTaxonomyOption(req: AuthenticatedRequest, res: Respon
     const { target_option_id, delete_source } = parsed.data;
 
     // Validate group key
-    const validGroupKeys: TaxonomyGroupKey[] = ['product', 'product_suite', 'topic_tag'];
+    const validGroupKeys: TaxonomyGroupKey[] = ['product', 'product_suite', 'topic_tag', 'badge'];
     if (!validGroupKeys.includes(groupKey)) {
       res.status(400).json({
         error: {

@@ -147,6 +147,7 @@ export async function createCourse(req: AuthenticatedRequest, res: Response) {
       description: z.string().optional(),
       icon_url: z.string().optional(),
     })).optional(),
+    badge_ids: z.array(z.string()).optional(),
   });
   
   const parsed = CreateCourseSchema.safeParse(req.body);
@@ -186,6 +187,7 @@ export async function createCourse(req: AuthenticatedRequest, res: Response) {
       product_suite_id,
       topic_tag_ids: parsed.data.topic_tag_ids || [],
       badges: parsed.data.badges || [],
+      badge_ids: parsed.data.badge_ids || [],
       sections: [],
       related_course_ids: [],
       created_at: now,

@@ -47,6 +47,7 @@ export interface CreateCourseRequest {
   product_suite_id?: string; // Was "product_concept_id"
   topic_tag_ids?: string[];
   badges?: Array<{ badge_id: string; name: string; description?: string; icon_url?: string }>;
+  badge_ids?: string[];
 }
 
 export interface UpdateCourseRequest {
@@ -60,6 +61,7 @@ export interface UpdateCourseRequest {
   product_suite_id?: string; // Was "product_concept_id"
   topic_tag_ids?: string[];
   badges?: Array<{ badge_id: string; name: string; description?: string; icon_url?: string }>;
+  badge_ids?: string[];
   cover_image?: MediaRef;
 }
 
