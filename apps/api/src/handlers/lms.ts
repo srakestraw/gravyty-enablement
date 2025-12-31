@@ -196,6 +196,19 @@ export async function getLessonDetail(req: AuthenticatedRequest, res: Response) 
       return;
     }
     
+    // Ensure lesson has required fields
+    if (!lesson.content) {
+      console.error(`[${requestId}] Lesson ${lessonId} missing content field`);
+      res.status(500).json({
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: 'Lesson data is invalid: missing content',
+        },
+        request_id: requestId,
+      });
+      return;
+    }
+    
     // Get user progress if authenticated
     let progress = null;
     if (req.user?.user_id) {
@@ -219,6 +232,7 @@ export async function getLessonDetail(req: AuthenticatedRequest, res: Response) 
     res.json(response);
   } catch (error) {
     console.error(`[${requestId}] Error getting lesson detail:`, error);
+    console.error(`[${requestId}] Error stack:`, error instanceof Error ? error.stack : 'No stack trace');
     res.status(500).json({
       error: {
         code: 'INTERNAL_ERROR',

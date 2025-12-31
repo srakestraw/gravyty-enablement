@@ -32,7 +32,9 @@ export const TaxonomyOptionSchema = z.object({
     label: z.string().min(1), // Display name
     slug: z.string().min(1), // URL-friendly identifier
     sort_order: z.number().int().min(0).default(0), // Display order within group
-    archived_at: z.string().optional(), // ISO datetime if archived
+    archived_at: z.string().optional(), // ISO datetime if archived (legacy, use status)
+    status: z.enum(['active', 'archived']).default('active'), // active | archived
+    deleted_at: z.string().optional().nullable(), // ISO datetime if soft-deleted
     parent_id: z.string().optional(), // For hierarchical taxonomies (e.g., product_suite -> product)
     color: z.string().optional(), // Optional color for UI display
     // Timestamps
@@ -59,7 +61,17 @@ export const UpdateTaxonomyOptionSchema = z.object({
     label: z.string().min(1).optional(),
     slug: z.string().min(1).optional(),
     sort_order: z.number().int().min(0).optional(),
-    archived_at: z.string().optional(), // Set to ISO datetime to archive, undefined to unarchive
-    color: z.string().optional(),
+    archived_at: z.string().optional(), // Set to ISO datetime to archive, undefined to unarchive (legacy)
+    status: z.enum(['active', 'archived']).optional(), // active | archived
+    deleted_at: z.string().optional().nullable(), // Set to ISO datetime to soft-delete, null to restore
+    color: z.string().optional().nullable(), // Set to null to clear color
+});
+/**
+ * Merge Taxonomy Option Request
+ *
+ * Moves all references from source option to target option
+ */
+export const MergeTaxonomyOptionSchema = z.object({
+    target_option_id: z.string().min(1),
 });
 //# sourceMappingURL=taxonomy.js.map

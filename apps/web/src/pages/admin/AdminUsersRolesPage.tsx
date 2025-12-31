@@ -40,6 +40,7 @@ import {
   Edit as EditIcon,
   Block as BlockIcon,
   CheckCircle as CheckCircleIcon,
+  Delete as DeleteIcon,
 } from '@mui/icons-material';
 import { usersApi, AdminUser, isErrorResponse } from '../../lib/apiClient';
 import { eventsApi } from '../../lib/apiClient';
@@ -62,12 +63,15 @@ export function AdminUsersRolesPage() {
   const [roleDialogOpen, setRoleDialogOpen] = useState(false);
   const [disableDialogOpen, setDisableDialogOpen] = useState(false);
   const [enableDialogOpen, setEnableDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [snackbar, setSnackbar] = useState<{ message: string; severity: 'success' | 'error' } | null>(null);
   const [newRole, setNewRole] = useState<Role>('Viewer');
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteName, setInviteName] = useState('');
   const [inviteRole, setInviteRole] = useState<Role>('Viewer');
   const [confirmDisableSelf, setConfirmDisableSelf] = useState(false);
+  const [confirmDeleteSelf, setConfirmDeleteSelf] = useState(false);
+  const [confirmDeleteEmail, setConfirmDeleteEmail] = useState('');
   const [nextCursor, setNextCursor] = useState<string | undefined>();
 
   // Debounced search
@@ -141,7 +145,8 @@ export function AdminUsersRolesPage() {
 
   const handleMenuClose = () => {
     setAnchorEl(null);
-    setSelectedUser(null);
+    // Don't clear selectedUser here - it's needed for dialogs
+    // setSelectedUser(null);
   };
 
   const handleInvite = async () => {
@@ -195,6 +200,7 @@ export function AdminUsersRolesPage() {
       } else {
         setSnackbar({ message: 'Role updated successfully', severity: 'success' });
         setRoleDialogOpen(false);
+        setSelectedUser(null);
         fetchUsers();
         // Track and audit
         eventsApi.track({
@@ -239,6 +245,7 @@ export function AdminUsersRolesPage() {
         setSnackbar({ message: 'User disabled successfully', severity: 'success' });
         setDisableDialogOpen(false);
         setConfirmDisableSelf(false);
+        setSelectedUser(null);
         fetchUsers();
         // Track and audit
         eventsApi.track({
@@ -275,6 +282,7 @@ export function AdminUsersRolesPage() {
       } else {
         setSnackbar({ message: 'User enabled successfully', severity: 'success' });
         setEnableDialogOpen(false);
+        setSelectedUser(null);
         fetchUsers();
         // Track and audit
         eventsApi.track({
@@ -295,6 +303,53 @@ export function AdminUsersRolesPage() {
     } catch (err) {
       setSnackbar({
         message: err instanceof Error ? err.message : 'Failed to enable user',
+        severity: 'error',
+      });
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!selectedUser) return;
+
+    // Check if deleting self
+    const deletingSelf = currentUser?.email === selectedUser.email || currentUser?.userId === selectedUser.username;
+    if (deletingSelf && (!confirmDeleteSelf || confirmDeleteEmail !== selectedUser.email)) {
+      setSnackbar({ 
+        message: 'Please confirm deletion by checking the box and typing the email address', 
+        severity: 'error' 
+      });
+      return;
+    }
+
+    try {
+      const response = await usersApi.deleteUser(selectedUser.username);
+
+      if (isErrorResponse(response)) {
+        setSnackbar({ message: response.error.message, severity: 'error' });
+      } else {
+        setSnackbar({ message: 'User deleted successfully', severity: 'success' });
+        setDeleteDialogOpen(false);
+        setConfirmDeleteSelf(false);
+        setConfirmDeleteEmail('');
+        setSelectedUser(null);
+        fetchUsers();
+        // Track and audit
+        eventsApi.track({
+          event_name: 'admin_user_deleted',
+          metadata: { username: selectedUser.username },
+        });
+        eventsApi.track({
+          event_name: 'admin_users_delete',
+          metadata: {
+            actor: currentUser?.email || currentUser?.userId,
+            target_username: selectedUser.username,
+            target_email: selectedUser.email,
+          },
+        });
+      }
+    } catch (err) {
+      setSnackbar({
+        message: err instanceof Error ? err.message : 'Failed to delete user',
         severity: 'error',
       });
     }
@@ -468,6 +523,19 @@ export function AdminUsersRolesPage() {
             Enable
           </MenuItem>
         )}
+        <MenuItem
+          onClick={(e) => {
+            e.stopPropagation();
+            setDeleteDialogOpen(true);
+            setConfirmDeleteSelf(false);
+            setConfirmDeleteEmail('');
+            handleMenuClose();
+          }}
+          sx={{ color: 'error.main' }}
+        >
+          <DeleteIcon sx={{ mr: 1 }} fontSize="small" />
+          Delete
+        </MenuItem>
       </Menu>
 
       {/* Invite Dialog */}
@@ -497,12 +565,17 @@ export function AdminUsersRolesPage() {
               label="Role"
               onChange={(e) => setInviteRole(e.target.value as Role)}
             >
-              <MenuItem value="Viewer">Viewer</MenuItem>
-              <MenuItem value="Contributor">Contributor</MenuItem>
-              <MenuItem value="Approver">Approver</MenuItem>
-              <MenuItem value="Admin">Admin</MenuItem>
+              <MenuItem value="Viewer">Viewer - View-only access to approved content</MenuItem>
+              <MenuItem value="Contributor">Contributor - Can create and edit content</MenuItem>
+              <MenuItem value="Approver">Approver - Can approve, deprecate, and expire content</MenuItem>
+              <MenuItem value="Admin">Admin - Full administrative access</MenuItem>
             </Select>
           </FormControl>
+          {inviteRole === 'Admin' && (
+            <Alert severity="warning" sx={{ mt: 2 }}>
+              <strong>Warning:</strong> Admin role grants full access to the system, including user management and all content.
+            </Alert>
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setInviteDialogOpen(false)}>Cancel</Button>
@@ -547,7 +620,10 @@ export function AdminUsersRolesPage() {
       </Dialog>
 
       {/* Disable Dialog */}
-      <Dialog open={disableDialogOpen} onClose={() => setDisableDialogOpen(false)} maxWidth="sm" fullWidth>
+      <Dialog open={disableDialogOpen} onClose={() => {
+        setDisableDialogOpen(false);
+        setSelectedUser(null);
+      }} maxWidth="sm" fullWidth>
         <DialogTitle>Disable User</DialogTitle>
         <DialogContent>
           {isSelf ? (
@@ -585,7 +661,10 @@ export function AdminUsersRolesPage() {
       </Dialog>
 
       {/* Enable Dialog */}
-      <Dialog open={enableDialogOpen} onClose={() => setEnableDialogOpen(false)} maxWidth="sm" fullWidth>
+      <Dialog open={enableDialogOpen} onClose={() => {
+        setEnableDialogOpen(false);
+        setSelectedUser(null);
+      }} maxWidth="sm" fullWidth>
         <DialogTitle>Enable User</DialogTitle>
         <DialogContent>
           <Typography>
@@ -596,6 +675,69 @@ export function AdminUsersRolesPage() {
           <Button onClick={() => setEnableDialogOpen(false)}>Cancel</Button>
           <Button onClick={handleEnable} variant="contained" color="success">
             Enable
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Dialog */}
+      <Dialog open={deleteDialogOpen} onClose={() => {
+        setDeleteDialogOpen(false);
+        setConfirmDeleteSelf(false);
+        setConfirmDeleteEmail('');
+        setSelectedUser(null);
+      }} maxWidth="sm" fullWidth>
+        <DialogTitle>Delete User</DialogTitle>
+        <DialogContent>
+          {selectedUser && (currentUser?.email === selectedUser.email || currentUser?.userId === selectedUser.username) ? (
+            <>
+              <Alert severity="error" sx={{ mb: 2 }}>
+                <strong>Warning:</strong> You are about to delete your own account. This action cannot be undone and you will immediately lose access to the system.
+              </Alert>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={confirmDeleteSelf}
+                    onChange={(e) => setConfirmDeleteSelf(e.target.checked)}
+                  />
+                }
+                label="I understand that deleting my account is permanent and cannot be undone"
+                sx={{ mb: 2 }}
+              />
+              <TextField
+                fullWidth
+                label="Type email to confirm"
+                placeholder={selectedUser?.email}
+                value={confirmDeleteEmail}
+                onChange={(e) => setConfirmDeleteEmail(e.target.value)}
+                error={confirmDeleteEmail !== selectedUser?.email && confirmDeleteEmail.length > 0}
+                helperText={confirmDeleteEmail !== selectedUser?.email && confirmDeleteEmail.length > 0 ? 'Email does not match' : 'Type the user email to confirm deletion'}
+              />
+            </>
+          ) : (
+            <>
+              <Alert severity="warning" sx={{ mb: 2 }}>
+                <strong>Warning:</strong> This action cannot be undone. The user will be permanently deleted from the system.
+              </Alert>
+              <Typography>
+                Are you sure you want to delete <strong>{selectedUser?.email}</strong>? This will permanently remove their account and all associated data.
+              </Typography>
+            </>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => {
+            setDeleteDialogOpen(false);
+            setConfirmDeleteSelf(false);
+            setConfirmDeleteEmail('');
+            setSelectedUser(null);
+          }}>Cancel</Button>
+          <Button
+            onClick={handleDelete}
+            variant="contained"
+            color="error"
+            disabled={selectedUser && (currentUser?.email === selectedUser.email || currentUser?.userId === selectedUser.username) && (!confirmDeleteSelf || confirmDeleteEmail !== selectedUser?.email)}
+          >
+            Delete
           </Button>
         </DialogActions>
       </Dialog>

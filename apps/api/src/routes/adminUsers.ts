@@ -24,5 +24,8 @@ router.patch('/:username/enable', adminUsersHandlers.enableUser);
 // Disable user
 router.patch('/:username/disable', adminUsersHandlers.disableUser);
 
+// Delete user
+router.delete('/:username', adminUsersHandlers.deleteUser);
+
 export default router;
 

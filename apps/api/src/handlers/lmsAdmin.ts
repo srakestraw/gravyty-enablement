@@ -406,6 +406,56 @@ export async function updateCourseLessons(req: AuthenticatedRequest, res: Respon
     return;
   }
   
+  // Quiz question schemas for validation
+  const QuizQuestionOptionSchema = z.object({
+    option_id: z.string(),
+    text: z.string(),
+  });
+
+  const QuizQuestionSchema = z.object({
+    question_id: z.string(),
+    kind: z.literal('single_choice'),
+    prompt: z.string(),
+    options: z.array(QuizQuestionOptionSchema).min(2),
+    correct_option_id: z.string(),
+    explanation: z.string().optional(),
+  });
+
+  // Lesson content discriminated union
+  const LessonContentSchema = z.discriminatedUnion('kind', [
+    z.object({
+      kind: z.literal('video'),
+      video_id: z.string(),
+      duration_seconds: z.number().int().min(1),
+      transcript: z.string().optional(),
+    }),
+    z.object({
+      kind: z.literal('reading'),
+      format: z.literal('markdown'),
+      markdown: z.string(),
+    }),
+    z.object({
+      kind: z.literal('quiz'),
+      passing_score_percent: z.number().int().min(0).max(100).optional(),
+      allow_retry: z.boolean().optional(),
+      show_answers_after_submit: z.boolean().optional(),
+      questions: z.array(QuizQuestionSchema).min(1),
+    }),
+    z.object({
+      kind: z.literal('assignment'),
+      instructions_markdown: z.string(),
+      submission_type: z.enum(['none', 'text', 'file', 'link']),
+      due_at: z.string().optional(),
+    }),
+    z.object({
+      kind: z.literal('interactive'),
+      provider: z.literal('embed'),
+      embed_url: z.string().url(),
+      height_px: z.number().int().min(1).optional(),
+      allow_fullscreen: z.boolean().optional(),
+    }),
+  ]);
+
   const UpdateLessonsSchema = z.object({
     sections: z.array(z.object({
       section_id: z.string(),
@@ -420,20 +470,16 @@ export async function updateCourseLessons(req: AuthenticatedRequest, res: Respon
       description: z.string().optional(),
       type: z.enum(['video', 'reading', 'quiz', 'assignment', 'interactive']),
       order: z.number(),
-      estimated_duration_minutes: z.number().optional(),
       required: z.boolean().optional(),
-      video_media: z.object({
+      content: LessonContentSchema,
+      resources: z.array(z.object({
         media_id: z.string(),
-        url: z.string(),
-      }).optional(),
-      transcript: z.object({
-        segments: z.array(z.object({
-          start_ms: z.number(),
-          end_ms: z.number(),
-          text: z.string(),
-        })),
-        full_text: z.string().optional(),
-      }).optional(),
+        type: z.enum(['image', 'video', 'document', 'audio', 'other']),
+        url: z.string().url(),
+        filename: z.string().optional(),
+        created_at: z.string(),
+        created_by: z.string(),
+      })).optional(),
     })),
   });
   

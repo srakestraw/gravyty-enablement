@@ -47,10 +47,10 @@ export declare const AssignmentSchema: z.ZodObject<{
     assigned_by: string;
     assigned_at: string;
     course_id?: string | undefined;
+    due_at?: string | undefined;
     path_id?: string | undefined;
     completed_at?: string | undefined;
     started_at?: string | undefined;
-    due_at?: string | undefined;
     waived_by?: string | undefined;
     waived_at?: string | undefined;
 }, {
@@ -62,10 +62,10 @@ export declare const AssignmentSchema: z.ZodObject<{
     assigned_by: string;
     assigned_at: string;
     course_id?: string | undefined;
+    due_at?: string | undefined;
     path_id?: string | undefined;
     completed_at?: string | undefined;
     started_at?: string | undefined;
-    due_at?: string | undefined;
     waived_by?: string | undefined;
     waived_at?: string | undefined;
 }>;

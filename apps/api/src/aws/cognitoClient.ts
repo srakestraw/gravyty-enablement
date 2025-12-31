@@ -12,6 +12,7 @@ import {
   AdminGetUserCommand,
   AdminEnableUserCommand,
   AdminDisableUserCommand,
+  AdminDeleteUserCommand,
   AdminAddUserToGroupCommand,
   AdminRemoveUserFromGroupCommand,
   AdminListGroupsForUserCommand,
@@ -267,7 +268,28 @@ export async function adminDisableUser(username: string): Promise<void> {
 }
 
 /**
+ * Delete a user
+ */
+export async function adminDeleteUser(username: string): Promise<void> {
+  if (!isCognitoConfigured()) {
+    throw new Error('Cognito is not configured. COGNITO_USER_POOL_ID must be set.');
+  }
+
+  try {
+    const command = new AdminDeleteUserCommand({
+      UserPoolId: USER_POOL_ID,
+      Username: username,
+    });
+    await cognitoClient!.send(command);
+  } catch (error) {
+    console.error(`[Cognito] Error deleting user ${username}:`, error);
+    throw error;
+  }
+}
+
+/**
  * Get a single user by username
+ * For federated users, username might be UUID or email
  */
 export async function getUserByUsername(username: string): Promise<AdminUser | null> {
   if (!isCognitoConfigured()) {
@@ -298,7 +320,7 @@ export async function getUserByUsername(username: string): Promise<AdminUser | n
       })) || [],
       UserCreateDate: user.UserCreateDate,
       UserLastModifiedDate: user.UserLastModifiedDate,
-      Enabled: user.Enabled,
+      Enabled: user.Enabled ?? true, // Default to true if undefined
       UserStatus: user.UserStatus as any,
     };
     
@@ -310,6 +332,55 @@ export async function getUserByUsername(username: string): Promise<AdminUser | n
       return null;
     }
     throw error;
+  }
+}
+
+/**
+ * Find user by username or email by searching the user list
+ * This is a fallback when direct lookup fails (e.g., for federated users)
+ */
+export async function findUserByUsernameOrEmail(identifier: string): Promise<AdminUser | null> {
+  if (!isCognitoConfigured()) {
+    throw new Error('Cognito is not configured. COGNITO_USER_POOL_ID must be set.');
+  }
+
+  try {
+    // Try searching with the identifier as query (searches both username and email)
+    let usersResult = await listUsers({ query: identifier, limit: 100 });
+    
+    // Try to find by username first
+    let foundUser = usersResult.users.find(u => u.username === identifier);
+    
+    // If not found and it's an email, try by email
+    if (!foundUser && identifier.includes('@')) {
+      foundUser = usersResult.users.find(u => u.email === identifier);
+    }
+    
+    // If found, return it
+    if (foundUser) {
+      return foundUser;
+    }
+    
+    // If not found and it's a UUID, try without filter (UUIDs might not match filter)
+    if (!foundUser && !identifier.includes('@')) {
+      // Search through paginated results
+      let paginationToken: string | undefined;
+      do {
+        const pageResult = await listUsers({ limit: 100, paginationToken });
+        foundUser = pageResult.users.find(u => u.username === identifier);
+        if (foundUser) {
+          return foundUser;
+        }
+        paginationToken = pageResult.paginationToken;
+        // Limit search to prevent infinite loops
+        if (pageResult.users.length === 0) break;
+      } while (paginationToken);
+    }
+    
+    return null;
+  } catch (error) {
+    console.error(`[Cognito] Error finding user ${identifier}:`, error);
+    return null;
   }
 }
 

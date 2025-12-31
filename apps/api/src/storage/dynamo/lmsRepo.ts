@@ -240,6 +240,123 @@ export class LmsRepo {
   }
 
   /**
+   * Transform old lesson format to new format (backward compatibility)
+   */
+  private transformLesson(item: any): Lesson {
+    // If already in new format (has content), ensure it's valid and return
+    if (item.content && typeof item.content === 'object' && item.content.kind) {
+      const lesson: Lesson = {
+        lesson_id: item.lesson_id,
+        course_id: item.course_id,
+        section_id: item.section_id,
+        title: item.title,
+        description: item.description,
+        type: item.type,
+        order: item.order,
+        required: item.required ?? true,
+        content: item.content,
+        resources: item.resources || [],
+        created_at: item.created_at,
+        created_by: item.created_by,
+        updated_at: item.updated_at,
+        updated_by: item.updated_by,
+      };
+      return lesson;
+    }
+
+    // Migrate from old format to new format
+    const lessonType = item.type || 'video';
+    const lesson: Lesson = {
+      lesson_id: item.lesson_id,
+      course_id: item.course_id,
+      section_id: item.section_id,
+      title: item.title,
+      description: item.description,
+      type: lessonType,
+      order: item.order,
+      required: item.required ?? true,
+      created_at: item.created_at,
+      created_by: item.created_by,
+      updated_at: item.updated_at,
+      updated_by: item.updated_by,
+    };
+
+    // Convert old video_media to new content structure
+    if (item.video_media) {
+      lesson.content = {
+        kind: 'video',
+        video_id: item.video_media.media_id || '',
+        duration_seconds: item.estimated_duration_minutes ? item.estimated_duration_minutes * 60 : 0,
+        transcript: item.transcript?.full_text,
+      };
+      // Add video_media to resources if it exists
+      if (item.video_media.url) {
+        lesson.resources = [{
+          media_id: item.video_media.media_id,
+          type: 'video',
+          url: item.video_media.url,
+          filename: item.video_media.filename,
+          created_at: item.video_media.created_at || item.created_at,
+          created_by: item.video_media.created_by || item.created_by,
+        }];
+      } else {
+        lesson.resources = [];
+      }
+    } else {
+      // Default content based on type
+      switch (lessonType) {
+        case 'reading':
+          lesson.content = {
+            kind: 'reading',
+            format: 'markdown',
+            markdown: item.markdown || '',
+          };
+          break;
+        case 'quiz':
+          lesson.content = {
+            kind: 'quiz',
+            questions: item.questions || [],
+            passing_score_percent: item.passing_score_percent || 70,
+            allow_retry: item.allow_retry || false,
+            show_answers_after_submit: item.show_answers_after_submit || false,
+          };
+          break;
+        case 'assignment':
+          lesson.content = {
+            kind: 'assignment',
+            instructions_markdown: item.instructions_markdown || '',
+            submission_type: item.submission_type || 'none',
+            due_at: item.due_at,
+          };
+          break;
+        case 'interactive':
+          lesson.content = {
+            kind: 'interactive',
+            provider: 'embed',
+            embed_url: item.embed_url || '',
+            height_px: item.height_px || 600,
+            allow_fullscreen: item.allow_fullscreen !== undefined ? item.allow_fullscreen : true,
+          };
+          break;
+        default:
+          lesson.content = {
+            kind: 'video',
+            video_id: '',
+            duration_seconds: 0,
+          };
+      }
+      lesson.resources = item.resources || [];
+    }
+
+    // Ensure resources is always an array
+    if (!lesson.resources) {
+      lesson.resources = [];
+    }
+
+    return lesson;
+  }
+
+  /**
    * Get lesson by course ID and lesson ID
    */
   async getLesson(courseId: string, lessonId: string): Promise<Lesson | null> {
@@ -252,7 +369,10 @@ export class LmsRepo {
     });
 
     const { Item } = await dynamoDocClient.send(command);
-    return (Item as Lesson) || null;
+    if (!Item) {
+      return null;
+    }
+    return this.transformLesson(Item);
   }
 
   /**
@@ -268,7 +388,7 @@ export class LmsRepo {
     });
 
     const { Items = [] } = await dynamoDocClient.send(command);
-    return (Items as Lesson[]).sort((a, b) => a.order - b.order);
+    return Items.map((item) => this.transformLesson(item)).sort((a, b) => a.order - b.order);
   }
 
   /**
@@ -1029,10 +1149,20 @@ export class LmsRepo {
       description?: string;
       type: 'video' | 'reading' | 'quiz' | 'assignment' | 'interactive';
       order: number;
-      estimated_duration_minutes?: number;
       required?: boolean;
-      video_media?: { media_id: string; url: string };
-      transcript?: { segments: Array<{ start_ms: number; end_ms: number; text: string }>; full_text?: string };
+      content: {
+        kind: 'video' | 'reading' | 'quiz' | 'assignment' | 'interactive';
+        [key: string]: any; // Allow type-specific fields
+      };
+      resources?: Array<{
+        media_id: string;
+        type: 'image' | 'video' | 'document' | 'audio' | 'other';
+        url: string;
+        filename?: string;
+        created_at: string;
+        created_by: string;
+        [key: string]: any;
+      }>;
     }>
   ): Promise<void> {
     const now = new Date().toISOString();
@@ -1074,32 +1204,16 @@ export class LmsRepo {
         description: lessonData.description,
         type: lessonData.type,
         order: lessonData.order,
-        estimated_duration_minutes: lessonData.estimated_duration_minutes,
         required: lessonData.required ?? true,
-      video_media: lessonData.video_media ? {
-        media_id: lessonData.video_media.media_id,
-        type: 'video' as const,
-        url: lessonData.video_media.url,
-        created_at: now,
-        created_by: userId,
-      } : undefined,
-      transcript: lessonData.transcript ? {
-        transcript_id: `transcript_${lessonData.lesson_id}`,
-        lesson_id: lessonData.lesson_id,
-        segments: lessonData.transcript.segments?.map((s, idx) => ({
-          segment_id: `seg_${idx}`,
-          start_ms: s.start_ms,
-          end_ms: s.end_ms,
-          text: s.text,
+        content: lessonData.content as any, // Type assertion needed due to discriminated union
+        resources: lessonData.resources?.map((r) => ({
+          media_id: r.media_id,
+          type: r.type,
+          url: r.url,
+          filename: r.filename,
+          created_at: r.created_at,
+          created_by: r.created_by,
         })),
-        full_text: lessonData.transcript.full_text,
-        language: 'en',
-        created_at: now,
-        created_by: userId,
-        updated_at: now,
-      } : undefined,
-        transcript_ref: undefined,
-        resource_refs: [],
         created_at: now,
         created_by: userId,
         updated_at: now,

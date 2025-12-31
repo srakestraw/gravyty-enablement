@@ -71,6 +71,111 @@ export function validateCoursePublish(course: Course, lessons: Lesson[]): Valida
           }
         });
       });
+
+      // Validate lesson content per type
+      lessons.forEach((lesson, lessonIndex) => {
+        // Ensure type and content.kind match
+        if (lesson.type !== lesson.content.kind) {
+          errors.push({
+            field: `lessons[${lessonIndex}].content`,
+            message: `Lesson type "${lesson.type}" does not match content kind "${lesson.content.kind}"`,
+          });
+        }
+
+        // Type-specific validation
+        switch (lesson.content.kind) {
+          case 'video':
+            if (!lesson.content.video_id || lesson.content.video_id.trim() === '') {
+              errors.push({
+                field: `lessons[${lessonIndex}].content.video_id`,
+                message: `Video lesson "${lesson.title || lesson.lesson_id}" must have a video_id`,
+              });
+            }
+            if (!lesson.content.duration_seconds || lesson.content.duration_seconds <= 0) {
+              errors.push({
+                field: `lessons[${lessonIndex}].content.duration_seconds`,
+                message: `Video lesson "${lesson.title || lesson.lesson_id}" must have duration_seconds > 0`,
+              });
+            }
+            break;
+
+          case 'reading':
+            if (!lesson.content.markdown || lesson.content.markdown.trim() === '') {
+              errors.push({
+                field: `lessons[${lessonIndex}].content.markdown`,
+                message: `Reading lesson "${lesson.title || lesson.lesson_id}" must have non-empty markdown`,
+              });
+            }
+            break;
+
+          case 'quiz':
+            if (!lesson.content.questions || lesson.content.questions.length === 0) {
+              errors.push({
+                field: `lessons[${lessonIndex}].content.questions`,
+                message: `Quiz lesson "${lesson.title || lesson.lesson_id}" must have at least one question`,
+              });
+            } else {
+              lesson.content.questions.forEach((question, qIndex) => {
+                if (!question.options || question.options.length < 2) {
+                  errors.push({
+                    field: `lessons[${lessonIndex}].content.questions[${qIndex}].options`,
+                    message: `Quiz question "${question.prompt || qIndex}" must have at least 2 options`,
+                  });
+                }
+                if (!question.correct_option_id) {
+                  errors.push({
+                    field: `lessons[${lessonIndex}].content.questions[${qIndex}].correct_option_id`,
+                    message: `Quiz question "${question.prompt || qIndex}" must have a correct_option_id`,
+                  });
+                } else {
+                  // Validate correct_option_id matches one of the options
+                  const optionIds = question.options.map((opt) => opt.option_id);
+                  if (!optionIds.includes(question.correct_option_id)) {
+                    errors.push({
+                      field: `lessons[${lessonIndex}].content.questions[${qIndex}].correct_option_id`,
+                      message: `Quiz question "${question.prompt || qIndex}" correct_option_id must match one of the options`,
+                    });
+                  }
+                }
+              });
+            }
+            break;
+
+          case 'assignment':
+            if (!lesson.content.instructions_markdown || lesson.content.instructions_markdown.trim() === '') {
+              errors.push({
+                field: `lessons[${lessonIndex}].content.instructions_markdown`,
+                message: `Assignment lesson "${lesson.title || lesson.lesson_id}" must have non-empty instructions_markdown`,
+              });
+            }
+            if (!lesson.content.submission_type) {
+              errors.push({
+                field: `lessons[${lessonIndex}].content.submission_type`,
+                message: `Assignment lesson "${lesson.title || lesson.lesson_id}" must have a submission_type`,
+              });
+            }
+            break;
+
+          case 'interactive':
+            if (!lesson.content.embed_url || lesson.content.embed_url.trim() === '') {
+              errors.push({
+                field: `lessons[${lessonIndex}].content.embed_url`,
+                message: `Interactive lesson "${lesson.title || lesson.lesson_id}" must have an embed_url`,
+              });
+            } else {
+              // Basic URL validation
+              try {
+                new URL(lesson.content.embed_url);
+              } catch {
+                errors.push({
+                  field: `lessons[${lessonIndex}].content.embed_url`,
+                  message: `Interactive lesson "${lesson.title || lesson.lesson_id}" embed_url must be a valid URL`,
+                });
+              }
+            }
+            break;
+        }
+      });
     }
   }
 

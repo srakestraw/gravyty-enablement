@@ -6,7 +6,7 @@
  */
 import { z } from 'zod';
 import { CourseSchema, CourseSectionSchema, } from './course.js';
-import { LessonSchema, TranscriptSchema, TranscriptSegmentSchema, } from './lesson.js';
+import { LessonSchema, } from './lesson.js';
 import { LearningPathSchema, LearningPathCourseRefSchema, } from './path.js';
 import { AssignmentStatusSchema, } from './assignment.js';
 import { MediaRefSchema } from './media.js';
@@ -49,16 +49,11 @@ export const CourseDetailSchema = CourseSchema.extend({
 /**
  * Lesson Detail
  *
- * Full lesson content including video media, transcript segments, and resources.
+ * Full lesson content including resources.
+ * Note: content is already part of LessonSchema, resources are hydrated MediaRefs.
  */
 export const LessonDetailSchema = LessonSchema.extend({
-    // Hydrated media
-    video_media: MediaRefSchema.optional(),
-    // Hydrated transcript
-    transcript: TranscriptSchema.extend({
-        segments: z.array(TranscriptSegmentSchema).optional(),
-    }).optional(),
-    // Hydrated resources
+    // Hydrated resources (MediaRef objects instead of just IDs)
     resources: z.array(MediaRefSchema).default([]),
 });
 /**

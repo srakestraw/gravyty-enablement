@@ -48,6 +48,41 @@ VITE_AUTH_MODE=cognito
 
 ## Troubleshooting
 
+### "Failed to set up process.env.secrets" Warning
+
+**Issue:** Build logs show `[WARNING]: !Failed to set up process.env.secrets`
+
+**Cause:** Amplify automatically tries to retrieve SSM parameters from `/amplify/{app-id}/{branch}/` but the service role lacks permissions.
+
+**Solution:**
+
+1. **Run the fix script** (recommended):
+   ```bash
+   export AMPLIFY_APP_ID=your-app-id  # Or enter when prompted
+   ./scripts/fix-amplify-ssm-permissions.sh
+   ```
+
+2. **Or manually fix via AWS Console**:
+   - Go to IAM Console → Roles
+   - Find your Amplify service role (e.g., `amplify-{app-id}-*`)
+   - Add inline policy with SSM permissions:
+     ```json
+     {
+       "Version": "2012-10-17",
+       "Statement": [{
+         "Effect": "Allow",
+         "Action": [
+           "ssm:GetParameter",
+           "ssm:GetParameters",
+           "ssm:GetParametersByPath"
+         ],
+         "Resource": "arn:aws:ssm:*:*:parameter/amplify/{app-id}/*"
+       }]
+     }
+     ```
+
+**Note:** If you're using Amplify Console environment variables (not SSM), this warning won't block your build, but fixing permissions prevents potential issues.
+
 ### Build Still Fails
 
 1. **Check build logs** - Look for which step failed:
@@ -61,6 +96,8 @@ VITE_AUTH_MODE=cognito
 3. **Check environment variables** - All `VITE_*` variables must be set
 
 4. **Verify npm workspaces** - The build should run from repo root where `package.json` has workspaces configured
+
+5. **Check SSM permissions** - If you see SSM warnings, run `./scripts/fix-amplify-ssm-permissions.sh`
 
 ### Build Uses Wrong amplify.yml
 

@@ -43,10 +43,71 @@ export const TranscriptSchema = z.object({
  */
 export const LessonTypeSchema = z.enum(['video', 'reading', 'quiz', 'assignment', 'interactive']);
 /**
+ * Quiz Question Option
+ */
+export const QuizQuestionOptionSchema = z.object({
+    option_id: z.string(),
+    text: z.string(),
+});
+/**
+ * Quiz Question (MVP: single choice only)
+ */
+export const QuizQuestionSchema = z.object({
+    question_id: z.string(),
+    kind: z.literal('single_choice'),
+    prompt: z.string(),
+    options: z.array(QuizQuestionOptionSchema).min(2),
+    correct_option_id: z.string(),
+    explanation: z.string().optional(),
+});
+/**
+ * Lesson Content Discriminated Union
+ *
+ * Type-specific content for each lesson type.
+ */
+export const LessonContentSchema = z.discriminatedUnion('kind', [
+    // Video lesson content
+    z.object({
+        kind: z.literal('video'),
+        video_id: z.string(), // Media ID reference
+        duration_seconds: z.number().int().min(1),
+        transcript: z.string().optional(),
+    }),
+    // Reading lesson content
+    z.object({
+        kind: z.literal('reading'),
+        format: z.literal('markdown'),
+        markdown: z.string(),
+    }),
+    // Quiz lesson content
+    z.object({
+        kind: z.literal('quiz'),
+        passing_score_percent: z.number().int().min(0).max(100).optional(),
+        allow_retry: z.boolean().optional().default(false),
+        show_answers_after_submit: z.boolean().optional().default(false),
+        questions: z.array(QuizQuestionSchema).min(1),
+    }),
+    // Assignment lesson content
+    z.object({
+        kind: z.literal('assignment'),
+        instructions_markdown: z.string(),
+        submission_type: z.enum(['none', 'text', 'file', 'link']),
+        due_at: z.string().optional(), // ISO datetime
+    }),
+    // Interactive lesson content
+    z.object({
+        kind: z.literal('interactive'),
+        provider: z.literal('embed'),
+        embed_url: z.string().url(),
+        height_px: z.number().int().min(1).optional(),
+        allow_fullscreen: z.boolean().optional().default(true),
+    }),
+]);
+/**
  * Lesson
  *
  * A single learning unit within a course section.
- * Lessons can contain video content, transcripts, and resource references.
+ * Uses discriminated union for type-specific content.
  */
 export const LessonSchema = z.object({
     lesson_id: z.string(),
@@ -56,15 +117,11 @@ export const LessonSchema = z.object({
     description: z.string().optional(),
     type: LessonTypeSchema,
     order: z.number().int().min(0), // Display order within section
-    // Video content
-    video_media: MediaRefSchema.optional(), // Video media reference
-    // Transcript
-    transcript_ref: z.string().optional(), // Reference to transcript_id
-    transcript: TranscriptSchema.optional(), // Embedded transcript (for detail views)
-    // Resources
-    resource_refs: z.array(z.string()).default([]), // Array of media_id references
+    // Type-specific content (discriminated union)
+    content: LessonContentSchema,
+    // Resources (optional, shared across all types)
+    resources: z.array(MediaRefSchema).optional(),
     // Metadata
-    estimated_duration_minutes: z.number().int().min(0).optional(),
     required: z.boolean().default(true), // Whether lesson is required for completion
     // Timestamps
     created_at: z.string(), // ISO datetime

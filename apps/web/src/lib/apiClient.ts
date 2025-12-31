@@ -286,5 +286,14 @@ export const usersApi = {
       method: 'PATCH',
     });
   },
+
+  /**
+   * DELETE /v1/admin/users/:username
+   */
+  deleteUser: async (username: string): Promise<ApiResponse<void>> => {
+    return apiFetch<void>(`/v1/admin/users/${encodeURIComponent(username)}`, {
+      method: 'DELETE',
+    });
+  },
 };
 

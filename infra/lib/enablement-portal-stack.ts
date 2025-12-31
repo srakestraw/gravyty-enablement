@@ -14,6 +14,7 @@ import * as targets from 'aws-cdk-lib/aws-events-targets';
 import { Construct } from 'constructs';
 import * as path from 'path';
 import { CognitoEmailDomainValidator } from './cognito-email-domain-validator';
+import { CognitoAutoAssignViewer } from './cognito-auto-assign-viewer';
 
 export class EnablementPortalStack extends cdk.Stack {
   public readonly eventsTable: dynamodb.Table;
@@ -283,11 +284,29 @@ export class EnablementPortalStack extends cdk.Stack {
       },
     });
 
-    // Grant Cognito permission to invoke the Lambda
+    // Grant Cognito permission to invoke the email domain validator Lambda
     emailDomainValidator.function.addPermission('CognitoInvoke', {
       principal: new iam.ServicePrincipal('cognito-idp.amazonaws.com'),
       sourceArn: this.userPool.userPoolArn,
     });
+
+    // Auto-assign Viewer role Lambda (assigns @gravyty.com users to Viewer group)
+    const autoAssignViewer = new CognitoAutoAssignViewer(this, 'AutoAssignViewer', {
+      userPoolId: this.userPool.userPoolId,
+    });
+
+    // Grant Cognito permission to invoke the auto-assign Lambda
+    autoAssignViewer.function.addPermission('CognitoInvoke', {
+      principal: new iam.ServicePrincipal('cognito-idp.amazonaws.com'),
+      sourceArn: this.userPool.userPoolArn,
+    });
+
+    // Add postAuthentication trigger to User Pool using CfnUserPool
+    const cfnUserPool = this.userPool.node.defaultChild as cognito.CfnUserPool;
+    cfnUserPool.lambdaConfig = {
+      preTokenGeneration: emailDomainValidator.function.functionArn,
+      postAuthentication: autoAssignViewer.function.functionArn,
+    };
 
     // Create Cognito Groups
     const viewerGroup = new cognito.CfnUserPoolGroup(this, 'ViewerGroup', {
@@ -327,6 +346,7 @@ export class EnablementPortalStack extends cdk.Stack {
         'cognito-idp:AdminGetUser',
         'cognito-idp:AdminEnableUser',
         'cognito-idp:AdminDisableUser',
+        'cognito-idp:AdminDeleteUser',
         'cognito-idp:AdminAddUserToGroup',
         'cognito-idp:AdminRemoveUserFromGroup',
         'cognito-idp:AdminListGroupsForUser',

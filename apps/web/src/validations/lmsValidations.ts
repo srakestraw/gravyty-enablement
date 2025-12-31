@@ -95,21 +95,111 @@ export function validateCoursePublish(course: Course, lessons: Lesson[]): Valida
             });
           }
 
-          // If lesson type is video, it should have media_ref
-          if (lesson.type === 'video' && !lesson.video_media) {
+          // Validate lesson content per type
+          if (!lesson.content) {
             errors.push({
-              field: `lessons[${lessonId}].video_media`,
-              message: `Video lesson "${lesson.title || lessonId}" must have a video media reference`,
+              field: `lessons[${lessonId}].content`,
+              message: `Lesson "${lesson.title || lessonId}" must have content`,
             });
-          }
-
-          // Validate transcript if present
-          if (lesson.transcript && lesson.transcript.full_text !== undefined) {
-            if (lesson.transcript.full_text.trim() === '') {
+          } else {
+            // Ensure type and content.kind match
+            if (lesson.type !== lesson.content.kind) {
               errors.push({
-                field: `lessons[${lessonId}].transcript.full_text`,
-                message: `Lesson "${lesson.title || lessonId}" transcript full_text cannot be empty if provided`,
+                field: `lessons[${lessonId}].content`,
+                message: `Lesson type "${lesson.type}" does not match content kind "${lesson.content.kind}"`,
               });
+            }
+
+            // Type-specific validation (same rules as validateCourseDraft)
+            switch (lesson.content.kind) {
+              case 'video':
+                if (!lesson.content.video_id || lesson.content.video_id.trim() === '') {
+                  errors.push({
+                    field: `lessons[${lessonId}].content.video_id`,
+                    message: `Video lesson "${lesson.title || lessonId}" must have a video_id`,
+                  });
+                }
+                if (!lesson.content.duration_seconds || lesson.content.duration_seconds <= 0) {
+                  errors.push({
+                    field: `lessons[${lessonId}].content.duration_seconds`,
+                    message: `Video lesson "${lesson.title || lessonId}" must have duration_seconds > 0`,
+                  });
+                }
+                break;
+
+              case 'reading':
+                if (!lesson.content.markdown || lesson.content.markdown.trim() === '') {
+                  errors.push({
+                    field: `lessons[${lessonId}].content.markdown`,
+                    message: `Reading lesson "${lesson.title || lessonId}" must have non-empty markdown`,
+                  });
+                }
+                break;
+
+              case 'quiz':
+                if (!lesson.content.questions || lesson.content.questions.length === 0) {
+                  errors.push({
+                    field: `lessons[${lessonId}].content.questions`,
+                    message: `Quiz lesson "${lesson.title || lessonId}" must have at least one question`,
+                  });
+                } else {
+                  lesson.content.questions.forEach((question, qIndex) => {
+                    if (!question.options || question.options.length < 2) {
+                      errors.push({
+                        field: `lessons[${lessonId}].content.questions[${qIndex}].options`,
+                        message: `Quiz question "${question.prompt || qIndex}" must have at least 2 options`,
+                      });
+                    }
+                    if (!question.correct_option_id) {
+                      errors.push({
+                        field: `lessons[${lessonId}].content.questions[${qIndex}].correct_option_id`,
+                        message: `Quiz question "${question.prompt || qIndex}" must have a correct_option_id`,
+                      });
+                    } else {
+                      const optionIds = question.options.map((opt) => opt.option_id);
+                      if (!optionIds.includes(question.correct_option_id)) {
+                        errors.push({
+                          field: `lessons[${lessonId}].content.questions[${qIndex}].correct_option_id`,
+                          message: `Quiz question "${question.prompt || qIndex}" correct_option_id must match one of the options`,
+                        });
+                      }
+                    }
+                  });
+                }
+                break;
+
+              case 'assignment':
+                if (!lesson.content.instructions_markdown || lesson.content.instructions_markdown.trim() === '') {
+                  errors.push({
+                    field: `lessons[${lessonId}].content.instructions_markdown`,
+                    message: `Assignment lesson "${lesson.title || lessonId}" must have non-empty instructions_markdown`,
+                  });
+                }
+                if (!lesson.content.submission_type) {
+                  errors.push({
+                    field: `lessons[${lessonId}].content.submission_type`,
+                    message: `Assignment lesson "${lesson.title || lessonId}" must have a submission_type`,
+                  });
+                }
+                break;
+
+              case 'interactive':
+                if (!lesson.content.embed_url || lesson.content.embed_url.trim() === '') {
+                  errors.push({
+                    field: `lessons[${lessonId}].content.embed_url`,
+                    message: `Interactive lesson "${lesson.title || lessonId}" must have an embed_url`,
+                  });
+                } else {
+                  try {
+                    new URL(lesson.content.embed_url);
+                  } catch {
+                    errors.push({
+                      field: `lessons[${lessonId}].content.embed_url`,
+                      message: `Interactive lesson "${lesson.title || lessonId}" embed_url must be a valid URL`,
+                    });
+                  }
+                }
+                break;
             }
           }
         }
@@ -327,29 +417,165 @@ export function validateCourseDraft(course: Course, lessons: Lesson[]): { errors
             });
           }
 
-          // If lesson type is video, it should have media_ref
-          if (lesson.type === 'video' && !lesson.video_media) {
+          // Validate lesson content per type
+          if (!lesson.content) {
             errors.push({
               severity: 'error',
-              field: `lessons[${lessonId}].video_media`,
-              message: `Video lesson "${lesson.title || lessonId}" must have a video media reference`,
+              field: `lessons[${lessonId}].content`,
+              message: `Lesson "${lesson.title || lessonId}" must have content`,
               entityType: 'lesson',
               entityId: lessonId,
-              fieldKey: 'video_media',
+              fieldKey: 'content',
             });
-          }
-
-          // Validate transcript if present
-          if (lesson.transcript && lesson.transcript.full_text !== undefined) {
-            if (lesson.transcript.full_text.trim() === '') {
+          } else {
+            // Ensure type and content.kind match
+            if (lesson.type !== lesson.content.kind) {
               errors.push({
                 severity: 'error',
-                field: `lessons[${lessonId}].transcript.full_text`,
-                message: `Lesson "${lesson.title || lessonId}" transcript full_text cannot be empty if provided`,
+                field: `lessons[${lessonId}].content`,
+                message: `Lesson type "${lesson.type}" does not match content kind "${lesson.content.kind}"`,
                 entityType: 'lesson',
                 entityId: lessonId,
-                fieldKey: 'transcript.full_text',
+                fieldKey: 'content',
               });
+            }
+
+            // Type-specific validation
+            switch (lesson.content.kind) {
+              case 'video':
+                if (!lesson.content.video_id || lesson.content.video_id.trim() === '') {
+                  errors.push({
+                    severity: 'error',
+                    field: `lessons[${lessonId}].content.video_id`,
+                    message: `Video lesson "${lesson.title || lessonId}" must have a video_id`,
+                    entityType: 'lesson',
+                    entityId: lessonId,
+                    fieldKey: 'content.video_id',
+                  });
+                }
+                if (!lesson.content.duration_seconds || lesson.content.duration_seconds <= 0) {
+                  errors.push({
+                    severity: 'error',
+                    field: `lessons[${lessonId}].content.duration_seconds`,
+                    message: `Video lesson "${lesson.title || lessonId}" must have duration_seconds > 0`,
+                    entityType: 'lesson',
+                    entityId: lessonId,
+                    fieldKey: 'content.duration_seconds',
+                  });
+                }
+                break;
+
+              case 'reading':
+                if (!lesson.content.markdown || lesson.content.markdown.trim() === '') {
+                  errors.push({
+                    severity: 'error',
+                    field: `lessons[${lessonId}].content.markdown`,
+                    message: `Reading lesson "${lesson.title || lessonId}" must have non-empty markdown`,
+                    entityType: 'lesson',
+                    entityId: lessonId,
+                    fieldKey: 'content.markdown',
+                  });
+                }
+                break;
+
+              case 'quiz':
+                if (!lesson.content.questions || lesson.content.questions.length === 0) {
+                  errors.push({
+                    severity: 'error',
+                    field: `lessons[${lessonId}].content.questions`,
+                    message: `Quiz lesson "${lesson.title || lessonId}" must have at least one question`,
+                    entityType: 'lesson',
+                    entityId: lessonId,
+                    fieldKey: 'content.questions',
+                  });
+                } else {
+                  lesson.content.questions.forEach((question, qIndex) => {
+                    if (!question.options || question.options.length < 2) {
+                      errors.push({
+                        severity: 'error',
+                        field: `lessons[${lessonId}].content.questions[${qIndex}].options`,
+                        message: `Quiz question "${question.prompt || qIndex}" must have at least 2 options`,
+                        entityType: 'lesson',
+                        entityId: lessonId,
+                        fieldKey: `content.questions[${qIndex}].options`,
+                      });
+                    }
+                    if (!question.correct_option_id) {
+                      errors.push({
+                        severity: 'error',
+                        field: `lessons[${lessonId}].content.questions[${qIndex}].correct_option_id`,
+                        message: `Quiz question "${question.prompt || qIndex}" must have a correct_option_id`,
+                        entityType: 'lesson',
+                        entityId: lessonId,
+                        fieldKey: `content.questions[${qIndex}].correct_option_id`,
+                      });
+                    } else {
+                      // Validate correct_option_id matches one of the options
+                      const optionIds = question.options.map((opt) => opt.option_id);
+                      if (!optionIds.includes(question.correct_option_id)) {
+                        errors.push({
+                          severity: 'error',
+                          field: `lessons[${lessonId}].content.questions[${qIndex}].correct_option_id`,
+                          message: `Quiz question "${question.prompt || qIndex}" correct_option_id must match one of the options`,
+                          entityType: 'lesson',
+                          entityId: lessonId,
+                          fieldKey: `content.questions[${qIndex}].correct_option_id`,
+                        });
+                      }
+                    }
+                  });
+                }
+                break;
+
+              case 'assignment':
+                if (!lesson.content.instructions_markdown || lesson.content.instructions_markdown.trim() === '') {
+                  errors.push({
+                    severity: 'error',
+                    field: `lessons[${lessonId}].content.instructions_markdown`,
+                    message: `Assignment lesson "${lesson.title || lessonId}" must have non-empty instructions_markdown`,
+                    entityType: 'lesson',
+                    entityId: lessonId,
+                    fieldKey: 'content.instructions_markdown',
+                  });
+                }
+                if (!lesson.content.submission_type) {
+                  errors.push({
+                    severity: 'error',
+                    field: `lessons[${lessonId}].content.submission_type`,
+                    message: `Assignment lesson "${lesson.title || lessonId}" must have a submission_type`,
+                    entityType: 'lesson',
+                    entityId: lessonId,
+                    fieldKey: 'content.submission_type',
+                  });
+                }
+                break;
+
+              case 'interactive':
+                if (!lesson.content.embed_url || lesson.content.embed_url.trim() === '') {
+                  errors.push({
+                    severity: 'error',
+                    field: `lessons[${lessonId}].content.embed_url`,
+                    message: `Interactive lesson "${lesson.title || lessonId}" must have an embed_url`,
+                    entityType: 'lesson',
+                    entityId: lessonId,
+                    fieldKey: 'content.embed_url',
+                  });
+                } else {
+                  // Basic URL validation
+                  try {
+                    new URL(lesson.content.embed_url);
+                  } catch {
+                    errors.push({
+                      severity: 'error',
+                      field: `lessons[${lessonId}].content.embed_url`,
+                      message: `Interactive lesson "${lesson.title || lessonId}" embed_url must be a valid URL`,
+                      entityType: 'lesson',
+                      entityId: lessonId,
+                      fieldKey: 'content.embed_url',
+                    });
+                  }
+                }
+                break;
             }
           }
         }

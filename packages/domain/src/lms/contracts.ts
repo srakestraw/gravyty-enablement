@@ -84,18 +84,11 @@ export type CourseDetail = z.infer<typeof CourseDetailSchema>;
 /**
  * Lesson Detail
  * 
- * Full lesson content including video media, transcript segments, and resources.
+ * Full lesson content including resources.
+ * Note: content is already part of LessonSchema, resources are hydrated MediaRefs.
  */
 export const LessonDetailSchema = LessonSchema.extend({
-  // Hydrated media
-  video_media: MediaRefSchema.optional(),
-  
-  // Hydrated transcript
-  transcript: TranscriptSchema.extend({
-    segments: z.array(TranscriptSegmentSchema).optional(),
-  }).optional(),
-  
-  // Hydrated resources
+  // Hydrated resources (MediaRef objects instead of just IDs)
   resources: z.array(MediaRefSchema).default([]),
 });
 

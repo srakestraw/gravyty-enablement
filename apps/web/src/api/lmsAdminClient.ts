@@ -77,13 +77,20 @@ export interface UpdateCourseLessonsRequest {
     description?: string;
     type: 'video' | 'reading' | 'quiz' | 'assignment' | 'interactive';
     order: number;
-    estimated_duration_minutes?: number;
     required?: boolean;
-    video_media?: { media_id: string; url: string };
-    transcript?: {
-      segments: Array<{ start_ms: number; end_ms: number; text: string }>;
-      full_text?: string;
+    content: {
+      kind: 'video' | 'reading' | 'quiz' | 'assignment' | 'interactive';
+      [key: string]: any; // Type-specific fields
     };
+    resources?: Array<{
+      media_id: string;
+      type: 'image' | 'video' | 'document' | 'audio' | 'other';
+      url: string;
+      filename?: string;
+      created_at: string;
+      created_by: string;
+      [key: string]: any;
+    }>;
   }>;
 }
 
