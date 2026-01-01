@@ -43,6 +43,8 @@ export class CognitoAutoAssignViewer extends Construct {
     });
 
     // Grant permissions to list groups and add users to groups
+    // Use wildcard ARN to avoid circular dependency with UserPool ID
+    // The Lambda will work with any UserPool in the account/region
     this.function.addToRolePolicy(
       new iam.PolicyStatement({
         effect: iam.Effect.ALLOW,
@@ -51,7 +53,7 @@ export class CognitoAutoAssignViewer extends Construct {
           'cognito-idp:AdminAddUserToGroup',
         ],
         resources: [
-          `arn:aws:cognito-idp:${cdk.Stack.of(this).region}:${cdk.Stack.of(this).account}:userpool/${props.userPoolId}`,
+          `arn:aws:cognito-idp:${cdk.Stack.of(this).region}:${cdk.Stack.of(this).account}:userpool/*`,
         ],
       })
     );

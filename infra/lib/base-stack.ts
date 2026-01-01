@@ -80,7 +80,7 @@ export class BaseStack extends cdk.NestedStack {
       allowedDomains: ['gravyty.com'],
     });
 
-    // Cognito User Pool
+    // Cognito User Pool (created WITHOUT lambda triggers initially to break circular dependency)
     this.userPool = new cognito.UserPool(this, 'UserPool', {
       userPoolName: 'enablement-portal-users',
       signInAliases: {
@@ -104,34 +104,42 @@ export class BaseStack extends cdk.NestedStack {
       },
       accountRecovery: cognito.AccountRecovery.EMAIL_ONLY,
       removalPolicy: cdk.RemovalPolicy.RETAIN,
-      lambdaTriggers: {
-        preTokenGeneration: emailDomainValidator.function,
-      },
+      // Note: lambdaTriggers are set later via CfnUserPool to avoid circular dependency
     });
 
     // Grant Cognito permission to invoke the email domain validator Lambda
+    // Use wildcard ARN to avoid circular dependency with UserPool ARN
     emailDomainValidator.function.addPermission('CognitoInvoke', {
       principal: new iam.ServicePrincipal('cognito-idp.amazonaws.com'),
-      sourceArn: this.userPool.userPoolArn,
+      // Use wildcard ARN instead of specific UserPool ARN to break circular dependency
+      sourceArn: `arn:aws:cognito-idp:${this.region}:${this.account}:userpool/*`,
     });
 
     // Auto-assign Viewer role Lambda (assigns @gravyty.com users to Viewer group)
+    // Pass empty string - the Lambda uses wildcard ARN so doesn't need specific UserPool ID
     const autoAssignViewer = new CognitoAutoAssignViewer(this, 'AutoAssignViewer', {
-      userPoolId: this.userPool.userPoolId,
+      userPoolId: '', // Not used anymore - Lambda uses wildcard ARN
     });
 
     // Grant Cognito permission to invoke the auto-assign Lambda
+    // Use wildcard ARN to avoid circular dependency with UserPool ARN
     autoAssignViewer.function.addPermission('CognitoInvoke', {
       principal: new iam.ServicePrincipal('cognito-idp.amazonaws.com'),
-      sourceArn: this.userPool.userPoolArn,
+      // Use wildcard ARN instead of specific UserPool ARN to break circular dependency
+      sourceArn: `arn:aws:cognito-idp:${this.region}:${this.account}:userpool/*`,
     });
 
-    // Add postAuthentication trigger to User Pool using CfnUserPool
+    // Add lambda triggers to User Pool using CfnUserPool AFTER permissions are set
+    // This breaks the circular dependency by configuring triggers after all resources are created
     const cfnUserPool = this.userPool.node.defaultChild as cognito.CfnUserPool;
     cfnUserPool.lambdaConfig = {
       preTokenGeneration: emailDomainValidator.function.functionArn,
       postAuthentication: autoAssignViewer.function.functionArn,
     };
+    
+    // Ensure lambdaConfig is set after permissions are created
+    cfnUserPool.node.addDependency(emailDomainValidator.function);
+    cfnUserPool.node.addDependency(autoAssignViewer.function);
 
     // Create Cognito Groups
     const viewerGroup = new cognito.CfnUserPoolGroup(this, 'ViewerGroup', {
