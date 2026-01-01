@@ -2,7 +2,27 @@
 
 ## Overview
 
-The `lms_transcripts` DynamoDB table was created in a previous deployment but is not currently tracked by CloudFormation. This document explains how to import it into the stack.
+The `lms_transcripts` DynamoDB table may be created during a failed deployment but not tracked by CloudFormation. This document explains how to import it into the stack or delete it if empty.
+
+## Quick Fix (If Table is Empty)
+
+If the table has no data (0 items), the simplest solution is to delete it and let CDK create it fresh:
+
+```bash
+# Check if table is empty
+aws dynamodb scan --table-name lms_transcripts --select COUNT --region us-east-1
+
+# If empty, delete it
+aws dynamodb delete-table --table-name lms_transcripts --region us-east-1
+aws dynamodb wait table-not-exists --table-name lms_transcripts --region us-east-1
+
+# Then deploy - CDK will create it fresh
+cd infra && npx cdk deploy
+```
+
+## Import Existing Table (If Table Has Data)
+
+If the table contains data, you should import it instead of deleting it.
 
 ## Prerequisites
 
