@@ -217,6 +217,10 @@ export class EnablementPortalStack extends cdk.Stack {
     });
 
     // LMS Transcripts Table
+    // Note: If this table already exists from a failed deployment, you may need to:
+    // 1. Import it: npx cdk import --resource-mapping-file <mapping-file> EnablementPortalStack
+    // 2. Or delete it (if empty): aws dynamodb delete-table --table-name lms_transcripts
+    // See infra/scripts/import-transcripts-table.sh for import script
     this.lmsTranscriptsTable = new dynamodb.Table(this, 'LmsTranscripts', {
       tableName: 'lms_transcripts',
       partitionKey: { name: 'transcript_id', type: dynamodb.AttributeType.STRING },
