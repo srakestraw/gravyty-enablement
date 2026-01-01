@@ -17,6 +17,7 @@ import {
 } from '../storage/dynamo/lmsRepo';
 import { emitLmsEvent, LMS_EVENTS } from '../telemetry/lmsTelemetry';
 import { dynamoDocClient } from '../aws/dynamoClient';
+import { PutCommand } from '@aws-sdk/lib-dynamodb';
 import type {
   Course,
   CourseSummary,
@@ -640,6 +641,74 @@ export async function publishCourse(req: AuthenticatedRequest, res: Response) {
       error: {
         code: 'INTERNAL_ERROR',
         message: error instanceof Error ? error.message : 'Failed to publish course',
+      },
+      request_id: requestId,
+    });
+  }
+}
+
+/**
+ * DELETE /v1/lms/admin/courses/:courseId
+ * Delete (archive) a course
+ */
+export async function deleteCourse(req: AuthenticatedRequest, res: Response) {
+  const requestId = req.headers['x-request-id'] as string;
+  const userId = req.user?.user_id;
+  const courseId = req.params.courseId as string;
+  
+  if (!userId) {
+    res.status(401).json({
+      error: { code: 'UNAUTHORIZED', message: 'User ID required' },
+      request_id: requestId,
+    });
+    return;
+  }
+  
+  try {
+    // Get course to verify it exists
+    const course = await lmsRepo.getCourseDraftOrPublished(courseId);
+    if (!course) {
+      res.status(404).json({
+        error: { code: 'NOT_FOUND', message: `Course ${courseId} not found` },
+        request_id: requestId,
+      });
+      return;
+    }
+    
+    // Archive the course (set status to 'archived')
+    // This is safer than hard deletion - preserves data for audit/recovery
+    const now = new Date().toISOString();
+    const archivedCourse: Course = {
+      ...course,
+      status: 'archived',
+      updated_at: now,
+      updated_by: userId,
+    };
+    
+    // Use PutCommand to update the course (allows status change to archived)
+    const command = new PutCommand({
+      TableName: LMS_COURSES_TABLE,
+      Item: archivedCourse,
+    });
+    await dynamoDocClient.send(command);
+    
+    // Emit telemetry
+    await emitLmsEvent(req, 'lms_admin_course_deleted' as any, {
+      course_id: courseId,
+      course_title: course.title,
+    });
+    
+    const response: ApiSuccessResponse<{ course: Course }> = {
+      data: { course: archivedCourse },
+      request_id: requestId,
+    };
+    res.json(response);
+  } catch (error) {
+    console.error(`[${requestId}] Error deleting course:`, error);
+    res.status(500).json({
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: error instanceof Error ? error.message : 'Failed to delete course',
       },
       request_id: requestId,
     });

@@ -214,6 +214,13 @@ export const lmsAdminApi = {
     });
   },
 
+  async deleteCourse(courseId: string) {
+    return apiFetch<{ course: Course }>(
+      `${BASE_URL}/courses/${courseId}`,
+      { method: 'DELETE' }
+    );
+  },
+
   async updateCourseLessons(courseId: string, data: UpdateCourseLessonsRequest) {
     return apiFetch<{ success: boolean }>(`${BASE_URL}/courses/${courseId}/lessons`, {
       method: 'PUT',

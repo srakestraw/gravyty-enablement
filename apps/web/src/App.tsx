@@ -65,6 +65,7 @@ import { AdminLearningCertificatesPage } from './pages/admin/learning/AdminLearn
 import { AdminLearningMediaPage } from './pages/admin/learning/AdminLearningMediaPage';
 import { AdminTaxonomyPage } from './pages/admin/learning/AdminTaxonomyPage';
 import { AdminTaxonomyDetailPage } from './pages/admin/learning/AdminTaxonomyDetailPage';
+import { TestCourseEditorState } from './pages/admin/learning/TestCourseEditorState';
 import { RequireLearningPermission } from './components/auth/RequireLearningPermission';
 
 const RETURN_TO_KEY = 'enablement_return_to';
@@ -624,6 +625,19 @@ function App() {
                 <AdminCourseEditorPage />
               </AppShell>
             </RequireLearningPermission>
+          </RequireAuth>
+        }
+      />
+      {/* Phase 1 Test Route - Remove after Phase 1 validation */}
+      <Route
+        path="/enablement/admin/learning/test-course-state/:courseId?"
+        element={
+          <RequireAuth>
+            <RequireAdmin>
+              <AppShell>
+                <TestCourseEditorState />
+              </AppShell>
+            </RequireAdmin>
           </RequireAuth>
         }
       />

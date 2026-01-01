@@ -22,6 +22,7 @@ import {
   DialogActions,
   DialogContentText,
   Tooltip,
+  TextField,
 } from '@mui/material';
 import {
   Save as SaveIcon,
@@ -31,8 +32,11 @@ import {
   Refresh as RefreshIcon,
 } from '@mui/icons-material';
 import { useAdminCourse } from '../../../hooks/useAdminCourse';
+import { useCourseEditorState } from '../../../hooks/useCourseEditorState';
+import { useCourseValidation } from '../../../hooks/useCourseValidation';
+import { useCourseEditorActions } from '../../../hooks/useCourseEditorActions';
 import { lmsAdminApi } from '../../../api/lmsAdminClient';
-import { validateCoursePublish, getValidationSummary, validateCourseDraft } from '../../../validations/lmsValidations';
+import { validateCourseDraft } from '../../../validations/lmsValidations';
 import { TreeOutlinePanel } from '../../../components/admin/learning/TreeOutlinePanel';
 import { EditorPanel } from '../../../components/admin/learning/EditorPanel';
 import { CourseAuthoringLayout } from '../../../components/admin/learning/CourseAuthoringLayout';
@@ -48,11 +52,20 @@ export function AdminCourseEditorPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const isNew = courseId === 'new';
-  const { data, loading, error, refetch } = useAdminCourse(isNew ? null : courseId || null);
 
-  // Local state
-  const [course, setCourse] = useState<Course | null>(null);
-  const [lessons, setLessons] = useState<Lesson[]>([]);
+  // Phase 1: State Management Hook (handles useAdminCourse internally)
+  const {
+    course,
+    lessons,
+    loading: stateLoading,
+    error: stateError,
+    updateCourse,
+    updateLessons,
+    refetch: refetchCourse,
+  } = useCourseEditorState({
+    courseId: courseId || 'new',
+    isNew,
+  });
   
   // Track temporary media IDs for cleanup (for new courses)
   const [temporaryMediaIds, setTemporaryMediaIds] = useState<Set<string>>(new Set());
@@ -181,61 +194,17 @@ export function AdminCourseEditorPage() {
     const selected = searchParams.get('selected');
     return parseSelectionFromUrl(selected);
   });
-  const [saving, setSaving] = useState(false);
-  const [savingLessons, setSavingLessons] = useState(false);
-  const [lastSaved, setLastSaved] = useState<Date | null>(null);
-  const [publishing, setPublishing] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
   const [publishedCourses, setPublishedCourses] = useState<Array<{ course_id: string; title: string }>>([]);
   const [discardDialogOpen, setDiscardDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
   
-  // Validation state model
-  const [hasAttemptedPublish, setHasAttemptedPublish] = useState(false);
-  const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
-  
-  // Debounce refs
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const saveLessonsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const isSavingRef = useRef(false);
-  const isUserEditingRef = useRef(false);
+  // Phase 2: Validation Hook (must be before editorActions)
+  const validation = useCourseValidation({
+    course,
+    lessons,
+  });
 
-  // Load course data (only for existing courses, not new ones)
-  // Only update when course_id changes to avoid overwriting local edits
-  useEffect(() => {
-    if (data?.course && !isNew && data.course.course_id !== course?.course_id && !isUserEditingRef.current) {
-      setCourse(data.course);
-    }
-  }, [data?.course?.course_id, isNew, course?.course_id]);
-
-  // Load lessons for course
-  useEffect(() => {
-    if (course && course.course_id !== 'new') {
-      lmsAdminApi.getCourseLessons(course.course_id)
-        .then((response) => {
-          if ('data' in response) {
-            setLessons(response.data.lessons);
-          }
-        })
-        .catch((err) => {
-          console.error('Failed to load lessons:', err);
-          setLessons([]);
-        });
-    } else {
-      setLessons([]);
-    }
-  }, [course?.course_id]);
-
-  // Cleanup timeouts on unmount
-  useEffect(() => {
-    return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-      if (saveLessonsTimeoutRef.current) {
-        clearTimeout(saveLessonsTimeoutRef.current);
-      }
-    };
-  }, []);
 
   // Load published courses for related courses selector
   useEffect(() => {
@@ -256,13 +225,7 @@ export function AdminCourseEditorPage() {
     }
   }, [courseId, isNew]);
 
-  // Validation
-  const validationResult = useMemo(() => {
-    if (!course) return { valid: false, errors: [], warnings: [] };
-    return validateCoursePublish(course, lessons);
-  }, [course, lessons]);
-
-  // Draft validation with warnings
+  // Draft validation with warnings (for Inspector display)
   const draftValidation = useMemo(() => {
     if (!course) return { errors: [], warnings: [] };
     return validateCourseDraft(course, lessons);
@@ -369,171 +332,38 @@ export function AdminCourseEditorPage() {
       if (selection?.kind !== entityType || selection?.id !== entityId) return false;
     }
     
-    if (hasAttemptedPublish) return true;
-    const key = `${entityType}:${entityId}:${fieldKey}`;
-    return touchedFields.has(key);
-  }, [hasAttemptedPublish, touchedFields, selection]);
+    // Use validation hook's shouldShowError
+    return validation.shouldShowError(entityType, entityId, fieldKey);
+  }, [validation, selection]);
 
   // Helper to mark field as touched
   const markFieldTouched = useCallback((entityType: 'course' | 'section' | 'lesson', entityId: string, fieldKey: string) => {
-    const key = `${entityType}:${entityId}:${fieldKey}`;
-    setTouchedFields((prev) => new Set(prev).add(key));
-  }, []);
+    validation.markFieldTouched(entityType, entityId, fieldKey);
+  }, [validation]);
+
+  // Phase 4: Editor Actions Hook (must come after handlers are defined)
+  const editorActions = useCourseEditorActions({
+    course,
+    lessons,
+    isNew,
+    validation,
+    onUpdateCourse: updateCourse,
+    onUpdateLessons: updateLessons,
+    refetchCourse: async () => {
+      await refetch();
+    },
+    temporaryMediaIds,
+    cleanupTemporaryMedia,
+    onSelectCourseDetails: handleSelectCourseDetails,
+    onSelectNode: handleSelectNode,
+    onOpenInspector: handleOpenInspectorToIssues,
+  });
 
   // Debounced auto-save for course metadata
-  const debouncedSaveCourse = useCallback(async (courseId: string, updates: Partial<Course>) => {
-    if (isNew || isSavingRef.current) return;
-    
-    isSavingRef.current = true;
-    setSaving(true);
-    
-    try {
-      await lmsAdminApi.updateCourse(courseId, updates);
-      await refetch();
-      setLastSaved(new Date());
-    } catch (err) {
-      setSaveError(err instanceof Error ? err.message : 'Failed to save course');
-    } finally {
-      setSaving(false);
-      isSavingRef.current = false;
-    }
-  }, [isNew, refetch]);
-
-  // Course update handlers with debounced autosave
+  // Course update handler (uses hook's updateCourse)
   const handleUpdateCourse = useCallback((updates: Partial<Course>) => {
-    // Mark that user is editing to prevent data-loading effect from overwriting
-    isUserEditingRef.current = true;
-    
-    // Use functional update to always get the latest course state
-    setCourse((prevCourse) => {
-      if (!prevCourse) return prevCourse;
-      
-      const updatedCourse = { ...prevCourse, ...updates };
-      
-      // Debug log to verify updates
-      if (updates.title || updates.short_description) {
-        console.log('Updating course:', { 
-          prevTitle: prevCourse.title, 
-          newTitle: updatedCourse.title,
-          prevShortDesc: prevCourse.short_description,
-          newShortDesc: updatedCourse.short_description
-        });
-      }
-      
-      // Only auto-save to backend if not a new course
-      if (!isNew && prevCourse.course_id !== 'new') {
-        // Clear existing timeout
-        if (saveTimeoutRef.current) {
-          clearTimeout(saveTimeoutRef.current);
-        }
-
-        // Debounce auto-save (1000ms) - capture course_id from prevCourse
-        const courseId = prevCourse.course_id;
-        saveTimeoutRef.current = setTimeout(() => {
-          debouncedSaveCourse(courseId, updates);
-          // Reset editing flag after save completes
-          isUserEditingRef.current = false;
-        }, 1000);
-      } else {
-        // For new courses, reset flag immediately since there's no autosave
-        setTimeout(() => {
-          isUserEditingRef.current = false;
-        }, 100);
-      }
-      
-      return updatedCourse;
-    });
-  }, [isNew, debouncedSaveCourse]);
-
-  // Save lessons structure to backend (with debouncing and refetch)
-  const saveLessonsStructure = useCallback(async (immediate = false) => {
-    if (!course || isNew) return;
-
-    const doSave = async () => {
-      setSavingLessons(true);
-      try {
-        const sections = course.sections.map((s) => ({
-          section_id: s.section_id,
-          title: s.title,
-          order: s.order,
-          lesson_ids: s.lesson_ids,
-        }));
-
-        const lessonsData = lessons.map((l) => ({
-          lesson_id: l.lesson_id,
-          section_id: l.section_id,
-          title: l.title,
-          description: l.description,
-          type: l.type,
-          order: l.order,
-          content: l.content || (() => {
-            switch (l.type) {
-              case 'video':
-                return { kind: 'video' as const, video_id: '', duration_seconds: 0 };
-              case 'reading':
-                return { kind: 'reading' as const, format: 'markdown' as const, markdown: '' };
-              case 'quiz':
-                return { kind: 'quiz' as const, questions: [], passing_score_percent: 70, allow_retry: false, show_answers_after_submit: false };
-              case 'assignment':
-                return { kind: 'assignment' as const, instructions_markdown: '', submission_type: 'none' as const };
-              case 'interactive':
-                return { kind: 'interactive' as const, provider: 'embed' as const, embed_url: '', height_px: 600, allow_fullscreen: true };
-              default:
-                return { kind: 'video' as const, video_id: '', duration_seconds: 0 };
-            }
-          })(),
-          resources: l.resources || [],
-          required: l.required,
-        }));
-
-        await lmsAdminApi.updateCourseLessons(course.course_id, {
-          sections,
-          lessons: lessonsData,
-        });
-        
-        // Refetch lessons to ensure UI matches backend
-        const lessonsResponse = await lmsAdminApi.getCourseLessons(course.course_id);
-        if ('data' in lessonsResponse) {
-          setLessons(lessonsResponse.data.lessons);
-        }
-        
-        // Refetch course to sync sections
-        await refetch();
-        setLastSaved(new Date());
-      } catch (err) {
-        console.error('Failed to save lessons structure:', err);
-        setSaveError(err instanceof Error ? err.message : 'Failed to save lessons');
-      } finally {
-        setSavingLessons(false);
-      }
-    };
-
-    if (immediate) {
-      // Clear any pending timeout and save immediately
-      if (saveLessonsTimeoutRef.current) {
-        clearTimeout(saveLessonsTimeoutRef.current);
-      }
-      await doSave();
-    } else {
-      // Debounce (750ms)
-      if (saveLessonsTimeoutRef.current) {
-        clearTimeout(saveLessonsTimeoutRef.current);
-      }
-      saveLessonsTimeoutRef.current = setTimeout(doSave, 750);
-    }
-  }, [course, lessons, isNew, refetch]);
-
-  // Auto-save on node change (debounced) - only for sections/lessons
-  useEffect(() => {
-    if (!selection || selection.kind === 'course_details' || !course || course.course_id === 'new') return;
-    
-    // Debounce save when node changes
-    const timeoutId = setTimeout(() => {
-      saveLessonsStructure(false);
-    }, 500);
-
-    return () => clearTimeout(timeoutId);
-  }, [selection?.id, course?.course_id, saveLessonsStructure]);
+    updateCourse(updates);
+  }, [updateCourse]);
 
   // Section update handler
   const handleUpdateSection = useCallback((sectionId: string, updates: Partial<CourseSection>) => {
@@ -542,11 +372,10 @@ export function AdminCourseEditorPage() {
     const updatedSections = course.sections.map((s) =>
       s.section_id === sectionId ? { ...s, ...updates } : s
     );
-    setCourse({ ...course, sections: updatedSections });
-    saveLessonsStructure(false);
-  }, [course, saveLessonsStructure]);
+    updateCourse({ sections: updatedSections });
+  }, [course, updateCourse]);
 
-  // Lesson update handlers (triggers debounced save)
+  // Lesson update handler
   const handleUpdateLesson = useCallback((updates: Partial<Lesson>) => {
     if (!selectedNode || selectedNode.type !== 'lesson' || !course) return;
 
@@ -554,11 +383,8 @@ export function AdminCourseEditorPage() {
     const updatedLessons = lessons.map((l) =>
       l.lesson_id === selectedNode.id ? updatedLesson : l
     );
-    setLessons(updatedLessons);
-
-    // Trigger debounced save
-    saveLessonsStructure(false);
-  }, [selectedNode, course, lessons, saveLessonsStructure]);
+    updateLessons(updatedLessons);
+  }, [selectedNode, course, lessons, updateLessons]);
 
   // Outline handlers
   const handleAddSection = () => {
@@ -572,7 +398,7 @@ export function AdminCourseEditorPage() {
     };
 
     const updatedSections = [...course.sections, newSection];
-    setCourse({ ...course, sections: updatedSections });
+    updateCourse({ sections: updatedSections });
     
     // Set selection directly since the section isn't in courseTree yet
     const newSelection: CourseSelection = { kind: 'section', id: newSection.section_id };
@@ -586,7 +412,7 @@ export function AdminCourseEditorPage() {
       focusRegistry.focus('section', newSection.section_id, 'title');
     }, 100);
     
-    saveLessonsStructure(false);
+    // Note: Save is handled by explicit Save Draft button
   };
 
   const handleRenameNode = (nodeId: string, newTitle: string) => {
@@ -604,7 +430,7 @@ export function AdminCourseEditorPage() {
     }
   };
 
-  const handleReorderSection = (sectionId: string, direction: 'up' | 'down') => {
+  const handleReorderSection = useCallback((sectionId: string, direction: 'up' | 'down') => {
     if (!course) return;
 
     const sections = [...course.sections].sort((a, b) => a.order - b.order);
@@ -618,9 +444,9 @@ export function AdminCourseEditorPage() {
     sections[index].order = index;
     sections[newIndex].order = newIndex;
 
-    setCourse({ ...course, sections });
-    saveLessonsStructure(false);
-  };
+    updateCourse({ sections });
+    // Note: Save is handled by explicit Save Draft button
+  }, [course, updateCourse]);
 
   const handleDeleteNode = (nodeId: string) => {
     if (!course || !courseTree) return;
@@ -634,20 +460,20 @@ export function AdminCourseEditorPage() {
 
       // Remove lessons in this section
       const updatedLessons = lessons.filter((l) => l.section_id !== nodeId);
-      setLessons(updatedLessons);
+      updateLessons(updatedLessons);
 
       // Remove section and reorder
       const updatedSections = course.sections
         .filter((s) => s.section_id !== nodeId)
         .map((s, idx) => ({ ...s, order: idx }));
-      setCourse({ ...course, sections: updatedSections });
+      updateCourse({ sections: updatedSections });
 
       if (selection?.kind === 'section' && selection.id === nodeId) {
         // Clear selection or select course details if section was selected
         handleSelectCourseDetails();
       }
 
-      saveLessonsStructure(false);
+      // Note: Save is handled by explicit Save Draft button
     } else if (node.type === 'lesson') {
       const lesson = lessons.find((l) => l.lesson_id === nodeId);
       if (!lesson) return;
@@ -663,18 +489,18 @@ export function AdminCourseEditorPage() {
       const updatedSections = course.sections.map((s) =>
         s.section_id === section.section_id ? updatedSection : s
       );
-      setCourse({ ...course, sections: updatedSections });
+      updateCourse({ sections: updatedSections });
 
       // Remove lesson
       const updatedLessons = lessons.filter((l) => l.lesson_id !== nodeId);
-      setLessons(updatedLessons);
+      updateLessons(updatedLessons);
 
       if (selection?.kind === 'lesson' && selection.id === nodeId) {
         // Select parent section when lesson is deleted
         handleSelectNode(section.section_id);
       }
 
-      saveLessonsStructure(false);
+      // Note: Save is handled by explicit Save Draft button
     }
     // Course deletion not supported
   };
@@ -706,7 +532,7 @@ export function AdminCourseEditorPage() {
     };
 
     const updatedLessons = [...lessons, newLesson];
-    setLessons(updatedLessons);
+    updateLessons(updatedLessons);
 
     const updatedSection = {
       ...section,
@@ -715,7 +541,7 @@ export function AdminCourseEditorPage() {
     const updatedSections = course.sections.map((s) =>
       s.section_id === sectionId ? updatedSection : s
     );
-    setCourse({ ...course, sections: updatedSections });
+    updateCourse({ sections: updatedSections });
 
     // Set selection directly since the lesson might not be in courseTree yet
     const newSelection: CourseSelection = { kind: 'lesson', id: newLesson.lesson_id };
@@ -729,7 +555,7 @@ export function AdminCourseEditorPage() {
       focusRegistry.focus('lesson', newLesson.lesson_id, 'title');
     }, 100);
     
-    saveLessonsStructure(false);
+    // Note: Save is handled by explicit Save Draft button
   };
 
   const handleReorderLesson = (lessonId: string, direction: 'up' | 'down') => {
@@ -763,7 +589,7 @@ export function AdminCourseEditorPage() {
       const updated = sectionLessons.find((sl) => sl.lesson_id === l.lesson_id);
       return updated || l;
     });
-    setLessons(updatedLessons);
+    updateLessons(updatedLessons);
 
     const updatedSection = {
       ...section,
@@ -772,9 +598,9 @@ export function AdminCourseEditorPage() {
     const updatedSections = course.sections.map((s) =>
       s.section_id === section.section_id ? updatedSection : s
     );
-    setCourse({ ...course, sections: updatedSections });
+    updateCourse({ sections: updatedSections });
 
-    saveLessonsStructure(false);
+    // Note: Save is handled by explicit Save Draft button
   };
 
   const handleMoveLesson = (lessonId: string, targetSectionId: string) => {
@@ -796,7 +622,7 @@ export function AdminCourseEditorPage() {
       const updatedSections = course.sections.map((s) =>
         s.section_id === oldSection.section_id ? updatedOldSection : s
       );
-      setCourse({ ...course, sections: updatedSections });
+      updateCourse({ sections: updatedSections });
     }
 
     // Add to new section
@@ -807,7 +633,7 @@ export function AdminCourseEditorPage() {
     const updatedSections = course.sections.map((s) =>
       s.section_id === targetSectionId ? updatedTargetSection : s
     );
-    setCourse({ ...course, sections: updatedSections });
+    updateCourse({ sections: updatedSections });
 
     // Update lesson
     const updatedLesson = {
@@ -818,9 +644,9 @@ export function AdminCourseEditorPage() {
     const updatedLessons = lessons.map((l) =>
       l.lesson_id === lessonId ? updatedLesson : l
     );
-    setLessons(updatedLessons);
+    updateLessons(updatedLessons);
 
-    saveLessonsStructure(false);
+    // Note: Save is handled by explicit Save Draft button
   };
 
   const handleDeleteLesson = (lessonId: string) => {
@@ -840,187 +666,43 @@ export function AdminCourseEditorPage() {
     const updatedSections = course.sections.map((s) =>
       s.section_id === section.section_id ? updatedSection : s
     );
-    setCourse({ ...course, sections: updatedSections });
+    updateCourse({ sections: updatedSections });
 
     // Remove lesson
     const updatedLessons = lessons.filter((l) => l.lesson_id !== lessonId);
-    setLessons(updatedLessons);
+    updateLessons(updatedLessons);
 
     if (selectedLessonId === lessonId) {
       setSelectedLessonId(null);
     }
 
-    saveLessonsStructure(false);
+    // Note: Save is handled by explicit Save Draft button
   };
 
-  // Save draft
-  const handleSave = async () => {
-    if (!course) return;
-
-    setSaving(true);
-    setSaveError(null);
-
-    try {
-      if (isNew) {
-        const response = await lmsAdminApi.createCourse({
-          title: course.title,
-          description: course.description,
-          short_description: course.short_description,
-          product: course.product,
-          product_suite: course.product_suite,
-          topic_tags: course.topic_tags,
-          product_id: course.product_id,
-          product_suite_id: course.product_suite_id,
-          topic_tag_ids: course.topic_tag_ids,
-          badges: course.badges,
-          estimated_minutes: course.estimated_minutes,
-        });
-
-        if ('data' in response) {
-          // Course saved successfully - cleanup temporary media
-          await cleanupTemporaryMedia();
-          navigate(`/enablement/admin/learning/courses/${response.data.course.course_id}`);
-        }
-      } else {
-        await lmsAdminApi.updateCourse(course.course_id, {
-          title: course.title,
-          description: course.description,
-          short_description: course.short_description,
-          product: course.product,
-          product_suite: course.product_suite,
-          topic_tags: course.topic_tags,
-          product_id: course.product_id,
-          product_suite_id: course.product_suite_id,
-          topic_tag_ids: course.topic_tag_ids,
-          badges: course.badges,
-          cover_image: course.cover_image,
-          estimated_minutes: course.estimated_minutes,
-        });
-        await saveLessonsStructure(true); // Immediate save on explicit Save Draft
-        await refetch();
-        
-        // Also refetch lessons
-        const lessonsResponse = await lmsAdminApi.getCourseLessons(course.course_id);
-        if ('data' in lessonsResponse) {
-          setLessons(lessonsResponse.data.lessons);
-        }
-      }
-    } catch (err) {
-      setSaveError(err instanceof Error ? err.message : 'Failed to save course');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  // Publish
-  const handlePublish = async () => {
-    if (!course || isNew) return;
-
-    // Set hasAttemptedPublish to show inline errors
-    setHasAttemptedPublish(true);
-
-    // Don't proceed if validation fails
-    if (!validationResult.valid) {
-      // Show inspector and scroll to first error
-      setInspectorOpen(true);
-      
-      // Find first error and navigate to it
-      const firstError = draftValidation.errors[0];
-      if (firstError && firstError.entityType && firstError.entityId) {
-        if (firstError.entityType === 'course') {
-          handleSelectCourseDetails();
-        } else {
-          handleSelectNode(firstError.entityId);
-        }
-        setTimeout(() => {
-          if (firstError.fieldKey) {
-            focusRegistry.focus(firstError.entityType!, firstError.entityId!, firstError.fieldKey);
-          }
-        }, 200);
-      }
-      return;
-    }
-
-    setPublishing(true);
-    setSaveError(null);
-
-    try {
-      await lmsAdminApi.publishCourse(course.course_id);
-      navigate('/enablement/admin/learning/courses');
-    } catch (err) {
-      setSaveError(err instanceof Error ? err.message : 'Failed to publish course');
-      // Show inspector on publish failure
-      setInspectorOpen(true);
-    } finally {
-      setPublishing(false);
-    }
-  };
-
-  // Preview as learner (deep-link to first lesson)
-  const handlePreview = () => {
-    if (!course) return;
-
-    // Set hasAttemptedPublish to show inline errors if validation fails
-    setHasAttemptedPublish(true);
-
-    // Check if course is published before previewing
-    if (course.status !== 'published') {
-      return;
-    }
-
-    // Find first lesson by section order ASC, lesson order ASC
-    const sortedSections = [...course.sections].sort((a, b) => a.order - b.order);
-    let firstLessonId: string | null = null;
-
-    for (const section of sortedSections) {
-      if (section.lesson_ids && section.lesson_ids.length > 0) {
-        // Get lessons in this section and sort by order
-        const sectionLessons = section.lesson_ids
-          .map((id) => lessons.find((l) => l.lesson_id === id))
-          .filter((l): l is Lesson => l !== undefined)
-          .sort((a, b) => a.order - b.order);
-
-        if (sectionLessons.length > 0) {
-          firstLessonId = sectionLessons[0].lesson_id;
-          break;
-        }
-      }
-    }
-
-    if (firstLessonId) {
-      window.open(`/enablement/learn/courses/${course.course_id}/lessons/${firstLessonId}`, '_blank');
-    } else {
-      // No lessons, open course detail
-      window.open(`/enablement/learn/courses/${course.course_id}`, '_blank');
-    }
-  };
-
-  // Discard changes and reload from server
+  // Phase 4: Use handlers from useCourseEditorActions hook
+  const handleSave = editorActions.handleSave;
+  const handlePublish = editorActions.handlePublish;
+  const handlePreview = editorActions.handlePreview;
   const handleDiscardChanges = async () => {
-    if (!course || isNew) return;
-
-    // Cancel any pending saves
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-      saveTimeoutRef.current = null;
-    }
-    if (saveLessonsTimeoutRef.current) {
-      clearTimeout(saveLessonsTimeoutRef.current);
-      saveLessonsTimeoutRef.current = null;
-    }
-
-    // Refetch course and lessons
-    await refetch();
-    const lessonsResponse = await lmsAdminApi.getCourseLessons(course.course_id);
-    if ('data' in lessonsResponse) {
-      setLessons(lessonsResponse.data.lessons);
-    }
-    setLastSaved(null);
+    await editorActions.handleDiscardChanges();
     setDiscardDialogOpen(false);
   };
 
+  const handleDelete = async () => {
+    await editorActions.handleDelete();
+    setDeleteDialogOpen(false);
+    setDeleteConfirmationText('');
+  };
 
-  if (loading) {
+  const handleDeleteDialogClose = () => {
+    setDeleteDialogOpen(false);
+    setDeleteConfirmationText('');
+  };
+
+  const isDeleteConfirmed = deleteConfirmationText === course?.title;
+
+
+  if (stateLoading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
         <CircularProgress />
@@ -1028,10 +710,10 @@ export function AdminCourseEditorPage() {
     );
   }
 
-  if (error) {
+  if (stateError) {
     return (
       <Box sx={{ p: 3 }}>
-        <Alert severity="error">{error.message}</Alert>
+        <Alert severity="error">{stateError?.message || 'Failed to load course'}</Alert>
       </Box>
     );
   }
@@ -1044,32 +726,10 @@ export function AdminCourseEditorPage() {
     );
   }
 
-  // Initialize course for new course
-  useEffect(() => {
-    if (isNew && !course) {
-      const newCourse: Course = {
-        course_id: 'new',
-        title: '',
-        short_description: '',
-        status: 'draft',
-        version: 1,
-        sections: [],
-        topic_tags: [],
-        related_course_ids: [],
-        badges: [],
-        created_at: new Date().toISOString(),
-        created_by: '',
-        updated_at: new Date().toISOString(),
-        updated_by: '',
-      };
-      setCourse(newCourse);
-    }
-  }, [isNew, course]);
-
   return (
     <Box sx={{ height: 'calc(100vh - 64px)', display: 'flex', flexDirection: 'column' }}>
       {/* Minimal top banner - only show on publish attempt */}
-      {hasAttemptedPublish && !validationResult.valid && validationResult.errors.length > 0 && (
+      {validation.hasAttemptedPublish && !validation.canPublish() && validation.errorsCount > 0 && (
         <Alert 
           severity="error" 
           sx={{ m: 2, py: 0.5 }}
@@ -1085,14 +745,14 @@ export function AdminCourseEditorPage() {
           }
         >
           <Typography variant="body2">
-            {validationResult.errors.length} issue{validationResult.errors.length !== 1 ? 's' : ''} must be fixed before publishing
+            {validation.errorsCount} issue{validation.errorsCount !== 1 ? 's' : ''} must be fixed before publishing
           </Typography>
         </Alert>
       )}
 
-      {saveError && (
+      {editorActions.saveError && (
         <Alert severity="error" sx={{ m: 2 }}>
-          {saveError}
+          {editorActions.saveError}
         </Alert>
       )}
 
@@ -1137,15 +797,19 @@ export function AdminCourseEditorPage() {
                 markFieldTouched={markFieldTouched}
                 // Header props
                 isNew={isNew}
-                saving={saving || savingLessons}
-                lastSaved={lastSaved}
-                publishing={publishing}
+                saving={editorActions.saving}
+                lastSaved={editorActions.lastSaved}
+                publishing={editorActions.publishing}
                 onSave={handleSave}
                 onPublish={handlePublish}
                 onPreview={handlePreview}
                 onDiscardChanges={() => setDiscardDialogOpen(true)}
+                onDelete={() => setDeleteDialogOpen(true)}
+                deleting={editorActions.deleting}
                 onCancel={() => navigate('/enablement/admin/learning/courses')}
-                issuesCount={draftValidation.errors.length}
+                validation={validation}
+                canSave={editorActions.canSave}
+                canPublish={editorActions.canPublish}
                 onOpenInspector={handleOpenInspectorToIssues}
                 inspectorOpen={inspectorOpen}
                 editorTab={editorTab}
@@ -1179,6 +843,49 @@ export function AdminCourseEditorPage() {
           onContextPanelToggle={() => setInspectorOpen(!inspectorOpen)}
         />
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onClose={handleDeleteDialogClose}>
+        <DialogTitle>Delete Course</DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ mb: 2 }}>
+            Are you sure you want to delete "{course?.title || 'this course'}"? This action cannot be undone.
+            The course will be archived and removed from the course list.
+          </DialogContentText>
+          <DialogContentText sx={{ mb: 2 }}>
+            To confirm, please type the course title: <strong>{course?.title || ''}</strong>
+          </DialogContentText>
+          <TextField
+            autoFocus
+            fullWidth
+            label="Course Title"
+            value={deleteConfirmationText}
+            onChange={(e) => setDeleteConfirmationText(e.target.value)}
+            error={deleteConfirmationText !== '' && !isDeleteConfirmed}
+            helperText={
+              deleteConfirmationText !== '' && !isDeleteConfirmed
+                ? 'Title does not match'
+                : ''
+            }
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && isDeleteConfirmed && !editorActions.deleting) {
+                handleDelete();
+              }
+            }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleDeleteDialogClose}>Cancel</Button>
+          <Button
+            onClick={handleDelete}
+            color="error"
+            variant="contained"
+            disabled={!isDeleteConfirmed || editorActions.deleting}
+          >
+            {editorActions.deleting ? 'Deleting...' : 'Delete'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Discard Changes Dialog */}
       <Dialog open={discardDialogOpen} onClose={() => setDiscardDialogOpen(false)}>

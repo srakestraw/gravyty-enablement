@@ -4,7 +4,7 @@
  * Right panel with tabs for Course/Section/Lesson editing
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Box,
   TextField,
@@ -35,6 +35,7 @@ import {
 } from '@mui/icons-material';
 import { LessonEditor } from './LessonEditor';
 import { DetailsTabContent } from './DetailsTabContent';
+import { CourseDetailsEditor } from './CourseDetailsEditor';
 import { TreeOutlinePanel } from './TreeOutlinePanel';
 import { RichTextEditor } from '../../common/RichTextEditor';
 import { focusRegistry } from '../../../utils/focusRegistry';
@@ -61,10 +62,15 @@ export interface EditorPanelProps {
   onPublish?: () => void;
   onPreview?: () => void;
   onDiscardChanges?: () => void;
+  onDelete?: () => void;
   onCancel?: () => void;
-  issuesCount?: number;
+  deleting?: boolean;
+  issuesCount?: number | (() => number);
+  validation?: { errorsCount: number }; // Alternative: pass validation object directly
   onOpenInspector?: () => void;
   inspectorOpen?: boolean;
+  canSave?: boolean; // Phase 4: From useCourseEditorActions
+  canPublish?: boolean; // Phase 4: From useCourseEditorActions
   // Editor tab state (for Inspector to know which tab is active)
   editorTab?: 'details' | 'outline';
   onEditorTabChange?: (tab: 'details' | 'outline') => void;
@@ -97,10 +103,15 @@ export function EditorPanel({
   onPublish,
   onPreview,
   onDiscardChanges,
+  onDelete,
   onCancel,
+  deleting = false,
   issuesCount = 0,
+  validation,
   onOpenInspector,
   inspectorOpen = false,
+  canSave,
+  canPublish,
   editorTab: controlledEditorTab,
   onEditorTabChange,
   courseTree = null,
@@ -209,10 +220,18 @@ export function EditorPanel({
     }
   };
 
-  const handleCourseFieldChange = (field: string, value: any) => {
-    if (!course) return;
-    onUpdateCourse({ [field]: value });
-  };
+  const handleCourseFieldChange = useCallback((fieldOrUpdates: string | Partial<Course>, value?: any) => {
+    // Support both signatures:
+    // 1. handleCourseFieldChange('title', 'My Title') - old signature
+    // 2. handleCourseFieldChange({ title: 'My Title' }) - new signature from CourseDetailsEditor
+    if (typeof fieldOrUpdates === 'string') {
+      // Old signature: (field: string, value: any)
+      onUpdateCourse({ [fieldOrUpdates]: value } as Partial<Course>);
+    } else {
+      // New signature: (updates: Partial<Course>)
+      onUpdateCourse(fieldOrUpdates);
+    }
+  }, [onUpdateCourse]);
 
   if (!course) {
     return (
@@ -332,19 +351,23 @@ export function EditorPanel({
 
 
               {/* Issues Chip - always visible */}
-              {onOpenInspector && (
-                <Tooltip title={issuesCount > 0 ? `${issuesCount} error${issuesCount !== 1 ? 's' : ''} - Click to view` : 'View issues'}>
-                  <Chip
-                    icon={<ErrorIcon />}
-                    label={issuesCount > 0 ? `Issues (${issuesCount})` : 'Issues'}
-                    size="small"
-                    color={issuesCount > 0 ? 'error' : 'default'}
-                    variant={inspectorOpen ? 'filled' : 'outlined'}
-                    onClick={() => onOpenInspector()}
-                    sx={{ cursor: 'pointer', flexShrink: 0, minWidth: 'fit-content' }}
-                  />
-                </Tooltip>
-              )}
+              {onOpenInspector && (() => {
+                // Use validation.errorsCount if available (always fresh), otherwise fall back to issuesCount prop
+                const currentIssuesCount = validation?.errorsCount ?? (typeof issuesCount === 'function' ? issuesCount() : (issuesCount || 0));
+                return (
+                  <Tooltip title={currentIssuesCount > 0 ? `${currentIssuesCount} error${currentIssuesCount !== 1 ? 's' : ''} - Click to view` : 'View issues'}>
+                    <Chip
+                      icon={<ErrorIcon />}
+                      label={currentIssuesCount > 0 ? `Issues (${currentIssuesCount})` : 'Issues'}
+                      size="small"
+                      color={currentIssuesCount > 0 ? 'error' : 'default'}
+                      variant={inspectorOpen ? 'filled' : 'outlined'}
+                      onClick={() => onOpenInspector()}
+                      sx={{ cursor: 'pointer', flexShrink: 0, minWidth: 'fit-content' }}
+                    />
+                  </Tooltip>
+                );
+              })()}
 
               {/* Save Status */}
               {saving && (
@@ -416,7 +439,7 @@ export function EditorPanel({
                   size="small"
                   startIcon={<SaveIcon />}
                   onClick={onSave}
-                  disabled={saving || !course?.title?.trim()}
+                  disabled={saving || (canSave !== undefined ? !canSave : !course?.title?.trim())}
                 >
                   Save Draft
                 </Button>
@@ -428,9 +451,20 @@ export function EditorPanel({
                   size="small"
                   startIcon={<PublishIcon />}
                   onClick={onPublish}
-                  disabled={publishing || issuesCount > 0}
+                  disabled={publishing || (canPublish !== undefined ? !canPublish : (validation?.errorsCount ?? (typeof issuesCount === 'function' ? issuesCount() : (issuesCount || 0))) > 0)}
                 >
                   {publishing ? 'Publishing...' : 'Publish'}
+                </Button>
+              )}
+              {onDelete && !isNew && (
+                <Button
+                  variant="outlined"
+                  color="error"
+                  size="small"
+                  onClick={onDelete}
+                  disabled={deleting}
+                >
+                  {deleting ? 'Deleting...' : 'Delete'}
                 </Button>
               )}
               {onCancel && (
@@ -484,18 +518,21 @@ export function EditorPanel({
         )}
 
         {/* Course Details Editor with Tabs */}
-        {/* Show Details tab content when on Details tab and selection is course_details */}
-        {editorTab === 'details' && selection?.kind === 'course_details' && course && (
-          <DetailsTabContent
-            course={course}
-            onUpdateCourse={handleCourseFieldChange}
-            shouldShowError={shouldShowError}
-            markFieldTouched={markFieldTouched}
-            titleRef={titleRef}
-            shortDescriptionRef={shortDescriptionRef}
-            descriptionRef={descriptionRef}
-            onTemporaryMediaCreated={onTemporaryMediaCreated}
-          />
+        {/* Phase 3: Always mount CourseDetailsEditor (controlled component) to prevent values disappearing on tab switch */}
+        {/* Use display: none instead of conditional rendering */}
+        {course && (
+          <Box sx={{ display: editorTab === 'details' && selection?.kind === 'course_details' ? 'block' : 'none' }}>
+            <CourseDetailsEditor
+              course={course}
+              onUpdateCourse={handleCourseFieldChange}
+              shouldShowError={shouldShowError}
+              markFieldTouched={markFieldTouched}
+              titleRef={titleRef}
+              shortDescriptionRef={shortDescriptionRef}
+              descriptionRef={descriptionRef}
+              onTemporaryMediaCreated={onTemporaryMediaCreated}
+            />
+          </Box>
         )}
         
         {/* Show Course Outline tab content when on Outline tab (regardless of selection kind) */}

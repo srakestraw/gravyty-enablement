@@ -22,6 +22,7 @@ router.get('/courses', lmsAdminHandlers.listAdminCourses);
 router.post('/courses', requireRole('Contributor'), lmsAdminHandlers.createCourse);
 router.get('/courses/:courseId', lmsAdminHandlers.getAdminCourse);
 router.put('/courses/:courseId', requireRole('Contributor'), lmsAdminHandlers.updateCourse);
+router.delete('/courses/:courseId', requireRole('Admin'), lmsAdminHandlers.deleteCourse);
 router.get('/courses/:courseId/lessons', lmsAdminHandlers.getAdminCourseLessons);
 router.put('/courses/:courseId/lessons', requireRole('Contributor'), lmsAdminHandlers.updateCourseLessons);
 router.post('/courses/:courseId/publish', requireRole('Approver'), lmsAdminHandlers.publishCourse);
