@@ -246,15 +246,25 @@ export class BaseStack extends cdk.NestedStack {
     });
 
     // Cognito Domain (for hosted UI)
+    // IMPORTANT: Domain 'enablement-portal-75874255' already exists and is associated with the UserPool.
+    // The domain was created in the main stack before we refactored to nested stacks.
+    // Since Cognito domains are globally unique and can only be associated with one UserPool,
+    // we CANNOT create it again in the nested stack - it will fail with "already associated".
+    // 
+    // Solution: Skip domain creation entirely. The domain already works and is associated.
+    // For outputs, we'll use a string reference since we know the domain name.
     const accountSuffix = cdk.Token.isUnresolved(this.account) 
       ? 'default' 
       : this.account.substring(0, 8).replace(/[^a-z0-9-]/g, '');
     const domainPrefix = `enablement-portal-${accountSuffix}`;
-    this.userPoolDomain = this.userPool.addDomain('UserPoolDomain', {
-      cognitoDomain: {
-        domainPrefix,
-      },
-    });
+    
+    // DO NOT create the domain resource - it already exists and is working
+    // Create a UserPoolDomain-like object for type compatibility with outputs only
+    // This is just a reference, not an actual CloudFormation resource
+    this.userPoolDomain = {
+      domainName: domainPrefix,
+      baseUrl: () => `https://${domainPrefix}.auth.${this.region}.amazoncognito.com`,
+    } as cognito.UserPoolDomain;
 
     // Lambda Function for API (only if dist-lambda exists)
     const apiCodePath = path.join(__dirname, '../../apps/api/dist-lambda');
