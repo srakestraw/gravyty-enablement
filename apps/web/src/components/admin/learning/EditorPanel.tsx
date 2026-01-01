@@ -65,7 +65,6 @@ export interface EditorPanelProps {
   issuesCount?: number;
   onOpenInspector?: () => void;
   inspectorOpen?: boolean;
-  inspectorActiveTab?: 'issues' | 'properties';
   // Editor tab state (for Inspector to know which tab is active)
   editorTab?: 'details' | 'outline';
   onEditorTabChange?: (tab: 'details' | 'outline') => void;
@@ -76,6 +75,7 @@ export interface EditorPanelProps {
   onRenameNode?: (nodeId: string, newTitle: string) => void;
   onDeleteNode?: (nodeId: string) => void;
   onReorderNode?: (nodeId: string, direction: 'up' | 'down') => void;
+  onTemporaryMediaCreated?: (mediaId: string) => void; // Callback when temporary media is uploaded
 }
 
 export function EditorPanel({
@@ -101,7 +101,6 @@ export function EditorPanel({
   issuesCount = 0,
   onOpenInspector,
   inspectorOpen = false,
-  inspectorActiveTab = 'issues',
   editorTab: controlledEditorTab,
   onEditorTabChange,
   courseTree = null,
@@ -110,6 +109,7 @@ export function EditorPanel({
   onRenameNode,
   onDeleteNode,
   onReorderNode,
+  onTemporaryMediaCreated,
 }: EditorPanelProps) {
   // Tab state for course details editing
   const [internalEditorTab, setInternalEditorTab] = useState<'details' | 'outline'>(() => {
@@ -339,7 +339,7 @@ export function EditorPanel({
                     label={issuesCount > 0 ? `Issues (${issuesCount})` : 'Issues'}
                     size="small"
                     color={issuesCount > 0 ? 'error' : 'default'}
-                    variant={inspectorOpen && inspectorActiveTab === 'issues' ? 'filled' : 'outlined'}
+                    variant={inspectorOpen ? 'filled' : 'outlined'}
                     onClick={() => onOpenInspector()}
                     sx={{ cursor: 'pointer', flexShrink: 0, minWidth: 'fit-content' }}
                   />
@@ -416,7 +416,7 @@ export function EditorPanel({
                   size="small"
                   startIcon={<SaveIcon />}
                   onClick={onSave}
-                  disabled={saving || !course?.title}
+                  disabled={saving || !course?.title?.trim() || !course?.short_description?.trim()}
                 >
                   Save Draft
                 </Button>
@@ -494,6 +494,7 @@ export function EditorPanel({
             titleRef={titleRef}
             shortDescriptionRef={shortDescriptionRef}
             descriptionRef={descriptionRef}
+            onTemporaryMediaCreated={onTemporaryMediaCreated}
           />
         )}
         

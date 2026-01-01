@@ -95,4 +95,13 @@ export function isContributorOrHigher(input?: string | null): boolean {
   return role === 'Contributor' || role === 'Approver' || role === 'Admin';
 }
 
+/**
+ * Check if a role has Approver level or higher (Approver, Admin).
+ * Case-insensitive check using normalizeRole.
+ */
+export function isApproverOrHigher(input?: string | null): boolean {
+  const role = normalizeRole(input);
+  return role === 'Approver' || role === 'Admin';
+}
+
 

@@ -10,9 +10,6 @@ import {
   Box,
   Typography,
   Collapse,
-  IconButton,
-  FormControlLabel,
-  Switch,
 } from '@mui/material';
 import {
   ExpandMore as ExpandMoreIcon,
@@ -58,10 +55,6 @@ export function IssuesPanel({
     if (courseId === 'new') return false;
     const stored = sessionStorage.getItem('inspector-warnings-expanded');
     return stored !== null ? stored === 'true' : false;
-  });
-  const [showWarnings, setShowWarnings] = useState(() => {
-    const stored = sessionStorage.getItem('inspector-show-warnings');
-    return stored !== null ? stored === 'true' : true;
   });
 
   // Track if errors have been seen before (to avoid auto-expanding on every render)
@@ -109,12 +102,6 @@ export function IssuesPanel({
       sessionStorage.setItem('inspector-warnings-expanded', String(warningsExpanded));
     }
   }, [warningsExpanded, courseId]);
-
-  useEffect(() => {
-    if (courseId !== 'new') {
-      sessionStorage.setItem('inspector-show-warnings', String(showWarnings));
-    }
-  }, [showWarnings, courseId]);
 
   const handleNavigateToIssue = (issue: ValidationIssue) => {
     if (!issue.entityType || !issue.entityId || !issue.fieldKey) return;
@@ -176,30 +163,9 @@ export function IssuesPanel({
 
   return (
     <Box sx={{ p: 2 }}>
-      {/* Hide Warnings Toggle */}
-      {warnings.length > 0 && (
-        <Box sx={{ mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
-          <FormControlLabel
-            control={
-              <Switch
-                size="small"
-                checked={showWarnings}
-                onChange={(e) => setShowWarnings(e.target.checked)}
-              />
-            }
-            label={
-              <Typography variant="caption" color="text.secondary">
-                Show warnings
-              </Typography>
-            }
-            sx={{ m: 0 }}
-          />
-        </Box>
-      )}
-
       {/* Errors Group */}
       {errors.length > 0 && (
-        <Box sx={{ mb: showWarnings && warnings.length > 0 ? 2 : 0 }}>
+        <Box sx={{ mb: warnings.length > 0 ? 2 : 0 }}>
           {/* Accordion Header */}
           <Box
             component="button"
@@ -225,9 +191,16 @@ export function IssuesPanel({
             aria-label={`${errorsExpanded ? 'Collapse' : 'Expand'} errors`}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <IconButton
-                size="small"
-                sx={{ p: 0, width: 20, height: 20 }}
+              <Box
+                component="span"
+                sx={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  width: 20, 
+                  height: 20,
+                  flexShrink: 0,
+                }}
                 aria-hidden="true"
               >
                 {errorsExpanded ? (
@@ -235,7 +208,7 @@ export function IssuesPanel({
                 ) : (
                   <ExpandMoreIcon fontSize="small" />
                 )}
-              </IconButton>
+              </Box>
               <Typography
                 variant="caption"
                 sx={{
@@ -342,7 +315,7 @@ export function IssuesPanel({
       )}
 
       {/* Warnings Group */}
-      {showWarnings && warnings.length > 0 && (
+      {warnings.length > 0 && (
         <Box>
           {/* Accordion Header */}
           <Box
@@ -369,9 +342,16 @@ export function IssuesPanel({
             aria-label={`${warningsExpanded ? 'Collapse' : 'Expand'} warnings`}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <IconButton
-                size="small"
-                sx={{ p: 0, width: 20, height: 20 }}
+              <Box
+                component="span"
+                sx={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  width: 20, 
+                  height: 20,
+                  flexShrink: 0,
+                }}
                 aria-hidden="true"
               >
                 {warningsExpanded ? (
@@ -379,7 +359,7 @@ export function IssuesPanel({
                 ) : (
                   <ExpandMoreIcon fontSize="small" />
                 )}
-              </IconButton>
+              </Box>
               <Typography
                 variant="caption"
                 sx={{

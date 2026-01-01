@@ -7,8 +7,12 @@
 import express from 'express';
 import { requireRole } from '../middleware/jwtAuth';
 import * as lmsAdminHandlers from '../handlers/lmsAdmin';
+import * as courseAssetHandlers from '../handlers/courseAssets';
 
 const router = express.Router();
+
+// Middleware for raw binary uploads (only for upload endpoint)
+const rawBodyParser = express.raw({ type: '*/*', limit: '50mb' });
 
 // All admin routes require Contributor+ role (individual routes may require higher)
 router.use(requireRole('Contributor'));
@@ -21,6 +25,12 @@ router.put('/courses/:courseId', requireRole('Contributor'), lmsAdminHandlers.up
 router.get('/courses/:courseId/lessons', lmsAdminHandlers.getAdminCourseLessons);
 router.put('/courses/:courseId/lessons', requireRole('Contributor'), lmsAdminHandlers.updateCourseLessons);
 router.post('/courses/:courseId/publish', requireRole('Approver'), lmsAdminHandlers.publishCourse);
+
+// Course Assets (Content Hub integration)
+router.post('/courses/:id/assets', requireRole('Contributor'), courseAssetHandlers.attachAssetToCourse);
+router.get('/courses/:id/assets', courseAssetHandlers.listCourseAssets);
+router.patch('/courses/:id/assets/:courseAssetId', requireRole('Contributor'), courseAssetHandlers.updateCourseAsset);
+router.delete('/courses/:id/assets/:courseAssetId', requireRole('Contributor'), courseAssetHandlers.detachAssetFromCourse);
 
 // Paths admin
 router.get('/paths', lmsAdminHandlers.listAdminPaths);
@@ -45,7 +55,18 @@ router.post('/certificates/templates/:templateId/archive', requireRole('Approver
 // Media Library admin
 router.get('/media', requireRole('Admin'), lmsAdminHandlers.listMedia);
 router.post('/media/presign', requireRole('Admin'), lmsAdminHandlers.presignMediaUpload);
+router.put('/media/:media_id/upload', requireRole('Admin'), rawBodyParser, lmsAdminHandlers.uploadMedia);
+router.delete('/media/:media_id', requireRole('Admin'), lmsAdminHandlers.deleteMedia);
 router.post('/media/:media_id/transcribe', requireRole('Admin'), lmsAdminHandlers.startMediaTranscription);
+
+// AI Image Generation
+router.post('/ai/suggest-image-prompt', requireRole('Contributor'), lmsAdminHandlers.suggestImagePrompt);
+router.post('/ai/generate-image', requireRole('Contributor'), lmsAdminHandlers.generateAIImage);
+router.post('/ai/download-image', requireRole('Contributor'), lmsAdminHandlers.downloadAIImage);
+
+// Unsplash Integration
+router.get('/unsplash/search', requireRole('Contributor'), lmsAdminHandlers.searchUnsplash);
+router.get('/unsplash/trending', requireRole('Contributor'), lmsAdminHandlers.getTrendingUnsplash);
 
 export default router;
 

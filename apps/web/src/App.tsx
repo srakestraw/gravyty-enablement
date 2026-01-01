@@ -35,6 +35,11 @@ import { KitsPage } from './pages/assets/KitsPage';
 import { BrandMessagingPage } from './pages/assets/BrandMessagingPage';
 import { UpdatesExpiringPage } from './pages/assets/UpdatesExpiringPage';
 import { ResourcesLibraryPage } from './pages/ResourcesLibraryPage';
+// Content Hub pages
+import { AssetLibraryPage as ContentHubAssetLibraryPage } from './pages/content-hub/AssetLibraryPage';
+import { AssetDetailPage } from './pages/content-hub/AssetDetailPage';
+import { ContentHubLandingPage } from './pages/content-hub/ContentHubLandingPage';
+import { CreateAssetPage } from './pages/content-hub/CreateAssetPage';
 
 // AI pages
 import { AiAssistantPage } from './pages/AiAssistantPage';
@@ -49,6 +54,7 @@ import { InsightsResourcesPage } from './pages/InsightsResourcesPage';
 // Admin pages
 import { AdminUsersRolesPage } from './pages/admin/AdminUsersRolesPage';
 import { AdminLearningPage } from './pages/admin/AdminLearningPage';
+import { AdminIntegrationsPage } from './pages/admin/AdminIntegrationsPage';
 // Admin Learning pages
 import { AdminLearningCoursesPage } from './pages/admin/learning/AdminLearningCoursesPage';
 import { AdminCourseEditorPage } from './pages/admin/learning/AdminCourseEditorPage';
@@ -383,7 +389,37 @@ function App() {
         element={
           <RequireAuth>
             <AppShell>
-              <ResourcesLibraryPage />
+              <ContentHubLandingPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/enablement/resources/library"
+        element={
+          <RequireAuth>
+            <AppShell>
+              <ContentHubAssetLibraryPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/enablement/content-hub/create"
+        element={
+          <RequireAuth>
+            <AppShell>
+              <CreateAssetPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/enablement/resources/:id"
+        element={
+          <RequireAuth>
+            <AppShell>
+              <AssetDetailPage />
             </AppShell>
           </RequireAuth>
         }
@@ -662,6 +698,18 @@ function App() {
             <RequireAdmin>
               <AppShell>
                 <AdminTaxonomyDetailPage />
+              </AppShell>
+            </RequireAdmin>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/enablement/admin/integrations"
+        element={
+          <RequireAuth>
+            <RequireAdmin>
+              <AppShell>
+                <AdminIntegrationsPage />
               </AppShell>
             </RequireAdmin>
           </RequireAuth>

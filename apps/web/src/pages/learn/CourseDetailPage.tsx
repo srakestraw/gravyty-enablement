@@ -33,6 +33,7 @@ import { lmsApi } from '../../api/lmsClient';
 import { track } from '../../lib/telemetry';
 import { isErrorResponse } from '../../lib/apiClient';
 import { CourseCard } from '../../components/lms/CourseCard';
+import { CourseAssets } from '../../components/lms/CourseAssets';
 import { formatDurationMinutes } from '../../utils/formatDuration';
 
 export function CourseDetailPage() {
@@ -181,6 +182,13 @@ export function CourseDetailPage() {
           </Card>
         ))}
       </Box>
+
+      {/* Course Assets */}
+      {courseId && (
+        <Box sx={{ mb: 4 }}>
+          <CourseAssets courseId={courseId} readOnly />
+        </Box>
+      )}
 
       {/* Related Courses */}
       {relatedCourses.length > 0 && (

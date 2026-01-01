@@ -54,10 +54,54 @@ export function AdminCourseEditorPage() {
   const [course, setCourse] = useState<Course | null>(null);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   
+  // Track temporary media IDs for cleanup (for new courses)
+  const [temporaryMediaIds, setTemporaryMediaIds] = useState<Set<string>>(new Set());
+  
+  // Cleanup temporary media function
+  const cleanupTemporaryMedia = useCallback(async (mediaIdsToCleanup?: Set<string>) => {
+    const idsToDelete = mediaIdsToCleanup || temporaryMediaIds;
+    if (idsToDelete.size === 0) return;
+    
+    // Delete all temporary media in parallel
+    const deletePromises = Array.from(idsToDelete).map((mediaId) =>
+      lmsAdminApi.deleteMedia(mediaId).catch((err) => {
+        // Log but don't fail - cleanup should be best effort
+        console.warn(`Failed to delete temporary media ${mediaId}:`, err);
+      })
+    );
+    
+    await Promise.all(deletePromises);
+    if (!mediaIdsToCleanup) {
+      setTemporaryMediaIds(new Set());
+    }
+  }, [temporaryMediaIds]);
+  
+  // Track temporary media when uploaded
+  const handleTemporaryMediaCreated = useCallback((mediaId: string) => {
+    setTemporaryMediaIds((prev) => new Set(prev).add(mediaId));
+  }, []);
+  
+  // Cleanup on unmount or navigation away (for new courses)
+  useEffect(() => {
+    if (!isNew) return;
+    
+    return () => {
+      // Cleanup on component unmount (when navigating away)
+      if (temporaryMediaIds.size > 0) {
+        // Use a copy of the set since we're in cleanup
+        const idsToCleanup = new Set(temporaryMediaIds);
+        // Fire and forget - cleanup should not block navigation
+        cleanupTemporaryMedia(idsToCleanup).catch((err) => {
+          console.warn('Failed to cleanup temporary media on unmount:', err);
+        });
+      }
+    };
+  }, [isNew, temporaryMediaIds, cleanupTemporaryMedia]);
+  
+  
   // Inspector panel state - persist in localStorage
   // Always default to closed, only restore from localStorage for existing courses
   const [inspectorOpen, setInspectorOpen] = useState(false);
-  const [inspectorActiveTab, setInspectorActiveTab] = useState<'issues' | 'properties'>('issues');
   
   // Editor tab state (Details or Course Outline) - persist in localStorage
   // For new courses, always default to 'details' tab
@@ -92,14 +136,9 @@ export function AdminCourseEditorPage() {
       if (storedOpen === 'true') {
         setInspectorOpen(true);
       }
-      const storedTab = localStorage.getItem('lms.courseEditor.inspectorTab');
-      if (storedTab === 'issues' || storedTab === 'properties') {
-        setInspectorActiveTab(storedTab);
-      }
     } else {
       // Explicitly close for new courses
       setInspectorOpen(false);
-      setInspectorActiveTab('issues');
     }
   }, [isNew, courseId]);
   
@@ -110,21 +149,14 @@ export function AdminCourseEditorPage() {
     }
   }, [inspectorOpen, isNew]);
   
-  useEffect(() => {
-    if (!isNew) {
-      localStorage.setItem('lms.courseEditor.inspectorTab', inspectorActiveTab);
-    }
-  }, [inspectorActiveTab, isNew]);
-  
-  // Handler to open inspector to Issues tab (called from Issues chip)
+  // Handler to open inspector (called from Issues chip)
   const handleOpenInspectorToIssues = () => {
-    // If inspector is already open and on Issues tab, do nothing
-    if (inspectorOpen && inspectorActiveTab === 'issues') {
+    // If inspector is already open, do nothing
+    if (inspectorOpen) {
       return;
     }
     
-    // Switch to Issues tab (or open if closed)
-    setInspectorActiveTab('issues');
+    // Open inspector
     setInspectorOpen(true);
     
     // Scroll to first issue after a brief delay to allow panel to open and errors to expand
@@ -165,13 +197,15 @@ export function AdminCourseEditorPage() {
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const saveLessonsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isSavingRef = useRef(false);
+  const isUserEditingRef = useRef(false);
 
-  // Load course data
+  // Load course data (only for existing courses, not new ones)
+  // Only update when course_id changes to avoid overwriting local edits
   useEffect(() => {
-    if (data?.course) {
+    if (data?.course && !isNew && data.course.course_id !== course?.course_id && !isUserEditingRef.current) {
       setCourse(data.course);
     }
-  }, [data]);
+  }, [data?.course?.course_id, isNew, course?.course_id]);
 
   // Load lessons for course
   useEffect(() => {
@@ -347,14 +381,14 @@ export function AdminCourseEditorPage() {
   }, []);
 
   // Debounced auto-save for course metadata
-  const debouncedSaveCourse = useCallback(async (updates: Partial<Course>) => {
-    if (!course || isNew || isSavingRef.current) return;
+  const debouncedSaveCourse = useCallback(async (courseId: string, updates: Partial<Course>) => {
+    if (isNew || isSavingRef.current) return;
     
     isSavingRef.current = true;
     setSaving(true);
     
     try {
-      await lmsAdminApi.updateCourse(course.course_id, updates);
+      await lmsAdminApi.updateCourse(courseId, updates);
       await refetch();
       setLastSaved(new Date());
     } catch (err) {
@@ -363,29 +397,53 @@ export function AdminCourseEditorPage() {
       setSaving(false);
       isSavingRef.current = false;
     }
-  }, [course, isNew, refetch]);
+  }, [isNew, refetch]);
 
   // Course update handlers with debounced autosave
   const handleUpdateCourse = useCallback((updates: Partial<Course>) => {
-    if (!course) return;
-
-    // Always update the course state immediately for validation
-    const updatedCourse = { ...course, ...updates };
-    setCourse(updatedCourse);
-
-    // Only auto-save to backend if not a new course
-    if (!isNew) {
-      // Clear existing timeout
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
+    // Mark that user is editing to prevent data-loading effect from overwriting
+    isUserEditingRef.current = true;
+    
+    // Use functional update to always get the latest course state
+    setCourse((prevCourse) => {
+      if (!prevCourse) return prevCourse;
+      
+      const updatedCourse = { ...prevCourse, ...updates };
+      
+      // Debug log to verify updates
+      if (updates.title || updates.short_description) {
+        console.log('Updating course:', { 
+          prevTitle: prevCourse.title, 
+          newTitle: updatedCourse.title,
+          prevShortDesc: prevCourse.short_description,
+          newShortDesc: updatedCourse.short_description
+        });
       }
+      
+      // Only auto-save to backend if not a new course
+      if (!isNew && prevCourse.course_id !== 'new') {
+        // Clear existing timeout
+        if (saveTimeoutRef.current) {
+          clearTimeout(saveTimeoutRef.current);
+        }
 
-      // Debounce auto-save (1000ms)
-      saveTimeoutRef.current = setTimeout(() => {
-        debouncedSaveCourse(updates);
-      }, 1000);
-    }
-  }, [course, isNew, debouncedSaveCourse]);
+        // Debounce auto-save (1000ms) - capture course_id from prevCourse
+        const courseId = prevCourse.course_id;
+        saveTimeoutRef.current = setTimeout(() => {
+          debouncedSaveCourse(courseId, updates);
+          // Reset editing flag after save completes
+          isUserEditingRef.current = false;
+        }, 1000);
+      } else {
+        // For new courses, reset flag immediately since there's no autosave
+        setTimeout(() => {
+          isUserEditingRef.current = false;
+        }, 100);
+      }
+      
+      return updatedCourse;
+    });
+  }, [isNew, debouncedSaveCourse]);
 
   // Save lessons structure to backend (with debouncing and refetch)
   const saveLessonsStructure = useCallback(async (immediate = false) => {
@@ -819,6 +877,8 @@ export function AdminCourseEditorPage() {
         });
 
         if ('data' in response) {
+          // Course saved successfully - cleanup temporary media
+          await cleanupTemporaryMedia();
           navigate(`/enablement/admin/learning/courses/${response.data.course.course_id}`);
         }
       } else {
@@ -985,24 +1045,26 @@ export function AdminCourseEditorPage() {
   }
 
   // Initialize course for new course
-  if (isNew && !course) {
-    const newCourse: Course = {
-      course_id: 'new',
-      title: '',
-      short_description: '',
-      status: 'draft',
-      version: 1,
-      sections: [],
-      topic_tags: [],
-      related_course_ids: [],
-      badges: [],
-      created_at: new Date().toISOString(),
-      created_by: '',
-      updated_at: new Date().toISOString(),
-      updated_by: '',
-    };
-    setCourse(newCourse);
-  }
+  useEffect(() => {
+    if (isNew && !course) {
+      const newCourse: Course = {
+        course_id: 'new',
+        title: '',
+        short_description: '',
+        status: 'draft',
+        version: 1,
+        sections: [],
+        topic_tags: [],
+        related_course_ids: [],
+        badges: [],
+        created_at: new Date().toISOString(),
+        created_by: '',
+        updated_at: new Date().toISOString(),
+        updated_by: '',
+      };
+      setCourse(newCourse);
+    }
+  }, [isNew, course]);
 
   return (
     <Box sx={{ height: 'calc(100vh - 64px)', display: 'flex', flexDirection: 'column' }}>
@@ -1086,7 +1148,6 @@ export function AdminCourseEditorPage() {
                 issuesCount={draftValidation.errors.length}
                 onOpenInspector={handleOpenInspectorToIssues}
                 inspectorOpen={inspectorOpen}
-                inspectorActiveTab={inspectorActiveTab}
                 editorTab={editorTab}
                 onEditorTabChange={setEditorTab}
                 // Outline panel props
@@ -1099,6 +1160,7 @@ export function AdminCourseEditorPage() {
                   // Stub for now - can implement later
                   console.log('Reorder node', nodeId, direction);
                 }}
+                onTemporaryMediaCreated={handleTemporaryMediaCreated}
               />
             </Box>
           }
@@ -1111,9 +1173,6 @@ export function AdminCourseEditorPage() {
               onSelectCourseDetails={handleSelectCourseDetails}
               onSelectNode={handleSelectNode}
               onClose={() => setInspectorOpen(false)}
-              activeTab={inspectorActiveTab}
-              onTabChange={setInspectorActiveTab}
-              editorTab={editorTab}
             />
           }
           contextPanelOpen={inspectorOpen}

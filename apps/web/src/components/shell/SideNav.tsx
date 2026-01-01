@@ -1,7 +1,7 @@
 /**
  * Side Navigation Component
  * 
- * Grouped navigation with expandable sections (Home, Learn, Resources, Ask AI, Insights, Admin).
+ * Grouped navigation with expandable sections (Home, Learn, Content Hub, Ask AI, Insights, Admin).
  * Uses MUI Outlined icons for consistency.
  */
 
@@ -46,6 +46,7 @@ import {
   AssignmentIndOutlined,
   PermMediaOutlined,
   CategoryOutlined,
+  HubOutlined,
   ExpandMore,
   ExpandLess,
 } from '@mui/icons-material';
@@ -107,7 +108,7 @@ export function SideNav() {
       ],
     },
     {
-      label: 'Resources',
+      label: 'Content Hub',
       icon: <FolderOutlined fontSize="small" />,
       items: [
         { label: 'Library', path: '/enablement/resources', icon: <CollectionsOutlined fontSize="small" /> },
@@ -140,6 +141,7 @@ export function SideNav() {
       items: [
         { label: 'Users & Roles', path: '/enablement/admin/users', icon: <ManageAccountsOutlined fontSize="small" /> },
         { label: 'Taxonomy', path: '/enablement/admin/taxonomy', icon: <CategoryOutlined fontSize="small" /> },
+        { label: 'Integrations', path: '/enablement/admin/integrations', icon: <HubOutlined fontSize="small" /> },
         { label: 'Media Library', path: '/enablement/admin/learning/media', icon: <PermMediaOutlined fontSize="small" /> },
         { label: 'Assignments', path: '/enablement/admin/learning/assignments', icon: <AssignmentIndOutlined fontSize="small" /> },
         { label: 'Certificate Templates', path: '/enablement/admin/learning/certificates', icon: <WorkspacePremiumOutlined fontSize="small" /> },

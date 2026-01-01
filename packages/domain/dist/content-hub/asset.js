@@ -1,0 +1,70 @@
+/**
+ * Content Hub - Asset Domain Model
+ *
+ * Represents a logical asset (e.g., "Q1 Sales Deck") that can have multiple versions.
+ */
+import { z } from 'zod';
+/**
+ * Asset Type
+ */
+export const AssetTypeSchema = z.enum([
+    'deck',
+    'doc',
+    'image',
+    'video',
+    'logo',
+    'worksheet',
+    'link',
+]);
+/**
+ * Asset Source Type
+ */
+export const AssetSourceTypeSchema = z.enum([
+    'UPLOAD',
+    'LINK',
+    'GOOGLE_DRIVE',
+]);
+/**
+ * Source Reference (JSON)
+ *
+ * Structure depends on sourceType:
+ * - LINK: { url: string, preview?: string }
+ * - GOOGLE_DRIVE: { driveFileId: string, driveMimeType: string, driveWebViewLink?: string, connectorId: string }
+ */
+export const SourceRefSchema = z.record(z.unknown());
+/**
+ * Asset
+ *
+ * Logical asset that can have multiple versions.
+ */
+export const AssetSchema = z.object({
+    // Primary key
+    asset_id: z.string(),
+    // Basic metadata
+    title: z.string(),
+    description: z.string().optional(),
+    asset_type: AssetTypeSchema,
+    // Ownership
+    owner_id: z.string(),
+    // Taxonomy
+    taxonomy_node_ids: z.array(z.string()).default([]),
+    // Source information
+    source_type: AssetSourceTypeSchema,
+    source_ref: SourceRefSchema.optional(),
+    // Version tracking
+    current_published_version_id: z.string().optional(),
+    // Pinning
+    pinned: z.boolean().default(false),
+    // Timestamps
+    created_at: z.string(), // ISO datetime
+    created_by: z.string(), // User ID
+    updated_at: z.string(), // ISO datetime
+    updated_by: z.string(), // User ID
+    // DynamoDB discriminator
+    entity_type: z.literal('ASSET').default('ASSET'),
+    // GSI attributes
+    'taxonomy_node_id#status': z.string().optional(), // For ByTaxonomyStatusUpdated GSI
+    'owner_id#updated_at': z.string().optional(), // For ByOwnerUpdated GSI
+    'pinned#updated_at': z.string().optional(), // For ByPinnedUpdated GSI
+});
+//# sourceMappingURL=asset.js.map

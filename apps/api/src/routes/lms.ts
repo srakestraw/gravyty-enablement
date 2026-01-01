@@ -7,6 +7,7 @@
 import express from 'express';
 import { requireRole } from '../middleware/jwtAuth';
 import * as lmsHandlers from '../handlers/lms';
+import * as courseAssetHandlers from '../handlers/courseAssets';
 
 const router = express.Router();
 
@@ -23,6 +24,7 @@ router.get('/paths', lmsHandlers.listPaths);
 // Detail
 router.get('/courses/:courseId', lmsHandlers.getCourseDetail);
 router.get('/courses/:courseId/lessons/:lessonId', lmsHandlers.getLessonDetail);
+router.get('/courses/:courseId/assets', courseAssetHandlers.listCourseAssets); // Learner-facing course assets
 router.get('/paths/:pathId', lmsHandlers.getPathDetail);
 router.post('/paths/:pathId/start', lmsHandlers.startPath);
 

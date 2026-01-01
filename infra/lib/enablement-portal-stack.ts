@@ -357,6 +357,48 @@ export class EnablementPortalStack extends cdk.Stack {
 
     transcribeRule.addTarget(new targets.LambdaFunction(transcriptionWorkerLambda));
 
+    // Content Hub Scheduler Lambda
+    const contentHubSchedulerLambda = new NodejsFunction(this, 'ContentHubScheduler', {
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'handler',
+      entry: path.join(__dirname, '../lambda/content-hub-scheduler/index.ts'),
+      description: 'Publishes scheduled versions and expires published versions',
+      timeout: cdk.Duration.minutes(5),
+      memorySize: 256,
+      environment: {
+        DDB_TABLE_CONTENT: process.env.DDB_TABLE_CONTENT || 'content_registry',
+        AWS_REGION: this.region,
+      },
+    });
+
+    // Grant DynamoDB permissions
+    this.eventsTable.grantReadWriteData(contentHubSchedulerLambda);
+    // Note: content_registry table permissions need to be granted
+    // Since content_registry is created via scripts, we'll grant permissions via IAM policy
+    contentHubSchedulerLambda.addToRolePolicy(new iam.PolicyStatement({
+      effect: iam.Effect.ALLOW,
+      actions: [
+        'dynamodb:GetItem',
+        'dynamodb:PutItem',
+        'dynamodb:UpdateItem',
+        'dynamodb:DeleteItem',
+        'dynamodb:Query',
+        'dynamodb:Scan',
+      ],
+      resources: [
+        `arn:aws:dynamodb:${this.region}:${this.account}:table/${process.env.DDB_TABLE_CONTENT || 'content_registry'}`,
+        `arn:aws:dynamodb:${this.region}:${this.account}:table/${process.env.DDB_TABLE_CONTENT || 'content_registry'}/index/*`,
+      ],
+    }));
+
+    // EventBridge rule for Content Hub scheduler (runs every 5 minutes)
+    const contentHubSchedulerRule = new events.Rule(this, 'ContentHubSchedulerRule', {
+      description: 'Runs Content Hub scheduler every 5 minutes',
+      schedule: events.Schedule.rate(cdk.Duration.minutes(5)),
+    });
+
+    contentHubSchedulerRule.addTarget(new targets.LambdaFunction(contentHubSchedulerLambda));
+
     // Create Lambda permission AFTER both nested stacks are fully created
     // This breaks the circular dependency by creating the permission last in the main stack
     // Must be done after both BaseStack and ApiStack are instantiated

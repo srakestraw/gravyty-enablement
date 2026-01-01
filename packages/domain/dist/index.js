@@ -7,4 +7,6 @@ export * from './lms/index.js';
 // Taxonomy Domain Module
 export * from './taxonomy.js';
 export * from './taxonomy-normalization.js';
+// Content Hub Domain Module
+export * from './content-hub/index.js';
 //# sourceMappingURL=index.js.map

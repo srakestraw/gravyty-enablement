@@ -77,7 +77,12 @@ export function RichTextEditor({
 
   const editor = useEditor({
     extensions: [
-      StarterKit,
+      StarterKit.configure({
+        // Exclude extensions that we're adding separately to avoid duplicates
+        link: false,
+        underline: false,
+        codeBlock: false,
+      }),
       Underline,
       Placeholder.configure({
         placeholder,
@@ -462,7 +467,7 @@ export function RichTextEditor({
             },
             '& .ProseMirror': {
               outline: 'none',
-              '& p.is-editor-empty:first-child::before': {
+              '& p.is-editor-empty:first-of-type::before': {
                 content: 'attr(data-placeholder)',
                 float: 'left',
                 color: theme.palette.text.disabled,

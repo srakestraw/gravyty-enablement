@@ -11,5 +11,8 @@ export * from './lms/index.js';
 export * from './taxonomy.js';
 export * from './taxonomy-normalization.js';
 
+// Content Hub Domain Module
+export * from './content-hub/index.js';
+
 
 

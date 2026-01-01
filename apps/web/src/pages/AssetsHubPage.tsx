@@ -1,30 +1,15 @@
 /**
- * Assets Hub Page
+ * Content Hub Page
  * 
- * Landing page for the Assets module with tiles for Asset Library, Kits, Brand and Messaging, etc.
+ * Landing page for the Content Hub with pinned, recently updated, expiring soon sections,
+ * and tiles for Asset Library, Kits, Brand and Messaging, etc.
  */
 
 import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import {
-  Box,
-  Typography,
-  Card,
-  CardContent,
-  CardActionArea,
-  Grid,
-  Chip,
-} from '@mui/material';
-import {
-  Inventory2Outlined,
-  ViewModuleOutlined,
-  CampaignOutlined,
-  UpdateOutlined,
-  ArrowForwardOutlined,
-} from '@mui/icons-material';
 import { PlaceholderPage } from '../components/shared/PlaceholderPage';
 import { track } from '../lib/telemetry';
 import { useAuth } from '../contexts/AuthContext';
+import { ContentHubLandingPage } from './content-hub/ContentHubLandingPage';
 
 interface HubTileProps {
   title: string;
@@ -114,58 +99,15 @@ export function AssetsHubPage() {
   const { user } = useAuth();
 
   useEffect(() => {
-    track('assets_hub_viewed', {
+    track('content_hub_viewed', {
       user_id: user?.userId,
       role: user?.role,
       auth_mode: user?.authMode,
     });
   }, [user]);
 
-  return (
-    <PlaceholderPage
-      title="Assets"
-      description="Access enablement assets, kits, brand materials, and updates"
-    >
-      <Grid container spacing={3}>
-        <Grid item xs={12} sm={6} md={4}>
-          <HubTile
-            title="Asset Library"
-            description="Browse and search enablement assets"
-            icon={<Inventory2Outlined />}
-            path="/enablement/assets/library"
-            comingSoon
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={4}>
-          <HubTile
-            title="Kits"
-            description="Curated collections of enablement assets"
-            icon={<ViewModuleOutlined />}
-            path="/enablement/assets/kits"
-            comingSoon
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={4}>
-          <HubTile
-            title="Brand and Messaging"
-            description="Access brand guidelines and messaging resources"
-            icon={<CampaignOutlined />}
-            path="/enablement/assets/brand"
-            comingSoon
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={4}>
-          <HubTile
-            title="Updates and Expiring"
-            description="View recent updates and expiring content"
-            icon={<UpdateOutlined />}
-            path="/enablement/assets/updates"
-            comingSoon
-          />
-        </Grid>
-      </Grid>
-    </PlaceholderPage>
-  );
+  // Show Content Hub landing page
+  return <ContentHubLandingPage />;
 }
 
 

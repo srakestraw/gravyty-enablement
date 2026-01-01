@@ -22,12 +22,17 @@ import {
   Image as ImageIcon,
   InfoOutlined as InfoIcon,
 } from '@mui/icons-material';
-import { MediaSelectModal } from './MediaSelectModal';
 import { TaxonomySelect, TaxonomyMultiSelect } from '../../taxonomy';
 import { RichTextEditor } from '../../common/RichTextEditor';
+import { AssetPicker } from '../../content-hub/AssetPicker';
+import { CourseAssets } from '../../lms/CourseAssets';
+import { CoverImageSelector } from '../../shared/CoverImageSelector';
+import { lmsAdminApi } from '../../../api/lmsAdminClient';
+import { isErrorResponse } from '../../../lib/apiClient';
 import { focusRegistry } from '../../../utils/focusRegistry';
 import type { Course, MediaRef } from '@gravyty/domain';
 import type { NodeType } from '../../../types/courseTree';
+import { Add } from '@mui/icons-material';
 
 export interface DetailsTabContentProps {
   course: Course;
@@ -38,6 +43,7 @@ export interface DetailsTabContentProps {
   titleRef?: React.RefObject<HTMLInputElement>;
   shortDescriptionRef?: React.RefObject<HTMLInputElement | HTMLTextAreaElement>;
   descriptionRef?: React.RefObject<HTMLDivElement>;
+  onTemporaryMediaCreated?: (mediaId: string) => void; // Callback when temporary media is uploaded
 }
 
 export function DetailsTabContent({
@@ -48,8 +54,8 @@ export function DetailsTabContent({
   titleRef,
   shortDescriptionRef,
   descriptionRef,
+  onTemporaryMediaCreated,
 }: DetailsTabContentProps) {
-  const [coverModalOpen, setCoverModalOpen] = useState(false);
   const [productId, setProductId] = useState<string | undefined>(undefined);
   const [productSuiteId, setProductSuiteId] = useState<string | undefined>(undefined);
   const [topicTagIds, setTopicTagIds] = useState<string[]>([]);
@@ -58,6 +64,8 @@ export function DetailsTabContent({
   const [shortDescription, setShortDescription] = useState('');
   const [description, setDescription] = useState('');
   const [estimatedMinutes, setEstimatedMinutes] = useState<string>('');
+  const [assetPickerOpen, setAssetPickerOpen] = useState(false);
+  const [assetsRefreshKey, setAssetsRefreshKey] = useState(0);
 
   // Refs for focus registry
   const productRef = useRef<HTMLDivElement>(null);
@@ -82,7 +90,7 @@ export function DetailsTabContent({
       setEstimatedMinutes(course.estimated_minutes?.toString() || '');
       lastSyncedCourseIdRef.current = course.course_id;
     }
-  }, [course?.course_id, course?.title, course?.short_description, course?.description, course?.product_id, course?.product_suite_id, course?.topic_tag_ids, course?.badge_ids, course?.estimated_minutes]);
+  }, [course?.course_id]);
 
   // Register fields with focus registry
   useEffect(() => {
@@ -141,13 +149,18 @@ export function DetailsTabContent({
   }, [course?.course_id]);
 
   const handleCourseFieldChange = (field: string, value: any) => {
-    if (!course) return;
+    if (!course) {
+      console.warn('handleCourseFieldChange: course is null');
+      return;
+    }
+    if (!onUpdateCourse) {
+      console.warn('handleCourseFieldChange: onUpdateCourse is undefined');
+      return;
+    }
+    console.log('handleCourseFieldChange:', field, value);
     onUpdateCourse({ [field]: value });
   };
 
-  const handleCoverSelect = (mediaRef: MediaRef) => {
-    handleCourseFieldChange('cover_image', mediaRef);
-  };
 
 
   // Clear Product Suite when Product is cleared
@@ -172,8 +185,9 @@ export function DetailsTabContent({
               label="Title"
               value={title}
               onChange={(e) => {
-                setTitle(e.target.value);
-                handleCourseFieldChange('title', e.target.value);
+                const newValue = e.target.value;
+                setTitle(newValue);
+                handleCourseFieldChange('title', newValue);
               }}
               onBlur={() => {
                 if (markFieldTouched) {
@@ -182,8 +196,8 @@ export function DetailsTabContent({
               }}
               required
               fullWidth
-              error={shouldShowError && (!title || title.trim() === '') && shouldShowError('course', course.course_id, 'title')}
-              helperText={shouldShowError && (!title || title.trim() === '') && shouldShowError('course', course.course_id, 'title') ? 'Course title is required' : ''}
+              error={shouldShowError && (!course.title || course.title.trim() === '') && shouldShowError('course', course.course_id, 'title')}
+              helperText={shouldShowError && (!course.title || course.title.trim() === '') && shouldShowError('course', course.course_id, 'title') ? 'Course title is required' : ''}
             />
 
             <TextField
@@ -191,8 +205,9 @@ export function DetailsTabContent({
               label="Short Description"
               value={shortDescription}
               onChange={(e) => {
-                setShortDescription(e.target.value);
-                handleCourseFieldChange('short_description', e.target.value);
+                const newValue = e.target.value;
+                setShortDescription(newValue);
+                handleCourseFieldChange('short_description', newValue);
               }}
               onBlur={() => {
                 if (markFieldTouched) {
@@ -203,8 +218,8 @@ export function DetailsTabContent({
               multiline
               rows={2}
               fullWidth
-              error={shouldShowError && (!shortDescription || shortDescription.trim() === '') && shouldShowError('course', course.course_id, 'short_description')}
-              helperText={shouldShowError && (!shortDescription || shortDescription.trim() === '') && shouldShowError('course', course.course_id, 'short_description') ? 'Short description is required' : 'Required: Brief description for course cards'}
+              error={shouldShowError && (!course.short_description || course.short_description.trim() === '') && shouldShowError('course', course.course_id, 'short_description')}
+              helperText={shouldShowError && (!course.short_description || course.short_description.trim() === '') && shouldShowError('course', course.course_id, 'short_description') ? 'Short description is required' : 'Required: Brief description for course cards'}
             />
 
             <RichTextEditor
@@ -361,68 +376,17 @@ export function DetailsTabContent({
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             {/* Cover Image */}
             <Box ref={coverImageRef}>
-              <Box sx={{ mb: 1.5 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
-                  <Typography variant="subtitle2">Cover Image</Typography>
-                  <Tooltip
-                    title={
-                      <Box>
-                        <Typography variant="body2" sx={{ mb: 0.5 }}>
-                          Used for course cards and may be cropped in some views.
-                        </Typography>
-                        <Typography variant="body2" sx={{ mb: 0.5 }}>
-                          Recommended: 16:9 aspect ratio (1600 x 900px). JPG or PNG format.
-                        </Typography>
-                        <Typography variant="body2" sx={{ mb: 0.5 }}>
-                          Keep the subject centered and avoid text near the edges.
-                        </Typography>
-                        <Typography variant="body2">
-                          If your image is larger, we'll downscale. If it's a different ratio, we'll center-crop.
-                        </Typography>
-                      </Box>
-                    }
-                    arrow
-                    placement="top"
-                  >
-                    <InfoIcon fontSize="small" sx={{ color: 'text.secondary', cursor: 'help' }} />
-                  </Tooltip>
-                </Box>
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
-                  Used for course cards and may be cropped in some views. Recommended 16:9 (1600 x 900). JPG or PNG. Keep the subject centered and avoid text near the edges.
-                </Typography>
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                  Best results: high-contrast image, no embedded titles. We'll crop to fit cards.
-                </Typography>
-              </Box>
-              <Box sx={{ display: 'flex', justifyContent: 'flex-start', mb: course.cover_image ? 1 : 0 }}>
-                <Button
-                  size="small"
-                  variant="outlined"
-                  startIcon={<ImageIcon />}
-                  onClick={() => setCoverModalOpen(true)}
-                >
-                  {course.cover_image ? 'Change Cover' : 'Attach Cover'}
-                </Button>
-              </Box>
-              {course.cover_image ? (
-                <Box>
-                  <Chip
-                    label={course.cover_image.filename || course.cover_image.media_id}
-                    onDelete={() => handleCourseFieldChange('cover_image', undefined)}
-                    color="primary"
-                    sx={{ mb: 1 }}
-                  />
-                  {course.cover_image.url && (
-                    <Typography variant="caption" color="text.secondary" display="block">
-                      {course.cover_image.url}
-                    </Typography>
-                  )}
-                </Box>
-              ) : (
-                <Typography variant="body2" color="text.secondary">
-                  No cover image attached
-                </Typography>
-              )}
+              <CoverImageSelector
+                entityType="course"
+                entityId={course.course_id}
+                coverImage={course.cover_image}
+                entityTitle={course.title || ''}
+                entityShortDescription={course.short_description || ''}
+                entityDescription={course.description || ''}
+                onCoverImageSelected={(mediaRef) => handleCourseFieldChange('cover_image', mediaRef)}
+                onCoverImageRemoved={() => handleCourseFieldChange('cover_image', undefined)}
+                onTemporaryMediaCreated={onTemporaryMediaCreated}
+              />
             </Box>
 
             {/* Badges */}
@@ -447,12 +411,52 @@ export function DetailsTabContent({
         </Paper>
       </Box>
 
-      <MediaSelectModal
-        open={coverModalOpen}
-        onClose={() => setCoverModalOpen(false)}
-        onSelect={handleCoverSelect}
-        mediaType="cover"
-        title="Select or Upload Cover Image"
+      {/* Course Assets */}
+      <Box sx={{ mb: 3 }}>
+        <Paper sx={{ p: 3 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Typography variant="h6">Course Assets</Typography>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<Add />}
+              onClick={() => setAssetPickerOpen(true)}
+            >
+              Add Asset
+            </Button>
+          </Box>
+          <CourseAssets 
+            key={assetsRefreshKey}
+            courseId={course.course_id} 
+            readOnly={false}
+            onAssetDetached={() => setAssetsRefreshKey(prev => prev + 1)}
+          />
+        </Paper>
+      </Box>
+
+      <AssetPicker
+        open={assetPickerOpen}
+        onClose={() => setAssetPickerOpen(false)}
+        onSelect={async (assetId, versionId, displayLabel) => {
+          try {
+            const response = await lmsAdminApi.attachAssetToCourse(course.course_id, {
+              asset_id: assetId,
+              version_id: versionId || undefined,
+              display_label: displayLabel,
+            });
+            
+            if (isErrorResponse(response)) {
+              alert(response.error.message);
+              return;
+            }
+            
+            // Refresh assets list
+            setAssetPickerOpen(false);
+            setAssetsRefreshKey(prev => prev + 1);
+          } catch (err) {
+            alert('Failed to attach asset');
+          }
+        }}
         courseId={course.course_id}
       />
     </>

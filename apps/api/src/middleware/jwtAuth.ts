@@ -12,12 +12,15 @@ import { AuthenticatedRequest } from '../types';
 const USER_POOL_ID = process.env.COGNITO_USER_POOL_ID || '';
 const USER_POOL_CLIENT_ID = process.env.COGNITO_USER_POOL_CLIENT_ID || '';
 
-// Create JWT verifier
+// Create JWT verifier with cache configuration
 const jwtVerifier = USER_POOL_ID && USER_POOL_CLIENT_ID
   ? CognitoJwtVerifier.create({
       userPoolId: USER_POOL_ID,
       tokenUse: 'id',
       clientId: USER_POOL_CLIENT_ID,
+      // Configure JWKS cache to refresh more frequently
+      // Default is 5 minutes, but we'll set it lower for better reliability
+      cacheMaxAge: 2 * 60 * 1000, // 2 minutes
     })
   : null;
 
@@ -85,6 +88,23 @@ export async function jwtAuthMiddleware(
 
   const token = authHeader.substring(7); // Remove 'Bearer ' prefix
 
+  // Decode token header to check kid and issuer before verification (for error reporting)
+  let tokenIssuer: string | null = null;
+  let tokenKid: string | null = null;
+  try {
+    const tokenParts = token.split('.');
+    if (tokenParts.length >= 2) {
+      const header = JSON.parse(Buffer.from(tokenParts[0], 'base64url').toString());
+      tokenKid = header.kid || null;
+      
+      // Decode payload to get issuer
+      const payload = JSON.parse(Buffer.from(tokenParts[1], 'base64url').toString());
+      tokenIssuer = payload.iss || null;
+    }
+  } catch (decodeError) {
+    // Ignore decode errors, will be caught by verifier
+  }
+
   try {
     // Verify JWT token
     const payload = await jwtVerifier.verify(token);
@@ -122,12 +142,32 @@ export async function jwtAuthMiddleware(
 
     next();
   } catch (error) {
-    console.error('JWT verification failed:', error);
+    // Enhanced error logging for JWKS issues
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const isJwksError = errorMessage.includes('JWK') || errorMessage.includes('kid') || errorMessage.includes('JWKS');
+    
+    console.error('JWT verification failed:', {
+      error: errorMessage,
+      isJwksError,
+      configuredUserPoolId: USER_POOL_ID,
+      configuredClientId: USER_POOL_CLIENT_ID,
+      tokenIssuer: tokenIssuer || 'unknown',
+      tokenKid: tokenKid || 'unknown',
+      expectedIssuer: USER_POOL_ID ? `https://cognito-idp.${process.env.AWS_REGION || 'us-east-1'}.amazonaws.com/${USER_POOL_ID}` : 'not configured',
+    });
+
     const requestId = req.headers['x-request-id'] as string || generateRequestId();
+    
+    // Provide more helpful error message for JWKS issues
+    let userMessage = errorMessage;
+    if (isJwksError) {
+      userMessage = `JWT verification failed: ${errorMessage}. This may indicate a token from a different User Pool or a stale JWKS cache. Please sign out and sign in again.`;
+    }
+    
     res.status(401).json({
       error: {
         code: 'UNAUTHORIZED',
-        message: error instanceof Error ? error.message : 'Invalid token',
+        message: userMessage,
       },
       request_id: requestId,
     });

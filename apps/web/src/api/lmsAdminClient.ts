@@ -4,13 +4,16 @@
  * Client for admin-facing LMS API endpoints
  */
 
-import { apiFetch } from '../lib/apiClient';
+import { apiFetch, type ApiResponse, type ApiSuccessResponse } from '../lib/apiClient';
 import type {
   Course,
   LearningPath,
   Assignment,
   CertificateTemplate,
   MediaRef,
+  CourseAsset,
+  Asset,
+  AssetVersion,
 } from '@gravyty/domain';
 
 const BASE_URL = '/v1/lms/admin';
@@ -172,6 +175,7 @@ export interface PresignMediaUploadRequest {
   lesson_id?: string;
   filename: string;
   content_type: string;
+  temporary?: boolean; // Flag to mark upload as temporary (for unsaved courses)
 }
 
 export interface PresignMediaUploadResponse {
@@ -331,6 +335,215 @@ export const lmsAdminApi = {
       method: 'POST',
       body: JSON.stringify(data),
     });
+  },
+
+  async deleteMedia(mediaId: string) {
+    return apiFetch<void>(`${BASE_URL}/media/${mediaId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  // Course Assets (Content Hub integration)
+  async attachAssetToCourse(courseId: string, data: {
+    asset_id: string;
+    version_id?: string;
+    display_label?: string;
+    module_id?: string;
+    lesson_id?: string;
+    sort_order?: number;
+  }) {
+    return apiFetch<CourseAsset>(`${BASE_URL}/courses/${courseId}/assets`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async listCourseAssets(courseId: string, params?: {
+    module_id?: string;
+    lesson_id?: string;
+    limit?: number;
+    cursor?: string;
+  }) {
+    const query = new URLSearchParams();
+    if (params?.module_id) query.append('module_id', params.module_id);
+    if (params?.lesson_id) query.append('lesson_id', params.lesson_id);
+    if (params?.limit) query.append('limit', params.limit.toString());
+    if (params?.cursor) query.append('cursor', params.cursor);
+    const url = `${BASE_URL}/courses/${courseId}/assets${query.toString() ? `?${query.toString()}` : ''}`;
+    return apiFetch<{ items: Array<CourseAsset & { asset: Asset | null; version: AssetVersion | null }>; next_cursor?: string }>(url);
+  },
+
+  async updateCourseAsset(courseId: string, courseAssetId: string, data: {
+    display_label?: string;
+    version_id?: string | null;
+    sort_order?: number;
+  }) {
+    return apiFetch<CourseAsset>(`${BASE_URL}/courses/${courseId}/assets/${courseAssetId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async detachAssetFromCourse(courseId: string, courseAssetId: string) {
+    return apiFetch<void>(`${BASE_URL}/courses/${courseId}/assets/${courseAssetId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  // AI Image Generation
+  async suggestImagePrompt(params: {
+    title: string;
+    short_description?: string;
+    description?: string;
+    entity_type?: 'course' | 'asset' | 'role-playing';
+  }) {
+    return apiFetch<{ suggested_prompt: string }>(`${BASE_URL}/ai/suggest-image-prompt`, {
+      method: 'POST',
+      body: JSON.stringify(params),
+    });
+  },
+
+  async generateImage(params: {
+    prompt: string;
+    provider?: 'openai' | 'gemini';
+    size?: '1024x1024' | '512x512' | '256x256';
+    quality?: 'standard' | 'hd';
+    style?: 'vivid' | 'natural';
+  }) {
+    return apiFetch<{ image_url: string; revised_prompt?: string; provider: string }>(`${BASE_URL}/ai/generate-image`, {
+      method: 'POST',
+      body: JSON.stringify(params),
+    });
+  },
+
+  async downloadAIImage(params: {
+    image_url: string;
+  }) {
+    return apiFetch<{ data_url: string; content_type: string; size_bytes: number }>(`${BASE_URL}/ai/download-image`, {
+      method: 'POST',
+      body: JSON.stringify(params),
+    });
+  },
+
+  async uploadMedia(mediaId: string, file: File): Promise<ApiResponse<{ media_ref: MediaRef }>> {
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
+    const url = `${API_BASE_URL}${BASE_URL}/media/${mediaId}/upload?content_type=${encodeURIComponent(file.type)}`;
+    
+    // Get auth headers (but override Content-Type)
+    const { getIdToken } = await import('../lib/auth');
+    const headers: HeadersInit = {
+      'Content-Type': file.type,
+    };
+    
+    try {
+      const token = await getIdToken(true);
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+    } catch {
+      // Fallback to dev headers
+      const devRole = import.meta.env.VITE_DEV_ROLE || 'Viewer';
+      const devUserId = import.meta.env.VITE_DEV_USER_ID || 'dev-user';
+      headers['x-dev-role'] = devRole;
+      headers['x-dev-user-id'] = devUserId;
+    }
+    
+    try {
+      const response = await fetch(url, {
+        method: 'PUT',
+        headers,
+        body: file,
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        return {
+          error: {
+            code: errorData.error?.code || 'HTTP_ERROR',
+            message: errorData.error?.message || `HTTP ${response.status}`,
+          },
+          request_id: errorData.request_id || 'unknown',
+        };
+      }
+      
+      const data = await response.json();
+      return data as ApiSuccessResponse<{ media_ref: MediaRef }>;
+    } catch (error) {
+      return {
+        error: {
+          code: 'NETWORK_ERROR',
+          message: error instanceof Error ? error.message : 'Network error',
+        },
+        request_id: 'unknown',
+      };
+    }
+  },
+
+  // Unsplash Integration
+  async searchUnsplash(params?: {
+    query?: string;
+    page?: number;
+    per_page?: number;
+    orientation?: 'landscape' | 'portrait' | 'squarish';
+  }) {
+    const query = new URLSearchParams();
+    if (params?.query) query.append('query', params.query);
+    if (params?.page) query.append('page', params.page.toString());
+    if (params?.per_page) query.append('per_page', params.per_page.toString());
+    if (params?.orientation) query.append('orientation', params.orientation);
+    const url = `${BASE_URL}/unsplash/search${query.toString() ? `?${query.toString()}` : ''}`;
+    return apiFetch<{
+      results: Array<{
+        id: string;
+        urls: {
+          raw: string;
+          full: string;
+          regular: string;
+          small: string;
+          thumb: string;
+        };
+        user: {
+          name: string;
+          username: string;
+        };
+        description?: string;
+        width: number;
+        height: number;
+      }>;
+      total: number;
+      total_pages: number;
+    }>(url);
+  },
+
+  async getTrendingUnsplash(params?: {
+    page?: number;
+    per_page?: number;
+  }) {
+    const query = new URLSearchParams();
+    if (params?.page) query.append('page', params.page.toString());
+    if (params?.per_page) query.append('per_page', params.per_page.toString());
+    const url = `${BASE_URL}/unsplash/trending${query.toString() ? `?${query.toString()}` : ''}`;
+    return apiFetch<{
+      results: Array<{
+        id: string;
+        urls: {
+          raw: string;
+          full: string;
+          regular: string;
+          small: string;
+          thumb: string;
+        };
+        user: {
+          name: string;
+          username: string;
+        };
+        description?: string;
+        width: number;
+        height: number;
+      }>;
+      total: number;
+      total_pages: number;
+    }>(url);
   },
 };
 

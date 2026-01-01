@@ -31,10 +31,15 @@ import {
   Image as ImageIcon,
   AttachFile as AttachmentIcon,
   Close as CloseIcon,
+  Collections as CollectionsIcon,
+  AutoAwesome as AutoAwesomeIcon,
+  PhotoLibrary as PhotoLibraryIcon,
 } from '@mui/icons-material';
 import { useAdminMedia } from '../../../hooks/useAdminMedia';
 import { lmsAdminApi } from '../../../api/lmsAdminClient';
 import type { MediaRef } from '@gravyty/domain';
+import { AIGenerationTab } from './AIGenerationTab';
+import { UnsplashTab } from './UnsplashTab';
 
 export interface MediaSelectModalProps {
   open: boolean;
@@ -44,6 +49,12 @@ export interface MediaSelectModalProps {
   title?: string;
   courseId?: string;
   lessonId?: string;
+  onTemporaryMediaCreated?: (mediaId: string) => void; // Callback when temporary media is uploaded
+  // For AI prompt suggestion
+  entityType?: 'course' | 'asset' | 'role-playing';
+  entityTitle?: string;
+  entityShortDescription?: string;
+  entityDescription?: string;
 }
 
 export function MediaSelectModal({
@@ -54,12 +65,36 @@ export function MediaSelectModal({
   title = 'Select Media',
   courseId,
   lessonId,
+  onTemporaryMediaCreated,
+  entityType = 'course',
+  entityTitle,
+  entityShortDescription,
+  entityDescription,
 }: MediaSelectModalProps) {
-  const [tab, setTab] = useState<'select' | 'upload'>('select');
+  // For cover images, show 4 tabs; for others, show 2 tabs
+  const isCoverImage = mediaType === 'cover';
+  const [tab, setTab] = useState<'gallery' | 'upload' | 'ai' | 'unsplash'>('gallery');
   const [selectedMediaId, setSelectedMediaId] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+
+  // Reset tab when modal opens and ensure valid tab state
+  useEffect(() => {
+    if (open) {
+      setTab('gallery');
+      setSelectedMediaId(null);
+      setFile(null);
+      setUploadError(null);
+    }
+  }, [open]);
+
+  // Ensure tab is valid for current media type
+  useEffect(() => {
+    if (!isCoverImage && (tab === 'ai' || tab === 'unsplash')) {
+      setTab('gallery');
+    }
+  }, [isCoverImage, tab]);
 
   const { data: media, loading, error, refetch } = useAdminMedia({
     media_type: mediaType,
@@ -83,12 +118,16 @@ export function MediaSelectModal({
     setUploadError(null);
 
     try {
+      // Mark as temporary if courseId is 'new' (unsaved course)
+      const isTemporary = courseId === 'new';
+      
       const presignResponse = await lmsAdminApi.presignMediaUpload({
         media_type: mediaType,
         course_id: courseId,
         lesson_id: lessonId,
         filename: file.name,
         content_type: file.type,
+        temporary: isTemporary,
       });
 
       if ('data' in presignResponse) {
@@ -100,6 +139,11 @@ export function MediaSelectModal({
             'Content-Type': file.type,
           },
         });
+
+        // If temporary, notify parent component to track it
+        if (isTemporary && onTemporaryMediaCreated) {
+          onTemporaryMediaCreated(presignResponse.data.media_ref.media_id);
+        }
 
         // Refresh media list and select the newly uploaded media
         await refetch();
@@ -159,12 +203,37 @@ export function MediaSelectModal({
         </Box>
       </DialogTitle>
       <DialogContent>
-        <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
-          <Tab label="Select Existing" value="select" />
-          <Tab label="Upload New" value="upload" />
+        <Tabs 
+          value={tab} 
+          onChange={(_, newValue) => {
+            const newTab = newValue as 'gallery' | 'upload' | 'ai' | 'unsplash';
+            // Only allow switching to AI/Unsplash tabs if it's a cover image
+            if ((newTab === 'ai' || newTab === 'unsplash') && !isCoverImage) {
+              return;
+            }
+            setTab(newTab);
+          }} 
+          sx={{ mb: 2 }}
+        >
+          <Tab label="Gallery" value="gallery" icon={<CollectionsIcon />} iconPosition="start" />
+          <Tab label="Upload" value="upload" icon={<UploadIcon />} iconPosition="start" />
+          <Tab 
+            label="Use AI Generation" 
+            value="ai" 
+            icon={<AutoAwesomeIcon />} 
+            iconPosition="start"
+            sx={{ display: isCoverImage ? 'flex' : 'none' }}
+          />
+          <Tab 
+            label="Unsplash" 
+            value="unsplash" 
+            icon={<PhotoLibraryIcon />} 
+            iconPosition="start"
+            sx={{ display: isCoverImage ? 'flex' : 'none' }}
+          />
         </Tabs>
 
-        {tab === 'select' && (
+        {tab === 'gallery' && (
           <Box>
             {loading && (
               <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
@@ -241,10 +310,36 @@ export function MediaSelectModal({
             )}
           </Box>
         )}
+
+        {tab === 'ai' && isCoverImage && (
+          <AIGenerationTab
+            entityTitle={entityTitle}
+            entityShortDescription={entityShortDescription}
+            entityDescription={entityDescription}
+            entityType={entityType}
+            mediaType={mediaType}
+            courseId={courseId}
+            lessonId={lessonId}
+            temporary={courseId === 'new'}
+            onImageGenerated={onSelect}
+            onClose={onClose}
+          />
+        )}
+
+        {tab === 'unsplash' && isCoverImage && (
+          <UnsplashTab
+            mediaType={mediaType}
+            courseId={courseId}
+            lessonId={lessonId}
+            temporary={courseId === 'new'}
+            onImageSelected={onSelect}
+            onClose={onClose}
+          />
+        )}
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Cancel</Button>
-        {tab === 'select' && (
+        {tab === 'gallery' && (
           <Button
             variant="contained"
             onClick={handleSelect}
@@ -263,6 +358,7 @@ export function MediaSelectModal({
             {uploading ? 'Uploading...' : 'Upload & Select'}
           </Button>
         )}
+        {/* AI and Unsplash tabs handle their own actions */}
       </DialogActions>
     </Dialog>
   );

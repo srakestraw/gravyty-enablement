@@ -75,6 +75,23 @@ export class BaseStack extends cdk.NestedStack {
       resources: ['*'],
     }));
 
+    // Add SSM permissions for AI API keys (OpenAI and Google Gemini) and Unsplash
+    this.lambdaRole.addToPolicy(new iam.PolicyStatement({
+      effect: iam.Effect.ALLOW,
+      actions: [
+        'ssm:GetParameter',
+        'ssm:GetParameters',
+      ],
+      resources: [
+        `arn:aws:ssm:${this.region}:${this.account}:parameter/enablement-portal/openai/api-key`,
+        `arn:aws:ssm:${this.region}:${this.account}:parameter/enablement-portal/gemini/api-key`,
+        `arn:aws:ssm:${this.region}:${this.account}:parameter/enablement-portal/gcp/service-account-json`,
+        `arn:aws:ssm:${this.region}:${this.account}:parameter/enablement-portal/unsplash/access-key`,
+        `arn:aws:ssm:${this.region}:${this.account}:parameter/enablement-portal/unsplash/application-id`,
+        `arn:aws:ssm:${this.region}:${this.account}:parameter/enablement-portal/unsplash/secret-key`,
+      ],
+    }));
+
     // Email domain validator Lambda (restrict to @gravyty.com)
     const emailDomainValidator = new CognitoEmailDomainValidator(this, 'EmailDomainValidator', {
       allowedDomains: ['gravyty.com'],

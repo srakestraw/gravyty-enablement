@@ -20,7 +20,7 @@ export const storageRepos = createStorageRepos();
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
 app.use(requestIdMiddleware);
 app.use(apiRateLimiter); // Apply rate limiting to all routes
 app.use(jwtAuthMiddleware); // JWT authentication (falls back to dev headers if not configured)
@@ -53,6 +53,24 @@ v1.use('/admin/users', requireRole('Admin'), adminUsersRoutes);
 
 // Taxonomy routes (Viewer+ for read, Admin for write)
 v1.use('/taxonomy', taxonomyRoutes);
+
+// Content Hub routes (Viewer+)
+import contentHubRoutes from './routes/contentHub';
+v1.use('/', contentHubRoutes);
+
+// Google Drive Integration routes
+import googleDriveRoutes from './routes/googleDriveIntegration';
+v1.use('/integrations/google-drive', googleDriveRoutes);
+
+// Asset import/sync routes (part of Content Hub)
+import * as googleDriveImportHandlers from './handlers/googleDriveAssetImport';
+v1.post('/assets/import/google-drive', requireRole('Contributor'), googleDriveImportHandlers.importFromGoogleDrive);
+v1.post('/assets/:id/sync', requireRole('Contributor'), googleDriveImportHandlers.syncAssetFromDrive);
+v1.get('/assets/:id/sync-status', requireRole('Viewer'), googleDriveImportHandlers.getAssetSyncStatus);
+
+// Public share link routes (no authentication)
+import publicShareLinkRoutes from './routes/publicShareLinks';
+app.use('/v1', publicShareLinkRoutes); // Mount at /v1 level for consistency
 
 app.use('/v1', v1);
 

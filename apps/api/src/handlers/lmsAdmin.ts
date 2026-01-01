@@ -28,10 +28,13 @@ import type {
   MediaRef,
 } from '@gravyty/domain';
 import { v4 as uuidv4 } from 'uuid';
-import { PutObjectCommand } from '@aws-sdk/client-s3';
+import { PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { s3Client } from '../aws/s3Client';
 import { startTranscriptionJob, getMediaFormatFromContentType } from '../aws/transcribeClient';
+import { createChatCompletion, generateImage, ChatMessage } from '../ai/aiService';
+import { ssmClient } from '../aws/ssmClient';
+import { GetParameterCommand } from '@aws-sdk/client-ssm';
 
 // ============================================================================
 // COURSES ADMIN
@@ -1592,6 +1595,7 @@ export async function presignMediaUpload(req: AuthenticatedRequest, res: Respons
     lesson_id: z.string().optional(),
     filename: z.string(),
     content_type: z.string(),
+    temporary: z.boolean().optional(), // Flag to mark upload as temporary (for unsaved courses)
   });
   
   const parsed = PresignSchema.safeParse(req.body);
@@ -1614,8 +1618,22 @@ export async function presignMediaUpload(req: AuthenticatedRequest, res: Respons
     
     // Build S3 key according to convention
     let s3Key = '';
-    if (parsed.data.media_type === 'cover' && parsed.data.course_id) {
-      s3Key = `covers/${parsed.data.course_id}/${sanitizedFilename}`;
+    if (parsed.data.media_type === 'cover') {
+      if (parsed.data.course_id && parsed.data.course_id !== 'new') {
+        s3Key = `covers/${parsed.data.course_id}/${sanitizedFilename}`;
+      } else if (parsed.data.temporary) {
+        // Temporary media for unsaved courses/assets - use temp prefix
+        s3Key = `temp/covers/${mediaId}/${sanitizedFilename}`;
+      } else {
+        res.status(400).json({
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'course_id is required for cover images (or set temporary=true for unsaved entities)',
+          },
+          request_id: requestId,
+        });
+        return;
+      }
     } else if (parsed.data.media_type === 'video' && parsed.data.course_id && parsed.data.lesson_id) {
       s3Key = `videos/${parsed.data.course_id}/${parsed.data.lesson_id}/${sanitizedFilename}`;
     } else if (parsed.data.media_type === 'poster' && parsed.data.course_id && parsed.data.lesson_id) {
@@ -1656,16 +1674,17 @@ export async function presignMediaUpload(req: AuthenticatedRequest, res: Respons
     };
     
     // Store media metadata (for listMedia to query)
+    // Note: LMS_CERTIFICATES_TABLE uses entity_type as partition key and SK as sort key
     const { PutCommand } = await import('@aws-sdk/lib-dynamodb');
     const metadataCommand = new PutCommand({
       TableName: LMS_CERTIFICATES_TABLE, // Reusing table with entity_type pattern
       Item: {
-        PK: 'MEDIA',
-        SK: mediaId,
-        entity_type: 'MEDIA',
+        entity_type: 'MEDIA', // Partition key
+        SK: mediaId, // Sort key
         ...mediaRef,
         course_id: parsed.data.course_id,
         lesson_id: parsed.data.lesson_id,
+        temporary: parsed.data.temporary || false, // Mark as temporary if flag is set
       },
     });
     await dynamoDocClient.send(metadataCommand);
@@ -1706,6 +1725,122 @@ export async function presignMediaUpload(req: AuthenticatedRequest, res: Respons
 }
 
 /**
+ * PUT /v1/lms/admin/media/:media_id/upload
+ * Upload media file directly through API (proxy to avoid CORS issues)
+ * Accepts file as raw binary in request body with media_id in URL
+ */
+export async function uploadMedia(req: AuthenticatedRequest, res: Response) {
+  const requestId = req.headers['x-request-id'] as string;
+  const userId = req.user?.user_id;
+  const mediaId = req.params.media_id;
+  
+  if (!userId) {
+    res.status(401).json({
+      error: { code: 'UNAUTHORIZED', message: 'User ID required' },
+      request_id: requestId,
+    });
+    return;
+  }
+
+  if (!mediaId) {
+    res.status(400).json({
+      error: { code: 'VALIDATION_ERROR', message: 'media_id is required in URL' },
+      request_id: requestId,
+    });
+    return;
+  }
+
+  try {
+    // Get file data from request body (raw buffer)
+    const fileBuffer = Buffer.isBuffer(req.body) ? req.body : null;
+    
+    if (!fileBuffer || fileBuffer.length === 0) {
+      res.status(400).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'File data not found in request body',
+        },
+        request_id: requestId,
+      });
+      return;
+    }
+
+    // Get media metadata from query params
+    const PresignSchema = z.object({
+      content_type: z.string(),
+    });
+
+    const parsed = PresignSchema.safeParse(req.query);
+    if (!parsed.success) {
+      res.status(400).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: parsed.error.errors.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+        },
+        request_id: requestId,
+      });
+      return;
+    }
+
+    // Look up media metadata
+    const { GetCommand } = await import('@aws-sdk/lib-dynamodb');
+    const mediaCommand = new GetCommand({
+      TableName: LMS_CERTIFICATES_TABLE,
+      Key: {
+        entity_type: 'MEDIA',
+        SK: mediaId,
+      },
+    });
+
+    const { Item: mediaItem } = await dynamoDocClient.send(mediaCommand);
+    if (!mediaItem || mediaItem.entity_type !== 'MEDIA') {
+      res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Media not found. Call presignMediaUpload first.' },
+        request_id: requestId,
+      });
+      return;
+    }
+
+    const mediaRef = mediaItem as any as MediaRef;
+
+    // Upload to S3
+    const putCommand = new PutObjectCommand({
+      Bucket: mediaRef.s3_bucket,
+      Key: mediaRef.s3_key,
+      Body: fileBuffer,
+      ContentType: parsed.data.content_type,
+    });
+    
+    await s3Client.send(putCommand);
+    
+    // Emit telemetry
+    await emitLmsEvent(req, 'lms_admin_media_uploaded' as any, {
+      media_id: mediaId,
+      media_type: mediaRef.type,
+    });
+    
+    const response: ApiSuccessResponse<{
+      media_ref: MediaRef;
+    }> = {
+      data: {
+        media_ref: mediaRef,
+      },
+      request_id: requestId,
+    };
+    res.json(response);
+  } catch (error) {
+    console.error(`[${requestId}] Error uploading media:`, error);
+    res.status(500).json({
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: error instanceof Error ? error.message : 'Failed to upload media',
+      },
+      request_id: requestId,
+    });
+  }
+}
+
+/**
  * POST /v1/lms/admin/media/:media_id/transcribe
  * Start transcription job for a video media file
  */
@@ -1736,7 +1871,7 @@ export async function startMediaTranscription(req: AuthenticatedRequest, res: Re
     const mediaCommand = new GetCommand({
       TableName: LMS_CERTIFICATES_TABLE,
       Key: {
-        PK: 'MEDIA',
+        entity_type: 'MEDIA',
         SK: mediaId,
       },
     });
@@ -1800,7 +1935,7 @@ export async function startMediaTranscription(req: AuthenticatedRequest, res: Re
     const updateCommand = new UpdateCommand({
       TableName: LMS_CERTIFICATES_TABLE,
       Key: {
-        PK: 'MEDIA',
+        entity_type: 'MEDIA',
         SK: mediaId,
       },
       UpdateExpression: 'SET transcription_job_id = :jobId, transcription_status = :status, transcription_language = :lang',
@@ -1835,6 +1970,557 @@ export async function startMediaTranscription(req: AuthenticatedRequest, res: Re
       error: {
         code: 'INTERNAL_ERROR',
         message: error instanceof Error ? error.message : 'Failed to start transcription',
+      },
+      request_id: requestId,
+    });
+  }
+}
+
+/**
+ * DELETE /v1/lms/admin/media/:media_id
+ * Delete media file and metadata
+ */
+export async function deleteMedia(req: AuthenticatedRequest, res: Response) {
+  const requestId = req.headers['x-request-id'] as string;
+  const userId = req.user?.user_id;
+  const mediaId = req.params.media_id;
+
+  if (!userId) {
+    res.status(401).json({
+      error: { code: 'UNAUTHORIZED', message: 'User ID required' },
+      request_id: requestId,
+    });
+    return;
+  }
+
+  if (!mediaId) {
+    res.status(400).json({
+      error: { code: 'VALIDATION_ERROR', message: 'media_id is required' },
+      request_id: requestId,
+    });
+    return;
+  }
+
+  try {
+    // Find media record
+    const { GetCommand, DeleteCommand } = await import('@aws-sdk/lib-dynamodb');
+    const mediaCommand = new GetCommand({
+      TableName: LMS_CERTIFICATES_TABLE,
+      Key: {
+        entity_type: 'MEDIA',
+        SK: mediaId,
+      },
+    });
+
+    const { Item: mediaItem } = await dynamoDocClient.send(mediaCommand);
+    if (!mediaItem || mediaItem.entity_type !== 'MEDIA') {
+      res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Media not found' },
+        request_id: requestId,
+      });
+      return;
+    }
+
+    // Delete from S3 if s3_key exists
+    if (mediaItem.s3_key && mediaItem.s3_bucket) {
+      try {
+        const deleteCommand = new DeleteObjectCommand({
+          Bucket: mediaItem.s3_bucket,
+          Key: mediaItem.s3_key,
+        });
+        await s3Client.send(deleteCommand);
+      } catch (s3Error) {
+        // Log but don't fail if S3 delete fails (file might already be deleted)
+        console.warn(`[${requestId}] Failed to delete S3 object ${mediaItem.s3_key}:`, s3Error);
+      }
+    }
+
+    // Delete from DynamoDB
+    const deleteCommand = new DeleteCommand({
+      TableName: LMS_CERTIFICATES_TABLE,
+      Key: {
+        entity_type: 'MEDIA',
+        SK: mediaId,
+      },
+    });
+    await dynamoDocClient.send(deleteCommand);
+
+    // Emit telemetry
+    await emitLmsEvent(req, 'lms_admin_media_deleted' as any, {
+      media_id: mediaId,
+      media_type: mediaItem.media_type,
+    });
+
+    const response: ApiSuccessResponse<void> = {
+      data: undefined,
+      request_id: requestId,
+    };
+    res.json(response);
+  } catch (error) {
+    console.error(`[${requestId}] Error deleting media:`, error);
+    res.status(500).json({
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: error instanceof Error ? error.message : 'Failed to delete media',
+      },
+      request_id: requestId,
+    });
+  }
+}
+
+// ============================================================================
+// AI IMAGE GENERATION
+// ============================================================================
+
+/**
+ * POST /v1/lms/admin/ai/suggest-image-prompt
+ * Generate image prompt suggestion from entity details
+ */
+export async function suggestImagePrompt(req: AuthenticatedRequest, res: Response) {
+  const requestId = req.headers['x-request-id'] as string;
+
+  try {
+    const SuggestPromptSchema = z.object({
+      title: z.string().min(1),
+      short_description: z.string().optional(),
+      description: z.string().optional(),
+      entity_type: z.enum(['course', 'asset', 'role-playing']).optional(),
+    });
+
+    const parsed = SuggestPromptSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: parsed.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', '),
+        },
+        request_id: requestId,
+      });
+      return;
+    }
+
+    const { title, short_description, description, entity_type } = parsed.data;
+
+    // Build context for prompt generation
+    const contextParts: string[] = [];
+    contextParts.push(`Title: ${title}`);
+    if (short_description) {
+      contextParts.push(`Short Description: ${short_description}`);
+    }
+    if (description) {
+      contextParts.push(`Description: ${description}`);
+    }
+
+    const context = contextParts.join('\n\n');
+
+    // System prompt for image generation
+    const systemPrompt = `You are an expert at creating image generation prompts for cover images. Create a detailed, visual prompt based on the provided information. 
+
+Requirements:
+- 16:9 aspect ratio (1600 x 900 recommended)
+- Centered subject composition
+- High contrast for visibility
+- Professional appearance suitable for learning materials
+- No text or embedded titles in the image (text will be overlaid)
+- Avoid placing important elements near edges (will be cropped)
+
+Focus on visual elements, composition, and style. Keep it concise but descriptive (under 200 words).`;
+
+    const messages: ChatMessage[] = [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: `Create an image generation prompt for a ${entity_type || 'course'} cover image based on:\n\n${context}` },
+    ];
+
+    // Use default provider for prompt suggestion
+    const response = await createChatCompletion(messages, {
+      maxTokens: 300,
+      temperature: 0.7,
+    });
+
+    const suggestedPrompt = response.content.trim();
+
+    const apiResponse: ApiSuccessResponse<{ suggested_prompt: string }> = {
+      data: { suggested_prompt: suggestedPrompt },
+      request_id: requestId,
+    };
+
+    res.json(apiResponse);
+  } catch (error) {
+    console.error(`[${requestId}] Error suggesting image prompt:`, error);
+    res.status(500).json({
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: error instanceof Error ? error.message : 'Failed to suggest image prompt',
+      },
+      request_id: requestId,
+    });
+  }
+}
+
+/**
+ * POST /v1/lms/admin/ai/generate-image
+ * Generate image from prompt using AI service
+ */
+export async function generateAIImage(req: AuthenticatedRequest, res: Response) {
+  const requestId = req.headers['x-request-id'] as string;
+
+  try {
+    const GenerateImageSchema = z.object({
+      prompt: z.string().min(1),
+      provider: z.enum(['openai', 'gemini']).optional(),
+      size: z.enum(['256x256', '512x512', '1024x1024']).optional(),
+      quality: z.enum(['standard', 'hd']).optional(),
+      style: z.enum(['vivid', 'natural']).optional(),
+    });
+
+    const parsed = GenerateImageSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: parsed.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', '),
+        },
+        request_id: requestId,
+      });
+      return;
+    }
+
+    const { prompt, provider, size, quality, style } = parsed.data;
+
+    // Generate image using AI service
+    const imageResponse = await generateImage(prompt, {
+      provider,
+      size: size || '1024x1024',
+      quality: quality || 'standard',
+      style: style || 'vivid',
+    });
+
+    const apiResponse: ApiSuccessResponse<{
+      image_url: string;
+      revised_prompt?: string;
+      provider: string;
+    }> = {
+      data: {
+        image_url: imageResponse.url,
+        revised_prompt: imageResponse.revisedPrompt,
+        provider: provider || 'openai',
+      },
+      request_id: requestId,
+    };
+
+    res.json(apiResponse);
+  } catch (error) {
+    console.error(`[${requestId}] Error generating image:`, error);
+    
+    // Handle AI provider errors
+    if (error instanceof Error && error.name === 'AIConfigError') {
+      res.status(400).json({
+        error: {
+          code: 'CONFIG_ERROR',
+          message: error.message,
+        },
+        request_id: requestId,
+      });
+      return;
+    }
+
+    res.status(500).json({
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: error instanceof Error ? error.message : 'Failed to generate image',
+      },
+      request_id: requestId,
+    });
+  }
+}
+
+/**
+ * POST /v1/lms/admin/ai/download-image
+ * Download image from external URL (proxy to avoid CORS)
+ * Returns the image as a blob that can be uploaded to S3
+ */
+export async function downloadAIImage(req: AuthenticatedRequest, res: Response) {
+  const requestId = req.headers['x-request-id'] as string;
+
+  try {
+    const DownloadImageSchema = z.object({
+      image_url: z.string().url(),
+    });
+
+    const parsed = DownloadImageSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: parsed.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', '),
+        },
+        request_id: requestId,
+      });
+      return;
+    }
+
+    const { image_url } = parsed.data;
+
+    // Download image server-side to avoid CORS issues
+    const imageResponse = await fetch(image_url, {
+      headers: {
+        'User-Agent': 'EnablementPortal/1.0',
+      },
+    });
+
+    if (!imageResponse.ok) {
+      throw new Error(`Failed to download image: ${imageResponse.status} ${imageResponse.statusText}`);
+    }
+
+    const imageBuffer = await imageResponse.arrayBuffer();
+    const contentType = imageResponse.headers.get('content-type') || 'image/png';
+
+    // Return image as base64-encoded data URL for frontend to use
+    const base64 = Buffer.from(imageBuffer).toString('base64');
+    const dataUrl = `data:${contentType};base64,${base64}`;
+
+    const apiResponse: ApiSuccessResponse<{
+      data_url: string;
+      content_type: string;
+      size_bytes: number;
+    }> = {
+      data: {
+        data_url: dataUrl,
+        content_type: contentType,
+        size_bytes: imageBuffer.byteLength,
+      },
+      request_id: requestId,
+    };
+
+    res.json(apiResponse);
+  } catch (error) {
+    console.error(`[${requestId}] Error downloading image:`, error);
+    res.status(500).json({
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: error instanceof Error ? error.message : 'Failed to download image',
+      },
+      request_id: requestId,
+    });
+  }
+}
+
+// ============================================================================
+// UNSPLASH INTEGRATION
+// ============================================================================
+
+/**
+ * Get Unsplash Access Key from SSM
+ * For public API access, Unsplash uses the Access Key with Client-ID header format
+ */
+async function getUnsplashAccessKey(): Promise<string> {
+  try {
+    const command = new GetParameterCommand({
+      Name: '/enablement-portal/unsplash/access-key',
+      WithDecryption: true,
+    });
+    const response = await ssmClient.send(command);
+    const accessKey = response.Parameter?.Value?.trim();
+
+    if (!accessKey || accessKey === 'REPLACE_WITH_UNSPLASH_ACCESS_KEY') {
+      throw new Error('Unsplash access key not configured in SSM Parameter Store');
+    }
+
+    return accessKey;
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('not configured')) {
+      throw error;
+    }
+    throw new Error(`Failed to retrieve Unsplash access key from SSM: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+/**
+ * GET /v1/lms/admin/unsplash/search
+ * Search Unsplash images (proxy to avoid CORS)
+ */
+export async function searchUnsplash(req: AuthenticatedRequest, res: Response) {
+  const requestId = req.headers['x-request-id'] as string;
+
+  try {
+    const query = req.query.query as string | undefined;
+    const page = parseInt(req.query.page as string || '1', 10);
+    const perPage = Math.min(parseInt(req.query.per_page as string || '20', 10), 30); // Max 30 per page
+    const orientation = (req.query.orientation as 'landscape' | 'portrait' | 'squarish') || 'landscape';
+
+    const accessKey = await getUnsplashAccessKey();
+
+    // Build Unsplash API URL
+    const unsplashUrl = new URL('https://api.unsplash.com/search/photos');
+    unsplashUrl.searchParams.set('query', query || '');
+    unsplashUrl.searchParams.set('page', page.toString());
+    unsplashUrl.searchParams.set('per_page', perPage.toString());
+    unsplashUrl.searchParams.set('orientation', orientation);
+
+    // Fetch from Unsplash API
+    // Note: Unsplash public API uses Client-ID header format
+    const unsplashResponse = await fetch(unsplashUrl.toString(), {
+      headers: {
+        'Authorization': `Client-ID ${accessKey}`,
+        'Accept-Version': 'v1', // Specify API version
+      },
+    });
+
+    if (!unsplashResponse.ok) {
+      const errorText = await unsplashResponse.text();
+      console.error(`[${requestId}] Unsplash API error:`, {
+        status: unsplashResponse.status,
+        statusText: unsplashResponse.statusText,
+        error: errorText,
+        url: unsplashUrl.toString(),
+        accessKeyLength: accessKey.length,
+        accessKeyPrefix: accessKey.substring(0, 10) + '...',
+      });
+      
+      // Provide helpful error message for 401 errors
+      if (unsplashResponse.status === 401) {
+        throw new Error(`Unsplash API authentication failed. Please verify your Access Key is valid and not expired in your Unsplash developer account. Error: ${errorText}`);
+      }
+      
+      throw new Error(`Unsplash API error: ${unsplashResponse.status} ${errorText}`);
+    }
+
+    const unsplashData = await unsplashResponse.json();
+
+    // Format response
+    const results = (unsplashData.results || []).map((photo: any) => ({
+      id: photo.id,
+      urls: {
+        raw: photo.urls.raw,
+        full: photo.urls.full,
+        regular: photo.urls.regular,
+        small: photo.urls.small,
+        thumb: photo.urls.thumb,
+      },
+      user: {
+        name: photo.user.name,
+        username: photo.user.username,
+      },
+      description: photo.description || photo.alt_description,
+      width: photo.width,
+      height: photo.height,
+    }));
+
+    const apiResponse: ApiSuccessResponse<{
+      results: typeof results;
+      total: number;
+      total_pages: number;
+    }> = {
+      data: {
+        results,
+        total: unsplashData.total || 0,
+        total_pages: unsplashData.total_pages || 0,
+      },
+      request_id: requestId,
+    };
+
+    res.json(apiResponse);
+  } catch (error) {
+    console.error(`[${requestId}] Error searching Unsplash:`, error);
+    res.status(500).json({
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: error instanceof Error ? error.message : 'Failed to search Unsplash',
+      },
+      request_id: requestId,
+    });
+  }
+}
+
+/**
+ * GET /v1/lms/admin/unsplash/trending
+ * Get trending Unsplash images (proxy to avoid CORS)
+ */
+export async function getTrendingUnsplash(req: AuthenticatedRequest, res: Response) {
+  const requestId = req.headers['x-request-id'] as string;
+
+  try {
+    const page = parseInt(req.query.page as string || '1', 10);
+    const perPage = Math.min(parseInt(req.query.per_page as string || '20', 10), 30); // Max 30 per page
+
+    const accessKey = await getUnsplashAccessKey();
+
+    // Build Unsplash API URL for trending photos
+    const unsplashUrl = new URL('https://api.unsplash.com/photos');
+    unsplashUrl.searchParams.set('order_by', 'popular');
+    unsplashUrl.searchParams.set('page', page.toString());
+    unsplashUrl.searchParams.set('per_page', perPage.toString());
+    unsplashUrl.searchParams.set('orientation', 'landscape'); // Default to landscape for 16:9
+
+    // Fetch from Unsplash API
+    // Note: Unsplash public API uses Client-ID header format
+    const unsplashResponse = await fetch(unsplashUrl.toString(), {
+      headers: {
+        'Authorization': `Client-ID ${accessKey}`,
+        'Accept-Version': 'v1', // Specify API version
+      },
+    });
+
+    if (!unsplashResponse.ok) {
+      const errorText = await unsplashResponse.text();
+      console.error(`[${requestId}] Unsplash API error:`, {
+        status: unsplashResponse.status,
+        statusText: unsplashResponse.statusText,
+        error: errorText,
+        url: unsplashUrl.toString(),
+        accessKeyLength: accessKey.length,
+        accessKeyPrefix: accessKey.substring(0, 10) + '...',
+      });
+      
+      // Provide helpful error message for 401 errors
+      if (unsplashResponse.status === 401) {
+        throw new Error(`Unsplash API authentication failed. Please verify your Access Key is valid and not expired in your Unsplash developer account. Error: ${errorText}`);
+      }
+      
+      throw new Error(`Unsplash API error: ${unsplashResponse.status} ${errorText}`);
+    }
+
+    const unsplashData = await unsplashResponse.json();
+
+    // Format response (trending returns array directly)
+    const results = (Array.isArray(unsplashData) ? unsplashData : []).map((photo: any) => ({
+      id: photo.id,
+      urls: {
+        raw: photo.urls.raw,
+        full: photo.urls.full,
+        regular: photo.urls.regular,
+        small: photo.urls.small,
+        thumb: photo.urls.thumb,
+      },
+      user: {
+        name: photo.user.name,
+        username: photo.user.username,
+      },
+      description: photo.description || photo.alt_description,
+      width: photo.width,
+      height: photo.height,
+    }));
+
+    const apiResponse: ApiSuccessResponse<{
+      results: typeof results;
+      total: number;
+      total_pages: number;
+    }> = {
+      data: {
+        results,
+        total: results.length,
+        total_pages: 1, // Unsplash doesn't provide pagination info for trending
+      },
+      request_id: requestId,
+    };
+
+    res.json(apiResponse);
+  } catch (error) {
+    console.error(`[${requestId}] Error getting trending Unsplash images:`, error);
+    res.status(500).json({
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: error instanceof Error ? error.message : 'Failed to get trending Unsplash images',
       },
       request_id: requestId,
     });

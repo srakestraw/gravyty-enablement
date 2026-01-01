@@ -14,7 +14,6 @@ import { SQSHandler, SQSEvent } from 'aws-lambda';
 import { S3Client, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, UpdateCommand, PutCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
-import { SSMClient, GetParameterCommand } from '@aws-sdk/client-ssm';
 import { Client } from '@opensearch-project/opensearch';
 import { AwsSigv4Signer } from '@opensearch-project/opensearch/aws';
 import { defaultProvider } from '@aws-sdk/credential-providers';
@@ -23,10 +22,10 @@ import { DynamoDBDocumentClient as EventsDynamoDocClient, PutCommand as EventsPu
 import type { BrainDocument } from '@gravyty/domain';
 import pdfParse from 'pdf-parse';
 import { convert as htmlToText } from 'html-to-text';
+import { generateEmbedding } from '../../apps/api/src/ai/aiService';
 
 const s3Client = new S3Client({});
 const dynamoDocClient = DynamoDBDocumentClient.from(new DynamoDBClient({}));
-const ssmClient = new SSMClient({});
 const eventsDynamoDocClient = EventsDynamoDocClient.from(new EventsDynamoDBClient({}));
 
 const EVENTS_TABLE = process.env.DDB_TABLE_EVENTS || 'events';
@@ -40,7 +39,6 @@ const S3_BUCKET = process.env.S3_BUCKET || '';
 const OPENSEARCH_COLLECTION_NAME = process.env.OPENSEARCH_COLLECTION_NAME || 'enablement-brain';
 const OPENSEARCH_INDEX_NAME = process.env.OPENSEARCH_INDEX_NAME || 'brain-chunks';
 const OPENSEARCH_ENDPOINT = process.env.OPENSEARCH_ENDPOINT || '';
-const OPENAI_API_KEY_PARAM = process.env.OPENAI_API_KEY_PARAM || '/enablement-portal/openai/api-key';
 const OPENAI_EMBEDDINGS_MODEL = process.env.OPENAI_EMBEDDINGS_MODEL || 'text-embedding-3-small';
 
 // Token estimation: ~4 characters per token (rough approximation)
@@ -55,18 +53,6 @@ const OPENSEARCH_READY_TIMEOUT_MS = parseInt(process.env.OPENSEARCH_READY_TIMEOU
 const OPENSEARCH_RETRY_DELAY_MS = 2000; // Start with 2 seconds
 const URL_FETCH_TIMEOUT_MS = 30000; // 30 seconds
 const MIN_EXTRACTED_TEXT_LENGTH = 100; // Minimum characters for valid extraction
-
-/**
- * Get OpenAI API key from SSM
- */
-async function getOpenAiApiKey(): Promise<string> {
-  const command = new GetParameterCommand({
-    Name: OPENAI_API_KEY_PARAM,
-    WithDecryption: true,
-  });
-  const response = await ssmClient.send(command);
-  return response.Parameter?.Value || '';
-}
 
 /**
  * Estimate token count (rough approximation)
@@ -118,44 +104,6 @@ function chunkText(text: string): Array<{ text: string; startIndex: number; endI
   return chunks;
 }
 
-/**
- * Generate embedding via OpenAI with timeout
- */
-async function generateEmbedding(text: string, apiKey: string, timeoutMs: number = 30000): Promise<number[]> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-
-  try {
-    const response = await fetch('https://api.openai.com/v1/embeddings', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: OPENAI_EMBEDDINGS_MODEL,
-        input: text,
-      }),
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`OpenAI embeddings API error: ${error}`);
-    }
-
-    const data = await response.json();
-    return data.data[0].embedding;
-  } catch (error) {
-    clearTimeout(timeoutId);
-    if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error('OpenAI embeddings API timeout');
-    }
-    throw error;
-  }
-}
 
 /**
  * Initialize OpenSearch client
@@ -510,14 +458,6 @@ async function processDocument(docId: string, isReindex: boolean = false): Promi
       throw new Error(errorMessage);
     }
 
-    // Get OpenAI API key
-    const apiKey = await getOpenAiApiKey();
-    if (!apiKey || apiKey === 'REPLACE_WITH_OPENAI_API_KEY') {
-      errorCode = 'CONFIGURATION_ERROR';
-      errorMessage = 'OpenAI API key not configured';
-      throw new Error(errorMessage);
-    }
-
     // Initialize OpenSearch client and wait for readiness
     const osClient = getOpenSearchClient();
     await waitForOpenSearchReady(osClient, OPENSEARCH_READY_TIMEOUT_MS);
@@ -533,8 +473,11 @@ async function processDocument(docId: string, isReindex: boolean = false): Promi
       const tokenCount = estimateTokens(chunk.text);
 
       try {
-        // Generate embedding with timeout
-        const embedding = await generateEmbedding(chunk.text, apiKey, 30000);
+        // Generate embedding using shared AI service
+        const embedding = await generateEmbedding(chunk.text, {
+          model: OPENAI_EMBEDDINGS_MODEL,
+          timeoutMs: 30000,
+        });
 
         // Store in OpenSearch
         await osClient.index({
@@ -633,7 +576,7 @@ async function processDocument(docId: string, isReindex: boolean = false): Promi
           errorCode = 'OPENSEARCH_NOT_READY';
         } else if (error.message.includes('timeout')) {
           errorCode = 'TIMEOUT';
-        } else if (error.message.includes('OpenAI')) {
+        } else if (error.message.includes('OpenAI') || error.message.includes('AI provider')) {
           errorCode = 'OPENAI_API_ERROR';
         } else {
           errorCode = 'PROCESSING_ERROR';
@@ -740,12 +683,6 @@ async function processTranscript(transcriptId: string, lessonId: string): Promis
     throw new Error(`No chunks created for transcript ${transcriptId}`);
   }
 
-  // Get OpenAI API key
-  const apiKey = await getOpenAiApiKey();
-  if (!apiKey) {
-    throw new Error('OpenAI API key not found');
-  }
-
   // Get OpenSearch client
   const osClient = getOpenSearchClient();
 
@@ -757,8 +694,11 @@ async function processTranscript(transcriptId: string, lessonId: string): Promis
     const tokenCount = estimateTokens(chunk.text);
 
     try {
-      // Generate embedding
-      const embedding = await generateEmbedding(chunk.text, apiKey, 30000);
+      // Generate embedding using shared AI service
+      const embedding = await generateEmbedding(chunk.text, {
+        model: OPENAI_EMBEDDINGS_MODEL,
+        timeoutMs: 30000,
+      });
 
       // Store in OpenSearch
       await osClient.index({

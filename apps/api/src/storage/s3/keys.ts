@@ -27,6 +27,15 @@ export function generateContentKey(contentId: string, filename: string): string 
 }
 
 /**
+ * Generate S3 key for Content Hub asset version
+ * Format: content/assets/{assetId}/{versionId}/original/{filename}
+ */
+export function generateAssetVersionKey(assetId: string, versionId: string, filename: string): string {
+  const sanitized = sanitizeFilename(filename);
+  return `content/assets/${assetId}/${versionId}/original/${sanitized}`;
+}
+
+/**
  * Generate S3 URI
  */
 export function generateS3Uri(bucket: string, key: string): string {

@@ -10,7 +10,9 @@
     "build:lambda": "npm run build && npm run bundle:lambda",
     "bundle:lambda": "rm -rf dist-lambda && mkdir -p dist-lambda && cp -r dist dist-lambda/ && cp package*.json dist-lambda/ && cd dist-lambda && npm ci --omit=dev",
     "start": "node dist/server.js",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:ai": "tsx src/ai/test-ai-service.ts",
+    "test:unsplash": "tsx src/handlers/test-unsplash.ts"
   },
   "keywords": [
     "api",
@@ -27,6 +29,9 @@
     "@aws-sdk/client-transcribe": "^3.958.0",
     "@aws-sdk/lib-dynamodb": "^3.490.0",
     "@aws-sdk/s3-request-presigner": "^3.490.0",
+    "@google-cloud/aiplatform": "^3.9.0",
+    "google-auth-library": "^9.0.0",
+    "googleapis": "^144.0.0",
     "@gravyty/domain": "*",
     "@opensearch-project/opensearch": "^2.5.0",
     "@vendia/serverless-express": "^4.12.6",

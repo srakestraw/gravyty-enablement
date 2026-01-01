@@ -242,5 +242,14 @@ export const lmsApi = {
       headers: buildTelemetryHeaders(options?.telemetry),
     });
   },
+
+  /**
+   * GET /v1/lms/courses/:courseId/assets
+   */
+  listCourseAssets: async (courseId: string, options?: LmsClientOptions) => {
+    return apiFetch<{ items: Array<any>; next_cursor?: string }>(`/v1/lms/courses/${courseId}/assets`, {
+      headers: buildTelemetryHeaders(options?.telemetry),
+    });
+  },
 };
 

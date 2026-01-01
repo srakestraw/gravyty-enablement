@@ -348,8 +348,27 @@ export async function getIdToken(forceRefresh: boolean = false): Promise<string 
   try {
     const session = await fetchAuthSession({ forceRefresh });
     return session.tokens?.idToken?.toString() || null;
-  } catch (error) {
-    console.error('Error getting ID token:', error);
+  } catch (error: any) {
+    // Handle specific Cognito errors more gracefully
+    const errorMessage = error?.message || String(error);
+    const errorName = error?.name || '';
+    
+    // ResourceNotFoundException typically means the client ID doesn't exist
+    if (errorName === 'ResourceNotFoundException' || errorMessage.includes('does not exist')) {
+      // Only log once per session to avoid console spam
+      if (!(window as any).__cognitoClientErrorLogged) {
+        console.error('[Auth] Cognito User Pool Client not found:', {
+          clientId: userPoolClientId,
+          userPoolId,
+          message: 'The configured client ID does not exist in Cognito. Please verify your environment variables.',
+          fix: 'Check VITE_COGNITO_USER_POOL_CLIENT_ID in your .env file or Amplify environment variables.',
+        });
+        (window as any).__cognitoClientErrorLogged = true;
+      }
+    } else {
+      // Log other errors normally
+      console.error('Error getting ID token:', error);
+    }
     return null;
   }
 }
