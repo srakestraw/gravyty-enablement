@@ -315,10 +315,10 @@ export function validateCourseDraft(course: Course, lessons: Lesson[]): { errors
   }
 
   if (!course.short_description || course.short_description.trim() === '') {
-    errors.push({ 
-      severity: 'error', 
+    warnings.push({ 
+      severity: 'warning', 
       field: 'short_description', 
-      message: 'Short description is required',
+      message: 'Short description is recommended but not required',
       entityType: 'course',
       entityId: course.course_id,
       fieldKey: 'short_description',

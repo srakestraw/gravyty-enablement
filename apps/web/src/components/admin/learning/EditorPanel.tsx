@@ -416,7 +416,7 @@ export function EditorPanel({
                   size="small"
                   startIcon={<SaveIcon />}
                   onClick={onSave}
-                  disabled={saving || !course?.title?.trim() || !course?.short_description?.trim()}
+                  disabled={saving || !course?.title?.trim()}
                 >
                   Save Draft
                 </Button>

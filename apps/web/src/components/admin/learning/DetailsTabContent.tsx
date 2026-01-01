@@ -7,7 +7,7 @@
  * - Media: Cover Image, Badges
  */
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Box,
   TextField,
@@ -37,6 +37,7 @@ import { Add } from '@mui/icons-material';
 export interface DetailsTabContentProps {
   course: Course;
   onUpdateCourse: (updates: Partial<Course>) => void;
+  onUpdateCourseField?: (field: string, value: any) => void; // New direct field update callback
   shouldShowError?: (entityType: NodeType, entityId: string, fieldKey: string) => boolean;
   markFieldTouched?: (entityType: NodeType, entityId: string, fieldKey: string) => void;
   // Refs for basic fields (Title, Short Description, Description)
@@ -49,6 +50,7 @@ export interface DetailsTabContentProps {
 export function DetailsTabContent({
   course,
   onUpdateCourse,
+  onUpdateCourseField,
   shouldShowError,
   markFieldTouched,
   titleRef,
@@ -80,6 +82,11 @@ export function DetailsTabContent({
   // Sync state with course (only when course ID changes)
   useEffect(() => {
     if (course && course.course_id !== lastSyncedCourseIdRef.current) {
+      console.log('[DetailsTabContent] Syncing local state with course (course_id changed):', {
+        courseId: course.course_id,
+        courseTitle: course.title,
+        currentLocalTitle: title,
+      });
       setProductId(course.product_id || course.product_suite_id || undefined);
       setProductSuiteId(course.product_suite_id || course.product_concept_id || undefined);
       setTopicTagIds(course.topic_tag_ids && course.topic_tag_ids.length > 0 ? course.topic_tag_ids : []);
@@ -91,6 +98,17 @@ export function DetailsTabContent({
       lastSyncedCourseIdRef.current = course.course_id;
     }
   }, [course?.course_id]);
+
+  // Debug: Track when course prop changes (any field, not just course_id)
+  useEffect(() => {
+    console.log('[DetailsTabContent] course prop changed:', {
+      courseId: course?.course_id,
+      courseTitle: course?.title,
+      localTitle: title,
+      titleMismatch: course?.title !== title,
+      timestamp: new Date().toISOString(),
+    });
+  }, [course]);
 
   // Register fields with focus registry
   useEffect(() => {
@@ -157,9 +175,134 @@ export function DetailsTabContent({
       console.warn('handleCourseFieldChange: onUpdateCourse is undefined');
       return;
     }
-    console.log('handleCourseFieldChange:', field, value);
-    onUpdateCourse({ [field]: value });
+    
+    // Create updates object explicitly based on field name to avoid TypeScript/computed property issues
+    let updates: Partial<Course>;
+    
+    // Use explicit object creation for each field to ensure proper structure
+    switch (field) {
+      case 'title':
+        updates = { title: value };
+        break;
+      case 'short_description':
+        updates = { short_description: value };
+        break;
+      case 'description':
+        updates = { description: value };
+        break;
+      case 'product_id':
+        updates = { product_id: value };
+        break;
+      case 'product_suite_id':
+        updates = { product_suite_id: value };
+        break;
+      case 'topic_tag_ids':
+        updates = { topic_tag_ids: value };
+        break;
+      case 'badge_ids':
+        updates = { badge_ids: value };
+        break;
+      case 'estimated_minutes':
+        updates = { estimated_minutes: typeof value === 'string' ? parseInt(value, 10) || undefined : value };
+        break;
+      default:
+        updates = { [field]: value } as Partial<Course>;
+    }
+    
+    console.log('[DetailsTabContent] handleCourseFieldChange calling onUpdateCourse:', {
+      field,
+      value,
+      updates,
+      updatesKeys: Object.keys(updates),
+      updatesEntries: Object.entries(updates),
+      hasTitle: 'title' in updates,
+      titleValue: updates.title,
+      updatesStringified: JSON.stringify(updates),
+      updatesType: typeof updates,
+      updatesConstructor: updates?.constructor?.name,
+      timestamp: new Date().toISOString(),
+    });
+    
+    // Create a fresh plain object to ensure no proxy/wrapper issues
+    // Parse and re-stringify to ensure we have a completely plain object
+    const updatesJson = JSON.stringify(updates);
+    const plainUpdates = JSON.parse(updatesJson) as Partial<Course>;
+    
+    console.log('[DetailsTabContent] Plain updates object:', {
+      plainUpdates,
+      plainUpdatesKeys: Object.keys(plainUpdates),
+      plainHasTitle: 'title' in plainUpdates,
+      plainTitleValue: plainUpdates.title,
+      plainUpdatesStringified: JSON.stringify(plainUpdates),
+      updatesJson,
+    });
+    
+    // Try the direct field update callback first (more reliable)
+    if (onUpdateCourseField) {
+      console.log('[DetailsTabContent] Using direct field update callback:', { field, value });
+      onUpdateCourseField(field, value);
+    } else {
+      // Fallback to object-based callback
+      onUpdateCourse(plainUpdates);
+    }
   };
+
+  // Debug: Track course.title changes
+  useEffect(() => {
+    console.log('[DetailsTabContent] course.title changed:', {
+      courseId: course?.course_id,
+      courseTitle: course?.title,
+      localTitle: title,
+      areEqual: course?.title === title,
+    });
+  }, [course?.title, course?.course_id, title]);
+
+  // Debug: Track local title state changes
+  useEffect(() => {
+    console.log('[DetailsTabContent] local title state changed:', {
+      localTitle: title,
+      courseTitle: course?.title,
+      areEqual: course?.title === title,
+    });
+  }, [title, course?.title]);
+
+  // Debug: Track shouldShowError calls and results
+  const debugShouldShowError = useCallback((entityType: NodeType, entityId: string, fieldKey: string): boolean => {
+    if (!shouldShowError) {
+      console.log('[DetailsTabContent] shouldShowError is undefined');
+      return false;
+    }
+    const result = shouldShowError(entityType, entityId, fieldKey);
+    console.log('[DetailsTabContent] shouldShowError called:', {
+      entityType,
+      entityId,
+      fieldKey,
+      result,
+      courseTitle: course?.title,
+      localTitle: title,
+      isEmpty: !course?.title || course.title.trim() === '',
+    });
+    return result;
+  }, [shouldShowError, course?.title, title]);
+
+  // Debug: Calculate error state for title field
+  useEffect(() => {
+    if (!shouldShowError) return;
+    
+    // Use local title state for validation since it updates immediately
+    const isEmpty = !title || title.trim() === '';
+    const shouldShow = shouldShowError('course', course?.course_id || '', 'title');
+    const errorState = isEmpty && shouldShow;
+    
+    console.log('[DetailsTabContent] Title error state calculation:', {
+      courseTitle: course?.title,
+      localTitle: title,
+      isEmpty,
+      shouldShow,
+      errorState,
+      courseId: course?.course_id,
+    });
+  }, [course?.title, course?.course_id, title, shouldShowError]);
 
 
 
@@ -196,8 +339,38 @@ export function DetailsTabContent({
               }}
               required
               fullWidth
-              error={shouldShowError && (!course.title || course.title.trim() === '') && shouldShowError('course', course.course_id, 'title')}
-              helperText={shouldShowError && (!course.title || course.title.trim() === '') && shouldShowError('course', course.course_id, 'title') ? 'Course title is required' : ''}
+              error={(() => {
+                // Use local title state for validation since it updates immediately
+                // course.title may lag behind due to React state update batching
+                const isEmpty = !title || title.trim() === '';
+                const shouldShow = shouldShowError ? debugShouldShowError('course', course.course_id, 'title') : false;
+                const errorState = isEmpty && shouldShow;
+                console.log('[DetailsTabContent] Title TextField error prop evaluation:', {
+                  courseTitle: course.title,
+                  localTitle: title,
+                  isEmpty,
+                  shouldShow,
+                  errorState,
+                  timestamp: new Date().toISOString(),
+                });
+                return errorState;
+              })()}
+              helperText={(() => {
+                // Use local title state for validation since it updates immediately
+                // course.title may lag behind due to React state update batching
+                const isEmpty = !title || title.trim() === '';
+                const shouldShow = shouldShowError ? debugShouldShowError('course', course.course_id, 'title') : false;
+                const helperText = isEmpty && shouldShow ? 'Course title is required' : '';
+                console.log('[DetailsTabContent] Title TextField helperText prop evaluation:', {
+                  courseTitle: course.title,
+                  localTitle: title,
+                  isEmpty,
+                  shouldShow,
+                  helperText,
+                  timestamp: new Date().toISOString(),
+                });
+                return helperText;
+              })()}
             />
 
             <TextField
@@ -214,12 +387,10 @@ export function DetailsTabContent({
                   markFieldTouched('course', course.course_id, 'short_description');
                 }
               }}
-              required
               multiline
               rows={2}
               fullWidth
-              error={shouldShowError && (!course.short_description || course.short_description.trim() === '') && shouldShowError('course', course.course_id, 'short_description')}
-              helperText={shouldShowError && (!course.short_description || course.short_description.trim() === '') && shouldShowError('course', course.course_id, 'short_description') ? 'Short description is required' : 'Required: Brief description for course cards'}
+              helperText="Recommended: Brief description for course cards"
             />
 
             <RichTextEditor
