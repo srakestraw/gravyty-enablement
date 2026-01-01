@@ -239,8 +239,18 @@ export class BaseStack extends cdk.NestedStack {
           cognito.OAuthScope.OPENID,
           cognito.OAuthScope.PROFILE,
         ],
-        callbackUrls: props.allowedOrigins.map(origin => `${origin}/auth/callback`),
-        logoutUrls: props.allowedOrigins.map(origin => `${origin}/auth/logout`),
+        // Include both base origin (for Amplify OAuth redirect) and /auth/callback path
+        // Amplify's signInWithRedirect uses the base origin as redirect_uri
+        callbackUrls: [
+          ...props.allowedOrigins.map(origin => origin), // Base origin (e.g., https://main.xxx.amplifyapp.com)
+          ...props.allowedOrigins.map(origin => `${origin}/`), // Base origin with trailing slash
+          ...props.allowedOrigins.map(origin => `${origin}/auth/callback`), // Explicit callback path
+        ],
+        logoutUrls: [
+          ...props.allowedOrigins.map(origin => origin), // Base origin
+          ...props.allowedOrigins.map(origin => `${origin}/`), // Base origin with trailing slash
+          ...props.allowedOrigins.map(origin => `${origin}/auth/logout`), // Explicit logout path
+        ],
       },
       preventUserExistenceErrors: true,
     });
