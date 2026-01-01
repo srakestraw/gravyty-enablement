@@ -69,7 +69,10 @@ export async function apiFetch<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<ApiResponse<T>> {
-  const url = `${API_BASE_URL}${endpoint}`;
+  // Normalize URL construction to avoid double slashes
+  const baseUrl = API_BASE_URL.replace(/\/+$/, ''); // Remove trailing slashes
+  const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  const url = `${baseUrl}${normalizedEndpoint}`;
   
   const authHeaders = await getAuthHeaders();
   const headers: HeadersInit = {

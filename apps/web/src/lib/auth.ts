@@ -63,29 +63,36 @@ if (import.meta.env.DEV && typeof window !== 'undefined' && typeof document !== 
 }
 
 // Build redirect URLs based on environment
-// In production, use production domain; in dev, use current origin and localhost variants
+// Always prioritize current origin first to support Amplify preview URLs and dynamic environments
+// Cognito requires the redirect_uri to match the origin where OAuth flow is initiated
 const getRedirectUrls = (): string[] => {
   const urls: string[] = [];
   
+  // Always prioritize current origin first (Amplify uses first URL)
+  // This ensures the redirect_uri matches what Cognito expects and works with preview URLs
+  if (currentOrigin) {
+    urls.push(currentOrigin); // Add without trailing slash first
+    urls.push(`${currentOrigin}/`); // Then with trailing slash
+  }
+  
   if (isProduction) {
-    // Production: use production domain
-    urls.push(productionDomain);
-    urls.push(`${productionDomain}/`);
-  } else {
-    // Development: prioritize current origin first (Amplify uses first URL)
-    // This ensures the redirect_uri matches what Cognito expects
-    if (currentOrigin) {
-      urls.push(currentOrigin); // Add without trailing slash first
-      urls.push(`${currentOrigin}/`); // Then with trailing slash
+    // Production: also include production domain as fallback
+    // But current origin (which could be Amplify preview URL) takes priority
+    if (productionDomain && currentOrigin !== productionDomain) {
+      urls.push(productionDomain);
+      urls.push(`${productionDomain}/`);
     }
-    // Also include other localhost variants
+  } else {
+    // Development: include localhost variants
     urls.push('http://localhost:3000');
     urls.push('http://localhost:3000/');
     urls.push('http://localhost:5173');
     urls.push('http://localhost:5173/');
     // Also include production domain for testing
-    urls.push(productionDomain);
-    urls.push(`${productionDomain}/`);
+    if (productionDomain && currentOrigin !== productionDomain) {
+      urls.push(productionDomain);
+      urls.push(`${productionDomain}/`);
+    }
   }
   
   // Remove duplicates while preserving order (first occurrence wins)
