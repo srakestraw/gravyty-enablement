@@ -5,7 +5,7 @@
  * and role-based publish behavior.
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -26,7 +26,6 @@ import {
   CardActionArea,
   Autocomplete,
   Chip,
-  Collapse,
   IconButton,
   Tooltip,
   FormHelperText,
@@ -40,14 +39,14 @@ import {
   CloudUpload as CloudUploadIcon,
   Link as LinkIcon,
   CloudQueue as CloudQueueIcon,
-  ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon,
   Info as InfoIcon,
   Delete as DeleteIcon,
 } from '@mui/icons-material';
-import { createAsset, initUpload, completeUpload, publishVersion, scheduleVersion, setExpireAt } from '../../api/contentHubClient';
+import { createAsset, initUpload, completeUpload, publishVersion, scheduleVersion, setExpireAt, saveRichTextContent } from '../../api/contentHubClient';
+import { RichTextEditor } from '../../components/common/RichTextEditor';
 import { isErrorResponse, usersApi, type AdminUser } from '../../lib/apiClient';
 import type { AssetType, AssetSourceType } from '@gravyty/domain';
+import { AttachmentsSection, type Attachment } from '../../components/content-hub/AttachmentsSection';
 import { useAuth } from '../../contexts/AuthContext';
 import { isContributorOrHigher, isApproverOrHigher, isAdmin } from '../../lib/roles';
 import { MetadataSelect } from '../../components/metadata/MetadataSelect';
@@ -56,6 +55,7 @@ import { MetadataSection } from '../../components/metadata';
 import { PlaceholderPage } from '../../components/shared/PlaceholderPage';
 import { CoverImageSelector } from '../../components/shared/CoverImageSelector';
 import { useMetadataOptions } from '../../hooks/useMetadataOptions';
+import { KeywordsInput } from '../../components/content-hub/KeywordsInput';
 import { metadataApi } from '../../api/metadataClient';
 import type { MetadataOption, MediaRef } from '@gravyty/domain';
 
@@ -63,11 +63,13 @@ type PublishAction = 'draft' | 'publish-now' | 'schedule';
 
 interface FieldErrors {
   title?: string;
+  summary?: string;
+  body?: string; // For text_content type
+  description?: string; // For non-text_content types
   assetType?: string;
   productSuite?: string;
   product?: string;
-  file?: string;
-  linkUrl?: string;
+  attachments?: string;
   publishAt?: string;
   expireAt?: string;
   changeLog?: string;
@@ -79,26 +81,25 @@ export function CreateAssetPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
-  const [showMoreDetails, setShowMoreDetails] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [dragActive, setDragActive] = useState(false);
   
   // Content Details
   const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
+  const [summary, setSummary] = useState(''); // Renamed from shortDescription
+  const [richTextContent, setRichTextContent] = useState(''); // RTE content (Body for text_content, Description for others)
   const [coverImage, setCoverImage] = useState<MediaRef | null>(null);
   const [assetType, setAssetType] = useState<AssetType>('doc');
   const [productSuiteIds, setProductSuiteIds] = useState<string[]>([]);
   const [productIds, setProductIds] = useState<string[]>([]);
   const [tagIds, setTagIds] = useState<string[]>([]);
   const [audienceIds, setAudienceIds] = useState<string[]>([]);
+  const [keywords, setKeywords] = useState<string[]>([]);
   const [ownerId, setOwnerId] = useState<string | undefined>(undefined);
   const [ownerUser, setOwnerUser] = useState<AdminUser | null>(null);
   
-  // Source & Availability
-  const [sourceType, setSourceType] = useState<AssetSourceType>('UPLOAD');
-  const [file, setFile] = useState<File | null>(null);
-  const [linkUrl, setLinkUrl] = useState('');
+  // Attachments (unified) - single source of truth
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  
+  // Publish settings
   const [publishAction, setPublishAction] = useState<PublishAction>('draft');
   const [publishAt, setPublishAt] = useState('');
   const [expireAt, setExpireAt] = useState('');
@@ -143,6 +144,9 @@ export function CreateAssetPage() {
   const canPublish = isApproverOrHigher(user?.role);
   const canSetOwner = isAdmin(user?.role) || isApproverOrHigher(user?.role);
   const isContributor = isContributorOrHigher(user?.role) && !canPublish;
+  
+  // Determine if content type is text_content
+  const isTextContent = assetType === 'text_content' || assetType === 'document';
   
   // Initialize form defaults
   useEffect(() => {
@@ -205,24 +209,34 @@ export function CreateAssetPage() {
         if (!assetType) return 'Content type is required';
         return undefined;
       case 'productSuite':
-        if ((publishAction === 'publish-now' || publishAction === 'schedule') && productSuiteIds.length === 0) {
-          return 'Product Suite is required to publish';
-        }
         return undefined;
       case 'product':
-        if ((publishAction === 'publish-now' || publishAction === 'schedule') && productIds.length === 0) {
-          return 'Product is required to publish';
+        return undefined;
+      case 'summary':
+        if (!summary.trim()) return 'Summary is required';
+        return undefined;
+      case 'body':
+        if (isTextContent && !richTextContent.trim()) {
+          return 'Body is required for Text Content';
         }
         return undefined;
-      case 'file':
-        if (sourceType === 'UPLOAD' && !file) {
-          return 'File is required for upload';
-        }
+      case 'description':
+        // Description is optional for non-text content
         return undefined;
-      case 'linkUrl':
-        if (sourceType === 'LINK') {
-          if (!linkUrl.trim()) return 'URL is required';
-          if (!linkUrl.startsWith('https://')) return 'Must be a valid https link';
+      case 'attachments':
+        if (!isTextContent && attachments.length === 0) {
+          return 'Add at least one attachment to publish.';
+        }
+        // Check for uploading/failed attachments when publishing
+        if ((publishAction === 'publish-now' || publishAction === 'schedule') && !isTextContent) {
+          const uploading = attachments.filter(a => a.status === 'uploading');
+          const failed = attachments.filter(a => a.status === 'failed');
+          if (uploading.length > 0) {
+            return 'Please wait for uploads to complete before publishing.';
+          }
+          if (failed.length > 0) {
+            return 'Please remove failed attachments or retry uploads before publishing.';
+          }
         }
         return undefined;
       case 'publishAt':
@@ -242,9 +256,7 @@ export function CreateAssetPage() {
         }
         return undefined;
       case 'changeLog':
-        if ((publishAction === 'publish-now' || publishAction === 'schedule') && !changeLog.trim()) {
-          return 'What changed is required when publishing';
-        }
+        // Change log is optional
         return undefined;
       default:
         return undefined;
@@ -254,7 +266,7 @@ export function CreateAssetPage() {
   // Validate all fields
   const validateForm = (): boolean => {
     const errors: FieldErrors = {};
-    const fields: (keyof FieldErrors)[] = ['title', 'assetType', 'productSuite', 'product', 'file', 'linkUrl', 'publishAt', 'expireAt', 'changeLog'];
+    const fields: (keyof FieldErrors)[] = ['title', 'summary', 'body', 'description', 'assetType', 'productSuite', 'product', 'attachments', 'publishAt', 'expireAt', 'changeLog'];
     
     fields.forEach(field => {
       const error = validateField(field);
@@ -270,15 +282,22 @@ export function CreateAssetPage() {
     // Basic required fields
     if (!title.trim() || !assetType) return false;
     
-    // Source-specific validation
-    if (sourceType === 'UPLOAD' && !file) return false;
-    if (sourceType === 'LINK' && (!linkUrl.trim() || !linkUrl.startsWith('https://'))) return false;
+    // Content-type-specific validation
+    if (!summary.trim()) return false;
+    if (isTextContent && !richTextContent.trim()) return false; // Body required for text content
+    if (!isTextContent) {
+      // Attachments required for non-text content
+      if (attachments.length === 0) return false;
+      // All attachments must be ready (not uploading/failed) when publishing
+      if (publishAction === 'publish-now' || publishAction === 'schedule') {
+        const notReady = attachments.filter(a => a.status !== 'ready');
+        if (notReady.length > 0) return false;
+      }
+    }
     
     // Publish/schedule validation
-    if (publishAction === 'publish-now' || publishAction === 'schedule') {
-      if (productSuiteIds.length === 0 || productIds.length === 0) return false;
-      if (!changeLog.trim()) return false;
-      if (publishAction === 'schedule' && (!publishAt || new Date(publishAt) <= new Date())) return false;
+    if (publishAction === 'schedule') {
+      if (!publishAt || new Date(publishAt) <= new Date()) return false;
     }
     
     // Expiration validation
@@ -310,47 +329,27 @@ export function CreateAssetPage() {
     navigate('/enablement/resources/library');
   };
   
-  const handleDrag = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === 'dragenter' || e.type === 'dragover') {
-      setDragActive(true);
-    } else if (e.type === 'dragleave') {
-      setDragActive(false);
+  // Attachment handlers - single source of truth
+  const handleAttachmentsChange = (newAttachments: Attachment[]) => {
+    setAttachments(newAttachments);
+    // Clear attachment error immediately when attachments are added
+    if (newAttachments.length > 0) {
+      setFieldErrors(prev => {
+        const updated = { ...prev };
+        delete updated.attachments;
+        return updated;
+      });
     }
+    // Trigger validation
+    handleFieldChange('attachments');
   };
   
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-    
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      setFile(e.dataTransfer.files[0]);
-      handleFieldChange('file');
-    }
-  };
-  
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
-      handleFieldChange('file');
-    }
-  };
-  
-  const formatFileSize = (bytes: number): string => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  };
-  
-  const getDomainFromUrl = (url: string): string => {
-    try {
-      const urlObj = new URL(url);
-      return urlObj.hostname;
-    } catch {
-      return '';
-    }
+  const handleSetPrimaryAttachment = (attachmentId: string) => {
+    const updated = attachments.map(a => ({
+      ...a,
+      isPrimary: a.id === attachmentId,
+    }));
+    setAttachments(updated);
   };
   
   const handleSubmit = async () => {
@@ -369,25 +368,34 @@ export function CreateAssetPage() {
       taxonomyNodeIds.push(...productIds);
       taxonomyNodeIds.push(...tagIds);
       
-      // Prepare source_ref based on source type
+      // Prepare source_ref from attachments (links)
+      const linkAttachments = attachments.filter(a => a.type === 'LINK' && a.url);
       let sourceRef: Record<string, unknown> | undefined;
-      if (sourceType === 'LINK') {
-        sourceRef = { url: linkUrl.trim() };
-      } else if (sourceType === 'GOOGLE_DRIVE') {
-        setError('Google Drive integration is not yet available');
-        return;
+      if (linkAttachments.length > 0) {
+        const validUrls = linkAttachments.map(a => a.url!).filter(url => url.startsWith('https://'));
+        if (validUrls.length === 1) {
+          sourceRef = { url: validUrls[0] };
+        } else if (validUrls.length > 1) {
+          sourceRef = { urls: validUrls };
+        }
       }
+      
+      // Determine rich text fields based on content type
+      const bodyRichText = isTextContent ? richTextContent : undefined;
+      const descriptionRichText = !isTextContent ? richTextContent : undefined;
       
       // Create content
       const createAssetResponse = await createAsset({
         title: title.trim(),
-        description: description.trim() || undefined,
+        short_description: summary.trim() || undefined,
+        description_rich_text: descriptionRichText || undefined,
+        body_rich_text: bodyRichText || undefined,
         cover_image: coverImage || undefined,
         asset_type: assetType,
         owner_id: ownerId,
-        taxonomy_node_ids: taxonomyNodeIds,
+        metadata_node_ids: taxonomyNodeIds,
         audience_ids: audienceIds,
-        source_type: sourceType,
+        keywords: keywords.length > 0 ? keywords : undefined,
         source_ref: sourceRef,
       });
       
@@ -397,15 +405,18 @@ export function CreateAssetPage() {
       }
       
       const createdAsset = createAssetResponse.data.asset;
-      let versionId: string | undefined;
+      let versionId: string | undefined = createAssetResponse.data.version?.version_id;
       
-      // Create version based on source type
-      if (sourceType === 'UPLOAD' && file) {
-        // Initialize upload
+      // Handle file attachments uploads
+      const fileAttachments = attachments.filter(a => a.type === 'FILE_UPLOAD' && a.file);
+      if (fileAttachments.length > 0 && !versionId) {
+        // Initialize upload for multiple files
         const initResponse = await initUpload(createdAsset.asset_id, {
-          filename: file.name,
-          content_type: file.type,
-          size_bytes: file.size,
+          files: fileAttachments.map(att => ({
+            filename: att.fileName || att.file!.name,
+            content_type: att.mimeType || att.file!.type,
+            size_bytes: att.fileSize || att.file!.size,
+          })),
         });
         
         if (isErrorResponse(initResponse)) {
@@ -415,37 +426,80 @@ export function CreateAssetPage() {
         
         versionId = initResponse.data.version_id;
         
-        // Upload file to S3
-        const uploadResponse = await fetch(initResponse.data.upload_url, {
-          method: 'PUT',
-          body: file,
-          headers: {
-            'Content-Type': file.type,
-          },
-        });
-        
-        if (!uploadResponse.ok) {
-          throw new Error('Failed to upload file to S3');
+        // Upload all files to S3
+        if (initResponse.data.uploads) {
+          // Multiple files
+          const uploadPromises = initResponse.data.uploads.map(async (uploadInfo, index) => {
+            const attachment = fileAttachments[index];
+            const file = attachment.file!;
+            const uploadResponse = await fetch(uploadInfo.upload_url, {
+              method: 'PUT',
+              body: file,
+              headers: {
+                'Content-Type': file.type,
+              },
+            });
+            
+            if (!uploadResponse.ok) {
+              throw new Error(`Failed to upload ${file.name} to S3`);
+            }
+            
+            return {
+              storage_key: uploadInfo.s3_key,
+              filename: file.name,
+              size_bytes: file.size,
+            };
+          });
+          
+          const uploadedFiles = await Promise.all(uploadPromises);
+          
+          // Complete upload
+          const completeResponse = await completeUpload(createdAsset.asset_id, {
+            version_id: versionId,
+            files: uploadedFiles,
+          });
+          
+          if (isErrorResponse(completeResponse)) {
+            setError(completeResponse.error.message);
+            return;
+          }
+          
+          versionId = completeResponse.data.version.version_id;
+        } else if (initResponse.data.upload_url) {
+          // Single file (backward compatible)
+          const attachment = fileAttachments[0];
+          const file = attachment.file!;
+          const uploadResponse = await fetch(initResponse.data.upload_url, {
+            method: 'PUT',
+            body: file,
+            headers: {
+              'Content-Type': file.type,
+            },
+          });
+          
+          if (!uploadResponse.ok) {
+            throw new Error('Failed to upload file to S3');
+          }
+          
+          // Complete upload
+          const completeResponse = await completeUpload(createdAsset.asset_id, {
+            version_id: versionId,
+            storage_key: initResponse.data.s3_key!,
+            size_bytes: file.size,
+          });
+          
+          if (isErrorResponse(completeResponse)) {
+            setError(completeResponse.error.message);
+            return;
+          }
+          
+          versionId = completeResponse.data.version.version_id;
         }
-        
-        // Complete upload
-        const completeResponse = await completeUpload(createdAsset.asset_id, {
-          version_id: versionId,
-          storage_key: initResponse.data.s3_key,
-          size_bytes: file.size,
-        });
-        
-        if (isErrorResponse(completeResponse)) {
-          setError(completeResponse.error.message);
-          return;
-        }
-        
-        versionId = completeResponse.data.version.version_id;
-      } else if (sourceType === 'LINK') {
-        // For LINK sources, version is created automatically by backend
-        if (createAssetResponse.data.version) {
-          versionId = createAssetResponse.data.version.version_id;
-        }
+      }
+      
+      // For text_content or if version was created automatically, use it
+      if (!versionId && createAssetResponse.data.version) {
+        versionId = createAssetResponse.data.version.version_id;
       }
       
       // Handle publish action
@@ -494,30 +548,24 @@ export function CreateAssetPage() {
     }
   };
   
-  // Get summary for review
-  const getSummary = () => {
-    return {
-      source: sourceType === 'UPLOAD' ? (file ? file.name : 'No file selected') : sourceType === 'LINK' ? (linkUrl ? getDomainFromUrl(linkUrl) : 'No URL') : 'Google Drive',
-      visibility: publishAction === 'draft' ? 'Draft' : publishAction === 'schedule' ? (publishAt ? `Scheduled: ${new Date(publishAt).toLocaleString()}` : 'Scheduled: Not set') : 'Publish now',
-      expiration: expireAt ? new Date(expireAt).toLocaleString() : 'None',
-      productSuite: productSuiteLabel || (productSuiteIds.length > 0 ? 'Selected' : 'Not set'),
-      product: productLabel || (productIds.length > 0 ? 'Selected' : 'Not set'),
-    };
-  };
-  
-  const summary = getSummary();
+  // Removed getSummary - no longer needed with new UX
   
   // Get disabled state reason for footer
   const getDisabledReason = (): string | null => {
     if (loading) return null;
     if (!title.trim()) return 'Enter a title';
     if (!assetType) return 'Select a content type';
-    if (sourceType === 'UPLOAD' && !file) return 'Select a file to upload';
-    if (sourceType === 'LINK' && (!linkUrl.trim() || !linkUrl.startsWith('https://'))) return 'Enter a valid https URL';
-    if ((publishAction === 'publish-now' || publishAction === 'schedule')) {
-      if (productSuiteIds.length === 0 || productIds.length === 0) return 'Select Product suite(s) and Product(s) to publish';
-      if (!changeLog.trim()) return 'Describe what changed';
-      if (publishAction === 'schedule' && (!publishAt || new Date(publishAt) <= new Date())) return 'Set a future publish date/time';
+    if (!summary.trim()) return 'Enter a summary';
+    if (isTextContent && !richTextContent.trim()) return 'Enter body content';
+    if (!isTextContent && attachments.length === 0) return 'Add at least one attachment to publish.';
+    if (!isTextContent && (publishAction === 'publish-now' || publishAction === 'schedule')) {
+      const uploading = attachments.filter(a => a.status === 'uploading');
+      const failed = attachments.filter(a => a.status === 'failed');
+      if (uploading.length > 0) return 'Please wait for uploads to complete.';
+      if (failed.length > 0) return 'Please remove failed attachments or retry uploads.';
+    }
+    if (publishAction === 'schedule' && (!publishAt || new Date(publishAt) <= new Date())) {
+      return 'Set a future publish date/time';
     }
     if (expireAt && new Date(expireAt) <= (publishAction === 'schedule' ? new Date(publishAt) : new Date())) {
       return 'Expiration must be after publish date/time';
@@ -582,12 +630,13 @@ export function CreateAssetPage() {
               sx={{ mb: 1.5 }}
             />
             
-            <FormControl fullWidth sx={{ mb: 2 }} required error={!!fieldErrors.assetType}>
+            <FormControl fullWidth sx={{ mb: 1.5 }} required error={!!fieldErrors.assetType}>
               <InputLabel>Content type</InputLabel>
               <Select
                 value={assetType}
                 onChange={(e) => {
-                  setAssetType(e.target.value as AssetType);
+                  const newAssetType = e.target.value as AssetType;
+                  setAssetType(newAssetType);
                   handleFieldChange('assetType');
                 }}
                 onBlur={() => handleFieldChange('assetType')}
@@ -595,6 +644,7 @@ export function CreateAssetPage() {
               >
                 <MenuItem value="deck">Deck</MenuItem>
                 <MenuItem value="doc">Document</MenuItem>
+                <MenuItem value="text_content">Text Content</MenuItem>
                 <MenuItem value="image">Image</MenuItem>
                 <MenuItem value="video">Video</MenuItem>
                 <MenuItem value="logo">Logo</MenuItem>
@@ -603,6 +653,43 @@ export function CreateAssetPage() {
               </Select>
               {fieldErrors.assetType && <FormHelperText>{fieldErrors.assetType}</FormHelperText>}
             </FormControl>
+            
+            <TextField
+              fullWidth
+              label="Summary (for cards)"
+              value={summary}
+              onChange={(e) => {
+                setSummary(e.target.value);
+                handleFieldChange('summary');
+              }}
+              onBlur={() => handleFieldChange('summary')}
+              multiline
+              rows={2}
+              required
+              error={!!fieldErrors.summary}
+              helperText={fieldErrors.summary || 'Brief description displayed on asset cards'}
+              sx={{ mb: 1.5 }}
+            />
+            
+            {/* Rich Text Editor - conditional label and required */}
+            <Box sx={{ mb: 2 }}>
+              <RichTextEditor
+                value={richTextContent}
+                onChange={(value) => {
+                  setRichTextContent(value);
+                  handleFieldChange(isTextContent ? 'body' : 'description');
+                }}
+                onBlur={() => handleFieldChange(isTextContent ? 'body' : 'description')}
+                label={isTextContent ? 'Body' : 'Description'}
+                placeholder={isTextContent ? 'Start writing your content...' : 'Add a description (optional)...'}
+                required={isTextContent}
+                error={!!(isTextContent ? fieldErrors.body : fieldErrors.description)}
+                helperText={isTextContent ? fieldErrors.body : fieldErrors.description}
+                rows={12}
+                fullWidth
+              />
+            </Box>
+            
             
             {/* Classification Section */}
             <Box sx={{ mb: 2 }}>
@@ -637,466 +724,205 @@ export function CreateAssetPage() {
                   {fieldErrors.productSuite || fieldErrors.product}
                 </FormHelperText>
               )}
-              {(publishAction === 'publish-now' || publishAction === 'schedule') && !fieldErrors.productSuite && !fieldErrors.product && (
-                <FormHelperText sx={{ mb: 1, mt: 1 }}>
-                  Product suite and product are required to publish.
-                </FormHelperText>
-              )}
             </Box>
             
-            {/* More Details Collapsible */}
+            {/* Search & Discovery Section */}
             <Box sx={{ mb: 2 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-                <Typography variant="body2" color="text.secondary">
-                  More details
-                </Typography>
-                <IconButton
-                  size="small"
-                  onClick={() => setShowMoreDetails(!showMoreDetails)}
-                >
-                  {showMoreDetails ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-                </IconButton>
-              </Box>
-              <Collapse in={showMoreDetails}>
-                <Box>
-                  <TextField
-                    fullWidth
-                    label="Description"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    multiline
-                    rows={3}
-                    sx={{ mb: 2 }}
-                  />
-                  
-                  <Box sx={{ mb: 2 }}>
-                    <CoverImageSelector
-                      entityType="asset"
-                      coverImage={coverImage}
-                      entityTitle={title}
-                      entityDescription={description}
-                      onCoverImageSelected={(mediaRef) => setCoverImage(mediaRef)}
-                      onCoverImageRemoved={() => setCoverImage(null)}
-                    />
-                  </Box>
-                  
-                  {canSetOwner && (
-                    <Autocomplete
-                      options={userOptions}
-                      getOptionLabel={(option) => `${option.name || option.email}${option.email ? ` (${option.email})` : ''}`}
-                      loading={userSearchLoading}
-                      value={ownerUser}
-                      onChange={(_, newValue) => {
-                        setOwnerUser(newValue);
-                        setOwnerId(newValue?.username);
-                      }}
-                      onInputChange={(_, newInputValue) => {
-                        setUserSearchQuery(newInputValue);
-                      }}
-                      renderInput={(params) => (
-                        <TextField
-                          {...params}
-                          label="Owner"
-                          placeholder="Search by name or email..."
-                          helperText="Default: current user"
-                        />
-                      )}
-                      sx={{ mb: 2 }}
-                    />
-                  )}
-                  {!canSetOwner && user && (
-                    <TextField
-                      fullWidth
-                      label="Owner"
-                      value={user.name || user.email || 'You'}
-                      disabled
-                      helperText="You are the owner"
-                      sx={{ mb: 2 }}
-                    />
-                  )}
-                </Box>
-              </Collapse>
+              <Typography variant="subtitle2" gutterBottom sx={{ mb: 1.5 }}>
+                Search & Discovery
+              </Typography>
+              <KeywordsInput
+                value={keywords}
+                onChange={setKeywords}
+                label="Keywords"
+                placeholder="Type to add keywords (e.g., ADA, Accessibility, VPAT)..."
+                helperText="Add search terms to help users find this content"
+                fullWidth
+              />
             </Box>
+            
+            <Box sx={{ mb: 2 }}>
+              <CoverImageSelector
+                entityType="asset"
+                coverImage={coverImage}
+                entityTitle={title}
+                entityDescription={summary}
+                onCoverImageSelected={(mediaRef) => setCoverImage(mediaRef)}
+                onCoverImageRemoved={() => setCoverImage(null)}
+              />
+            </Box>
+            
+            {canSetOwner && (
+              <Autocomplete
+                options={userOptions}
+                getOptionLabel={(option) => `${option.name || option.email}${option.email ? ` (${option.email})` : ''}`}
+                loading={userSearchLoading}
+                value={ownerUser}
+                onChange={(_, newValue) => {
+                  setOwnerUser(newValue);
+                  setOwnerId(newValue?.username);
+                }}
+                onInputChange={(_, newInputValue) => {
+                  setUserSearchQuery(newInputValue);
+                }}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Owner"
+                    placeholder="Search by name or email..."
+                    helperText="Default: current user"
+                  />
+                )}
+                sx={{ mb: 2 }}
+              />
+            )}
+            {!canSetOwner && user && (
+              <TextField
+                fullWidth
+                label="Owner"
+                value={user.name || user.email}
+                disabled
+                helperText="You are the owner"
+                sx={{ mb: 2 }}
+              />
+            )}
           </Paper>
         </Box>
         
-        {/* Right Column: Add content */}
+        {/* Right Column: Attachments + Publish */}
         <Box>
-          <Paper sx={{ p: 3 }}>
-            <Typography variant="h6" gutterBottom>
-              Add content
-            </Typography>
+          <Stack spacing={3}>
+            {/* Attachments */}
+            <Paper sx={{ p: 3 }}>
+              <AttachmentsSection
+                attachments={attachments}
+                onAttachmentsChange={handleAttachmentsChange}
+                onSetPrimary={handleSetPrimaryAttachment}
+                requiresAttachments={!isTextContent}
+                canUseDrive={false}
+                disabled={loading}
+                error={fieldErrors.attachments}
+              />
+            </Paper>
             
-            <Stack spacing={3}>
-              {/* Source Section */}
-              <Box>
-                <Typography variant="subtitle2" gutterBottom sx={{ mb: 1.5 }}>
-                  Source
-                </Typography>
-                
-                {/* Source Type Cards */}
-                <Box sx={{ display: 'flex', gap: 1.5, mb: 2 }}>
-                  <Card
-                    sx={{
-                      flex: 1,
-                      minWidth: 100,
-                      border: sourceType === 'UPLOAD' ? 2 : 1,
-                      borderColor: sourceType === 'UPLOAD' ? 'primary.main' : 'divider',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      flexDirection: 'column',
-                    }}
-                    onClick={() => {
-                      setSourceType('UPLOAD');
-                      setFile(null);
-                      setLinkUrl('');
-                    }}
-                  >
-                    <CardActionArea sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                      <CardContent sx={{ 
-                        display: 'flex', 
-                        flexDirection: 'column', 
-                        alignItems: 'center', 
-                        justifyContent: 'center',
-                        py: 2, 
-                        px: 1,
-                        gap: 0.75,
-                        minHeight: 72,
-                      }}>
-                        <CloudUploadIcon sx={{ 
-                          fontSize: 24, 
-                          color: sourceType === 'UPLOAD' ? 'primary.main' : 'text.secondary',
-                          display: 'block',
-                        }} />
-                        <Typography 
-                          variant="caption" 
-                          fontWeight={sourceType === 'UPLOAD' ? 'bold' : 'normal'}
-                          sx={{ textAlign: 'center', lineHeight: 1.2 }}
-                        >
-                          Upload
-                        </Typography>
-                      </CardContent>
-                    </CardActionArea>
-                  </Card>
-                  
-                  <Card
-                    sx={{
-                      flex: 1,
-                      minWidth: 100,
-                      border: sourceType === 'LINK' ? 2 : 1,
-                      borderColor: sourceType === 'LINK' ? 'primary.main' : 'divider',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      flexDirection: 'column',
-                    }}
-                    onClick={() => {
-                      setSourceType('LINK');
-                      setFile(null);
-                      setLinkUrl('');
-                    }}
-                  >
-                    <CardActionArea sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                      <CardContent sx={{ 
-                        display: 'flex', 
-                        flexDirection: 'column', 
-                        alignItems: 'center', 
-                        justifyContent: 'center',
-                        py: 2, 
-                        px: 1,
-                        gap: 0.75,
-                        minHeight: 72,
-                      }}>
-                        <LinkIcon sx={{ 
-                          fontSize: 24, 
-                          color: sourceType === 'LINK' ? 'primary.main' : 'text.secondary',
-                          display: 'block',
-                        }} />
-                        <Typography 
-                          variant="caption" 
-                          fontWeight={sourceType === 'LINK' ? 'bold' : 'normal'}
-                          sx={{ textAlign: 'center', lineHeight: 1.2 }}
-                        >
-                          Link
-                        </Typography>
-                      </CardContent>
-                    </CardActionArea>
-                  </Card>
-                  
-                  <Card
-                    sx={{
-                      flex: 1,
-                      minWidth: 100,
-                      border: 1,
-                      borderColor: 'divider',
-                      opacity: 0.5,
-                      cursor: 'not-allowed',
-                      display: 'flex',
-                      flexDirection: 'column',
-                    }}
-                  >
-                    <CardContent sx={{ 
-                      display: 'flex', 
-                      flexDirection: 'column', 
-                      alignItems: 'center', 
-                      justifyContent: 'center',
-                      py: 2, 
-                      px: 1,
-                      gap: 0.75,
-                      minHeight: 72,
-                    }}>
-                      <Tooltip title="Enable in Admin -> Integrations">
-                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.75 }}>
-                          <CloudQueueIcon sx={{ 
-                            fontSize: 24, 
-                            color: 'text.secondary',
-                            display: 'block',
-                          }} />
-                          <Typography 
-                            variant="caption" 
-                            color="text.secondary"
-                            sx={{ textAlign: 'center', lineHeight: 1.2 }}
-                          >
-                            Drive
-                          </Typography>
-                        </Box>
-                      </Tooltip>
-                    </CardContent>
-                  </Card>
-                </Box>
-                
-                {/* Source-specific fields */}
-                {sourceType === 'UPLOAD' && (
-                  <Box>
-                    {!file ? (
-                      <Box
-                        onDragEnter={handleDrag}
-                        onDragLeave={handleDrag}
-                        onDragOver={handleDrag}
-                        onDrop={handleDrop}
-                        sx={{
-                          border: `2px dashed ${dragActive ? 'primary.main' : 'divider'}`,
-                          borderRadius: 1,
-                          p: 3,
-                          textAlign: 'center',
-                          bgcolor: dragActive ? 'action.hover' : 'background.paper',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s',
-                          minHeight: '140px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          justifyContent: 'center',
-                          alignItems: 'center',
-                        }}
-                        onClick={() => fileInputRef.current?.click()}
-                      >
-                        <CloudUploadIcon sx={{ fontSize: 36, mb: 1, color: 'text.secondary' }} />
-                        <Typography variant="body2" gutterBottom>
-                          Drag and drop or click to upload
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          All file types
-                        </Typography>
-                        <input
-                          ref={fileInputRef}
-                          type="file"
-                          hidden
-                          onChange={handleFileSelect}
-                        />
-                      </Box>
-                    ) : (
-                      <Box sx={{ p: 1.5, border: 1, borderColor: 'divider', borderRadius: 1, bgcolor: 'action.hover' }}>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1 }}>
-                          <Box sx={{ flex: 1, minWidth: 0 }}>
-                            <Typography variant="body2" fontWeight="medium" noWrap>
-                              {file.name}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              {formatFileSize(file.size)}
-                            </Typography>
-                          </Box>
-                          <Box sx={{ display: 'flex', gap: 0.5 }}>
-                            <Button
-                              size="small"
-                              onClick={() => fileInputRef.current?.click()}
-                            >
-                              Replace
-                            </Button>
-                            <IconButton
-                              size="small"
-                              onClick={() => {
-                                setFile(null);
-                                handleFieldChange('file');
-                              }}
-                            >
-                              <DeleteIcon fontSize="small" />
-                            </IconButton>
-                          </Box>
-                        </Box>
-                      </Box>
-                    )}
-                    {fieldErrors.file && (
-                      <FormHelperText error sx={{ mt: 0.5 }}>
-                        {fieldErrors.file}
-                      </FormHelperText>
-                    )}
-                  </Box>
-                )}
-                
-                {sourceType === 'LINK' && (
-                  <TextField
-                    fullWidth
-                    label="URL"
-                    value={linkUrl}
-                    onChange={(e) => {
-                      setLinkUrl(e.target.value);
-                      handleFieldChange('linkUrl');
-                    }}
-                    onBlur={() => handleFieldChange('linkUrl')}
-                    placeholder="https://..."
-                    required
-                    error={!!fieldErrors.linkUrl}
-                    helperText={fieldErrors.linkUrl || 'Must be a valid https link'}
-                    size="small"
-                  />
-                )}
-                
-                {sourceType === 'GOOGLE_DRIVE' && (
-                  <Alert severity="info" sx={{ py: 1 }}>
-                    Google Drive integration is coming soon. Please use Upload or Link for now.
-                  </Alert>
-                )}
-              </Box>
+            {/* Publish Settings */}
+            <Paper sx={{ p: 3 }}>
+              <Typography variant="h6" gutterBottom>
+                Publish
+              </Typography>
               
-              {/* Availability Section */}
-              <Box>
-                <Typography variant="subtitle2" gutterBottom sx={{ mb: 1.5 }}>
-                  Availability
-                </Typography>
-                
-                {isContributor ? (
+              {isContributor ? (
+                <Box>
+                  <Typography variant="body2" color="text.secondary">
+                    Status: <strong>Draft</strong>
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Contributors cannot publish. Your content will be saved as a draft.
+                  </Typography>
+                </Box>
+              ) : (
+                <Stack spacing={2}>
+                  {/* Visibility */}
                   <Box>
-                    <Typography variant="body2" color="text.secondary">
-                      Status: <strong>Draft</strong>
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Contributors cannot publish. Your content will be saved as a draft.
-                    </Typography>
-                  </Box>
-                ) : (
-                  <Stack spacing={2}>
-                    {/* Visibility */}
-                    <Box>
-                      <ToggleButtonGroup
-                        value={publishAction === 'draft' ? 'publish-now' : publishAction}
-                        exclusive
-                        onChange={(_, value) => {
-                          if (value !== null) {
-                            setPublishAction(value as PublishAction);
-                            if (value === 'publish-now') {
-                              setPublishAt('');
-                            }
+                    <ToggleButtonGroup
+                      value={publishAction === 'draft' ? 'publish-now' : publishAction}
+                      exclusive
+                      onChange={(_, value) => {
+                        if (value !== null) {
+                          setPublishAction(value as PublishAction);
+                          if (value === 'publish-now') {
+                            setPublishAt('');
                           }
-                        }}
-                        fullWidth
-                        size="small"
-                      >
-                        <ToggleButton value="publish-now">Publish now</ToggleButton>
-                        <ToggleButton value="schedule">Schedule</ToggleButton>
-                      </ToggleButtonGroup>
-                      
-                      {publishAction === 'schedule' && (
-                        <TextField
-                          fullWidth
-                          type="datetime-local"
-                          label="Publish at"
-                          value={publishAt}
-                          onChange={(e) => {
-                            setPublishAt(e.target.value);
-                            handleFieldChange('publishAt');
-                          }}
-                          onBlur={() => handleFieldChange('publishAt')}
-                          InputLabelProps={{ shrink: true }}
-                          required
-                          error={!!fieldErrors.publishAt}
-                          helperText={fieldErrors.publishAt || 'Times shown in ET'}
-                          size="small"
-                          sx={{ mt: 1.5 }}
-                        />
-                      )}
-                    </Box>
-                    
-                    {/* Expiration */}
-                    <Box>
-                      <FormControlLabel
-                        control={
-                          <Checkbox
-                            checked={showExpiration}
-                            onChange={(e) => {
-                              setShowExpiration(e.target.checked);
-                              if (!e.target.checked) {
-                                setExpireAt('');
-                              }
-                            }}
-                            size="small"
-                          />
                         }
-                        label="Set expiration (optional)"
-                      />
-                      {showExpiration && (
-                        <TextField
-                          fullWidth
-                          type="datetime-local"
-                          label="Expiration date/time"
-                          value={expireAt}
-                          onChange={(e) => {
-                            setExpireAt(e.target.value);
-                            handleFieldChange('expireAt');
-                          }}
-                          onBlur={() => handleFieldChange('expireAt')}
-                          InputLabelProps={{ shrink: true }}
-                          error={!!fieldErrors.expireAt}
-                          helperText={fieldErrors.expireAt || 'Leave empty for no expiration'}
-                          size="small"
-                          sx={{ mt: 1 }}
-                        />
-                      )}
-                    </Box>
+                      }}
+                      fullWidth
+                      size="small"
+                    >
+                      <ToggleButton value="publish-now">Publish now</ToggleButton>
+                      <ToggleButton value="schedule">Schedule</ToggleButton>
+                    </ToggleButtonGroup>
                     
-                    {/* What Changed */}
-                    {(publishAction === 'publish-now' || publishAction === 'schedule') && (
+                    {publishAction === 'schedule' && (
                       <TextField
                         fullWidth
-                        multiline
-                        rows={2}
-                        label="What changed"
-                        value={changeLog}
+                        type="datetime-local"
+                        label="Publish at"
+                        value={publishAt}
                         onChange={(e) => {
-                          setChangeLog(e.target.value);
-                          handleFieldChange('changeLog');
+                          setPublishAt(e.target.value);
+                          handleFieldChange('publishAt');
                         }}
-                        onBlur={() => handleFieldChange('changeLog')}
-                        placeholder="Describe what changed in this version..."
+                        onBlur={() => handleFieldChange('publishAt')}
+                        InputLabelProps={{ shrink: true }}
                         required
-                        error={!!fieldErrors.changeLog}
-                        helperText={fieldErrors.changeLog || 'Included in notifications'}
+                        error={!!fieldErrors.publishAt}
+                        helperText={fieldErrors.publishAt || 'Times shown in ET'}
                         size="small"
+                        sx={{ mt: 1.5 }}
                       />
                     )}
-                  </Stack>
-                )}
-              </Box>
-              
-              {/* Inline Summary */}
-              <Box sx={{ pt: 2, borderTop: 1, borderColor: 'divider' }}>
-                <Typography variant="caption" color="text.secondary" component="div" sx={{ lineHeight: 1.8 }}>
-                  <Box component="span" sx={{ fontWeight: 'medium', color: 'text.primary' }}>Source:</Box> {summary.source}<br />
-                  <Box component="span" sx={{ fontWeight: 'medium', color: 'text.primary' }}>Visibility:</Box> {summary.visibility}<br />
-                  <Box component="span" sx={{ fontWeight: 'medium', color: 'text.primary' }}>Expiration:</Box> {summary.expiration}<br />
-                  <Box component="span" sx={{ fontWeight: 'medium', color: 'text.primary' }}>Product:</Box> {summary.productSuite && summary.product ? `${summary.productSuite} - ${summary.product}` : 'Not set'}
-                </Typography>
-              </Box>
-            </Stack>
-          </Paper>
+                  </Box>
+                  
+                  {/* Expiration */}
+                  <Box>
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          checked={showExpiration}
+                          onChange={(e) => {
+                            setShowExpiration(e.target.checked);
+                            if (!e.target.checked) {
+                              setExpireAt('');
+                            }
+                          }}
+                          size="small"
+                        />
+                      }
+                      label="Set expiration (optional)"
+                    />
+                    {showExpiration && (
+                      <TextField
+                        fullWidth
+                        type="datetime-local"
+                        label="Expiration date/time"
+                        value={expireAt}
+                        onChange={(e) => {
+                          setExpireAt(e.target.value);
+                          handleFieldChange('expireAt');
+                        }}
+                        onBlur={() => handleFieldChange('expireAt')}
+                        InputLabelProps={{ shrink: true }}
+                        error={!!fieldErrors.expireAt}
+                        helperText={fieldErrors.expireAt || 'Leave empty for no expiration'}
+                        size="small"
+                        sx={{ mt: 1 }}
+                      />
+                    )}
+                  </Box>
+                  
+                  {/* What Changed - Optional */}
+                  {(publishAction === 'publish-now' || publishAction === 'schedule') && (
+                    <TextField
+                      fullWidth
+                      multiline
+                      rows={2}
+                      label="What changed (optional)"
+                      value={changeLog}
+                      onChange={(e) => {
+                        setChangeLog(e.target.value);
+                        handleFieldChange('changeLog');
+                      }}
+                      onBlur={() => handleFieldChange('changeLog')}
+                      placeholder="Describe what changed in this version..."
+                      error={!!fieldErrors.changeLog}
+                      helperText={fieldErrors.changeLog || 'Optional: Included in notifications if provided'}
+                      size="small"
+                    />
+                  )}
+                </Stack>
+              )}
+            </Paper>
+          </Stack>
         </Box>
       </Box>
       
@@ -1116,24 +942,38 @@ export function CreateAssetPage() {
           px: { xs: 2, sm: 3 },
         }}
       >
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2 }}>
           <Button onClick={handleCancel} disabled={loading}>
             Cancel
           </Button>
-          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0.5 }}>
-            <Button
-              onClick={handleSubmit}
-              variant="contained"
-              disabled={loading || !isFormValid()}
-            >
-              {loading ? (
-                <CircularProgress size={20} />
-              ) : (
-                publishAction === 'draft' ? 'Create draft' : publishAction === 'schedule' ? 'Schedule' : 'Publish'
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1 }}>
+            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+              {canPublish && (
+                <Button
+                  onClick={() => {
+                    setPublishAction('draft');
+                    handleSubmit();
+                  }}
+                  variant="outlined"
+                  disabled={loading || !title.trim() || !summary.trim() || (isTextContent && !richTextContent.trim())}
+                >
+                  {loading ? <CircularProgress size={20} /> : 'Save draft'}
+                </Button>
               )}
-            </Button>
+              <Button
+                onClick={handleSubmit}
+                variant="contained"
+                disabled={loading || !isFormValid()}
+              >
+                {loading ? (
+                  <CircularProgress size={20} />
+                ) : (
+                  publishAction === 'draft' ? 'Create draft' : publishAction === 'schedule' ? 'Schedule' : 'Publish'
+                )}
+              </Button>
+            </Box>
             {!loading && !isFormValid() && getDisabledReason() && (
-              <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'right', maxWidth: 300 }}>
+              <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'right', maxWidth: 400 }}>
                 {getDisabledReason()}
               </Typography>
             )}
