@@ -42,6 +42,7 @@ export async function createAsset(req: AuthenticatedRequest, res: Response) {
       asset_type: z.enum(['deck', 'doc', 'image', 'video', 'logo', 'worksheet', 'link']),
       owner_id: z.string().optional(), // Defaults to current user
       metadata_node_ids: z.array(z.string()).default([]),
+      audience_ids: z.array(z.string()).optional(),
       source_type: z.enum(['UPLOAD', 'LINK', 'GOOGLE_DRIVE']),
       source_ref: z.record(z.unknown()).optional(),
       cover_image: MediaRefSchema.optional(),
@@ -71,6 +72,7 @@ export async function createAsset(req: AuthenticatedRequest, res: Response) {
       asset_type: parsed.data.asset_type,
       owner_id: parsed.data.owner_id || userId,
       metadata_node_ids: parsed.data.metadata_node_ids,
+      audience_ids: parsed.data.audience_ids || [],
       source_type: parsed.data.source_type,
       source_ref: parsed.data.source_ref,
       cover_image: parsed.data.cover_image,
@@ -222,6 +224,7 @@ export async function updateAsset(req: AuthenticatedRequest, res: Response) {
       asset_type: z.enum(['deck', 'doc', 'image', 'video', 'logo', 'worksheet', 'link']).optional(),
       owner_id: z.string().optional(),
       metadata_node_ids: z.array(z.string()).optional(),
+      audience_ids: z.array(z.string()).optional(),
       cover_image: MediaRefSchema.optional().nullable(),
     });
     

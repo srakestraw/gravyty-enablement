@@ -46,8 +46,8 @@ export declare const ShareLinkSchema: z.ZodObject<{
     status: "active" | "expired" | "revoked";
     created_at: string;
     created_by: string;
-    asset_id: string;
     entity_type: "SHARE_LINK";
+    asset_id: string;
     share_link_id: string;
     token: string;
     target_type: "version" | "canonicalAsset";

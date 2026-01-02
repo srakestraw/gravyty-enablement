@@ -22,7 +22,7 @@ import {
   Image as ImageIcon,
   InfoOutlined as InfoIcon,
 } from '@mui/icons-material';
-import { MetadataSelect, MetadataMultiSelect } from '../../metadata';
+import { MetadataSelect, MetadataMultiSelect, MetadataSection } from '../../metadata';
 import { RichTextEditor } from '../../common/RichTextEditor';
 import { AssetPicker } from '../../content-hub/AssetPicker';
 import { CourseAssets } from '../../lms/CourseAssets';
@@ -528,103 +528,53 @@ export function DetailsTabContent({
           <Typography variant="subtitle2" gutterBottom sx={{ mb: 2 }}>
             Metadata
           </Typography>
-          <Grid container spacing={2}>
-            {/* Product Suite */}
-            <Grid item xs={12} sm={6}>
-              <Box ref={productSuiteRef}>
-                <MetadataMultiSelect
-                  groupKey="product_suite"
-                  values={productSuiteIds}
-                  onChange={(optionIds: string[]) => {
-                    console.log('[DetailsTabContent] Product Suite onChange called:', {
-                      newOptionIds: optionIds,
-                      currentProductSuiteIds: productSuiteIds,
-                      timestamp: new Date().toISOString(),
-                    });
-                    setProductSuiteIds(optionIds);
-                    handleCourseFieldChange('product_suite_ids', optionIds);
-                    if (markFieldTouched) {
-                      markFieldTouched('course', course.course_id, 'product_suite_ids');
-                    }
-                  }}
-                  label="Product Suite"
-                  placeholder="Select product suites"
-                  fullWidth
-                  error={shouldShowError && shouldShowError('course', course.course_id, 'product_suite_ids')}
-                />
-              </Box>
-            </Grid>
-
-            {/* Product */}
-            <Grid item xs={12} sm={6}>
-              <Box ref={productRef}>
-                <MetadataMultiSelect
-                  groupKey="product"
-                  values={productIds}
-                  onChange={(optionIds: string[]) => {
-                    console.log('[DetailsTabContent] Product onChange called:', {
-                      newOptionIds: optionIds,
-                      currentProductIds: productIds,
-                      courseId: course?.course_id,
-                      timestamp: new Date().toISOString(),
-                    });
-                    setProductIds(optionIds);
-                    handleCourseFieldChange('product_ids', optionIds);
-                    if (markFieldTouched) {
-                      markFieldTouched('course', course.course_id, 'product_ids');
-                    }
-                  }}
-                  label="Product"
-                  placeholder="Select products"
-                  fullWidth
-                  error={shouldShowError && shouldShowError('course', course.course_id, 'product_ids')}
-                />
-              </Box>
-            </Grid>
-
-            {/* Topic Tags */}
-            <Grid item xs={12}>
-              <Box ref={topicTagsRef}>
-                <MetadataMultiSelect
-                  groupKey="topic_tag"
-                  values={topicTagIds}
-                  onChange={(optionIds: string[]) => {
-                    setTopicTagIds(optionIds);
-                    handleCourseFieldChange('topic_tag_ids', optionIds);
-                    if (markFieldTouched) {
-                      markFieldTouched('course', course.course_id, 'topic_tag_ids');
-                    }
-                  }}
-                  label="Topic Tags"
-                  placeholder="Add topic tags"
-                  fullWidth
-                  error={shouldShowError && shouldShowError('course', course.course_id, 'topic_tag_ids')}
-                />
-              </Box>
-            </Grid>
-
-            {/* Audience */}
-            <Grid item xs={12}>
-              <Box ref={audienceRef}>
-                <MetadataMultiSelect
-                  groupKey="audience"
-                  values={audienceIds}
-                  onChange={(optionIds: string[]) => {
-                    setAudienceIds(optionIds);
-                    handleCourseFieldChange('audience_ids', optionIds);
-                    if (markFieldTouched) {
-                      markFieldTouched('course', course.course_id, 'audience_ids');
-                    }
-                  }}
-                  label="Audience"
-                  placeholder="Select audiences"
-                  fullWidth
-                  error={shouldShowError && shouldShowError('course', course.course_id, 'audience_ids')}
-                />
-              </Box>
-            </Grid>
-
-            {/* Estimated Time */}
+          <MetadataSection
+            entityType="course"
+            entityId={course.course_id}
+            productIds={productIds}
+            onProductIdsChange={(ids) => {
+              setProductIds(ids);
+              handleCourseFieldChange('product_ids', ids);
+            }}
+            productSuiteIds={productSuiteIds}
+            onProductSuiteIdsChange={(ids) => {
+              setProductSuiteIds(ids);
+              handleCourseFieldChange('product_suite_ids', ids);
+            }}
+            topicTagIds={topicTagIds}
+            onTopicTagIdsChange={(ids) => {
+              setTopicTagIds(ids);
+              handleCourseFieldChange('topic_tag_ids', ids);
+            }}
+            audienceIds={audienceIds}
+            onAudienceIdsChange={(ids) => {
+              setAudienceIds(ids);
+              handleCourseFieldChange('audience_ids', ids);
+            }}
+            badgeIds={badgeIds}
+            onBadgeIdsChange={(ids) => {
+              setBadgeIds(ids);
+              handleCourseFieldChange('badge_ids', ids);
+            }}
+            shouldShowError={(fieldKey) => {
+              return shouldShowError ? shouldShowError('course', course.course_id, fieldKey) : false;
+            }}
+            markFieldTouched={(fieldKey) => {
+              if (markFieldTouched) {
+                markFieldTouched('course', course.course_id, fieldKey);
+              }
+            }}
+            refs={{
+              productRef,
+              productSuiteRef,
+              topicTagsRef,
+              audienceRef,
+              badgesRef,
+            }}
+          />
+          
+          {/* Estimated Time */}
+          <Grid container spacing={2} sx={{ mt: 1 }}>
             <Grid item xs={12} sm={6}>
               <TextField
                 label="Estimated time"
@@ -704,24 +654,6 @@ export function DetailsTabContent({
               />
             </Box>
 
-            {/* Badges */}
-            <Box ref={badgesRef}>
-              <MetadataMultiSelect
-                groupKey="badge"
-                values={badgeIds}
-                onChange={(optionIds: string[]) => {
-                  setBadgeIds(optionIds);
-                  handleCourseFieldChange('badge_ids', optionIds);
-                  if (markFieldTouched) {
-                    markFieldTouched('course', course.course_id, 'badge_ids');
-                  }
-                }}
-                label="Badges"
-                placeholder="Select badges"
-                fullWidth
-                error={shouldShowError && shouldShowError('course', course.course_id, 'badge_ids')}
-              />
-            </Box>
           </Box>
         </Paper>
       </Box>

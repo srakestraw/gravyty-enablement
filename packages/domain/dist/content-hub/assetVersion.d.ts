@@ -70,8 +70,8 @@ export declare const AssetVersionSchema: z.ZodObject<{
     created_at: string;
     created_by: string;
     updated_at: string;
-    asset_id: string;
     entity_type: "ASSET_VERSION";
+    asset_id: string;
     version_id: string;
     version_number: number;
     size_bytes?: number | undefined;

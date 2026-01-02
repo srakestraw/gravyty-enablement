@@ -27,9 +27,9 @@ export declare const CourseAssetSchema: z.ZodObject<{
     created_at: string;
     created_by: string;
     course_id: string;
+    entity_type: "COURSE_ASSET";
     sort_order: number;
     asset_id: string;
-    entity_type: "COURSE_ASSET";
     course_asset_id: string;
     lesson_id?: string | undefined;
     version_id?: string | undefined;
@@ -44,8 +44,8 @@ export declare const CourseAssetSchema: z.ZodObject<{
     asset_id: string;
     course_asset_id: string;
     lesson_id?: string | undefined;
-    sort_order?: number | undefined;
     entity_type?: "COURSE_ASSET" | undefined;
+    sort_order?: number | undefined;
     version_id?: string | undefined;
     display_label?: string | undefined;
     module_id?: string | undefined;

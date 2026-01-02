@@ -24,7 +24,7 @@ import type { MediaRef } from '@gravyty/domain';
 
 export interface CoverImageSelectorProps {
   // Entity context
-  entityType: 'course' | 'asset' | 'role-playing';
+  entityType: 'course' | 'asset' | 'role-playing' | 'path' | 'kit';
   entityId?: string;
   
   // Current cover image
@@ -165,6 +165,10 @@ export function CoverImageSelector({
           mediaType="cover"
           title="Select Cover Image"
           courseId={entityType === 'course' ? entityId : undefined}
+          pathId={entityType === 'path' ? entityId : undefined}
+          kitId={entityType === 'kit' ? entityId : undefined}
+          rolePlayingId={entityType === 'role-playing' ? entityId : undefined}
+          assetId={entityType === 'asset' ? entityId : undefined}
           onTemporaryMediaCreated={onTemporaryMediaCreated}
           entityType={entityType}
           entityTitle={entityTitle}

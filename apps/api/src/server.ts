@@ -11,6 +11,7 @@ import { createStorageRepos } from './storage/factory';
 import lmsRoutes from './routes/lms';
 import adminUsersRoutes from './routes/adminUsers';
 import metadataRoutes from './routes/metadata';
+import searchRoutes from './routes/search';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -66,6 +67,9 @@ v1.use('/admin/users', requireRole('Admin'), adminUsersRoutes);
 
 // Metadata routes (Viewer+ for read, Admin for write)
 v1.use('/metadata', metadataRoutes);
+
+// Search routes (Viewer+)
+v1.use('/search', searchRoutes);
 
 // Content Hub routes (Viewer+)
 import contentHubRoutes from './routes/contentHub';

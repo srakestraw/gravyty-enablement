@@ -26,7 +26,7 @@ import {
   Image as ImageIcon,
   InfoOutlined as InfoIcon,
 } from '@mui/icons-material';
-import { MetadataSelect, MetadataMultiSelect } from '../../metadata';
+import { MetadataSelect, MetadataMultiSelect, MetadataSection } from '../../metadata';
 import { RichTextEditor } from '../../common/RichTextEditor';
 import { AssetPicker } from '../../content-hub/AssetPicker';
 import { CourseAssets } from '../../lms/CourseAssets';
@@ -80,6 +80,7 @@ export function CourseDetailsEditor({
   const productRef = useRef<HTMLDivElement>(null);
   const productSuiteRef = useRef<HTMLDivElement>(null);
   const topicTagsRef = useRef<HTMLDivElement>(null);
+  const audienceRef = useRef<HTMLDivElement>(null);
   const coverImageRef = useRef<HTMLDivElement>(null);
   const badgesRef = useRef<HTMLDivElement>(null);
 
@@ -121,6 +122,15 @@ export function CourseDetailsEditor({
         entityId: course.course_id,
         fieldKey: 'topic_tag_ids',
         ref: topicTagsRef,
+      }));
+    }
+
+    if (audienceRef.current) {
+      unregisters.push(focusRegistry.register({
+        entityType: 'course',
+        entityId: course.course_id,
+        fieldKey: 'audience_ids',
+        ref: audienceRef,
       }));
     }
 
@@ -261,64 +271,46 @@ export function CourseDetailsEditor({
           <Typography variant="subtitle2" gutterBottom sx={{ mb: 2 }}>
             Metadata
           </Typography>
-          <Grid container spacing={2}>
-            {/* Product Suite */}
-            <Grid item xs={12} sm={6}>
-              <Box ref={productSuiteRef}>
-                <MetadataMultiSelect
-                  groupKey="product_suite"
-                  values={
-                    (course.product_suite_ids && course.product_suite_ids.length > 0)
-                      ? course.product_suite_ids
-                      : (course.product_suite_id ? [course.product_suite_id] : [])
-                  }
-                  onChange={(optionIds) => {
-                    handleFieldChange('product_suite_ids', optionIds);
-                  }}
-                  label="Product Suite"
-                  placeholder="Select product suites"
-                  fullWidth
-                />
-              </Box>
-            </Grid>
-
-            {/* Product */}
-            <Grid item xs={12} sm={6}>
-              <Box ref={productRef}>
-                <MetadataMultiSelect
-                  groupKey="product"
-                  values={
-                    (course.product_ids && course.product_ids.length > 0)
-                      ? course.product_ids
-                      : (course.product_id ? [course.product_id] : [])
-                  }
-                  onChange={(optionIds) => {
-                    handleFieldChange('product_ids', optionIds);
-                  }}
-                  label="Product"
-                  placeholder="Select products"
-                  fullWidth
-                />
-              </Box>
-            </Grid>
-
-            {/* Topic Tags */}
-            <Grid item xs={12}>
-              <Box ref={topicTagsRef}>
-                <MetadataMultiSelect
-                  groupKey="topic_tag"
-                  values={course.topic_tag_ids && course.topic_tag_ids.length > 0 ? course.topic_tag_ids : []}
-                  onChange={(optionIds) => {
-                    handleFieldChange('topic_tag_ids', optionIds);
-                  }}
-                  label="Topic Tags"
-                  placeholder="Add topic tags"
-                  fullWidth
-                />
-              </Box>
-            </Grid>
-
-            {/* Estimated Time */}
+          <MetadataSection
+            entityType="course"
+            entityId={course.course_id}
+            productIds={
+              (course.product_ids && course.product_ids.length > 0)
+                ? course.product_ids
+                : (course.product_id ? [course.product_id] : [])
+            }
+            onProductIdsChange={(ids) => handleFieldChange('product_ids', ids)}
+            productSuiteIds={
+              (course.product_suite_ids && course.product_suite_ids.length > 0)
+                ? course.product_suite_ids
+                : (course.product_suite_id ? [course.product_suite_id] : [])
+            }
+            onProductSuiteIdsChange={(ids) => handleFieldChange('product_suite_ids', ids)}
+            topicTagIds={course.topic_tag_ids && course.topic_tag_ids.length > 0 ? course.topic_tag_ids : []}
+            onTopicTagIdsChange={(ids) => handleFieldChange('topic_tag_ids', ids)}
+            audienceIds={course.audience_ids && course.audience_ids.length > 0 ? course.audience_ids : []}
+            onAudienceIdsChange={(ids) => handleFieldChange('audience_ids', ids)}
+            badgeIds={course.badge_ids && course.badge_ids.length > 0 ? course.badge_ids : []}
+            onBadgeIdsChange={(ids) => handleFieldChange('badge_ids', ids)}
+            shouldShowError={(fieldKey) => {
+              return shouldShowError ? shouldShowError('course', course.course_id, fieldKey) : false;
+            }}
+            markFieldTouched={(fieldKey) => {
+              if (markFieldTouched) {
+                markFieldTouched('course', course.course_id, fieldKey);
+              }
+            }}
+            refs={{
+              productRef,
+              productSuiteRef,
+              topicTagsRef,
+              audienceRef,
+              badgesRef,
+            }}
+          />
+          
+          {/* Estimated Time */}
+          <Grid container spacing={2} sx={{ mt: 1 }}>
             <Grid item xs={12} sm={6}>
               <TextField
                 label="Estimated time"
@@ -371,19 +363,7 @@ export function CourseDetailsEditor({
               />
             </Box>
 
-            {/* Badges */}
-            <Box ref={badgesRef}>
-              <TaxonomyMultiSelect
-                groupKey="badge"
-                values={course.badge_ids && course.badge_ids.length > 0 ? course.badge_ids : []}
-                onChange={(optionIds) => {
-                  handleFieldChange('badge_ids', optionIds);
-                }}
-                label="Badges"
-                placeholder="Select badges"
-                fullWidth
-              />
-            </Box>
+            {/* Badges - moved to MetadataSection */}
           </Box>
         </Paper>
       </Box>

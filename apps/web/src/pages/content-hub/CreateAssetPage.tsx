@@ -52,6 +52,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { isContributorOrHigher, isApproverOrHigher, isAdmin } from '../../lib/roles';
 import { MetadataSelect } from '../../components/metadata/MetadataSelect';
 import { MetadataMultiSelect } from '../../components/metadata/MetadataMultiSelect';
+import { MetadataSection } from '../../components/metadata';
 import { PlaceholderPage } from '../../components/shared/PlaceholderPage';
 import { CoverImageSelector } from '../../components/shared/CoverImageSelector';
 import { useMetadataOptions } from '../../hooks/useMetadataOptions';
@@ -90,6 +91,7 @@ export function CreateAssetPage() {
   const [productSuiteIds, setProductSuiteIds] = useState<string[]>([]);
   const [productIds, setProductIds] = useState<string[]>([]);
   const [tagIds, setTagIds] = useState<string[]>([]);
+  const [audienceIds, setAudienceIds] = useState<string[]>([]);
   const [ownerId, setOwnerId] = useState<string | undefined>(undefined);
   const [ownerUser, setOwnerUser] = useState<AdminUser | null>(null);
   
@@ -384,6 +386,7 @@ export function CreateAssetPage() {
         asset_type: assetType,
         owner_id: ownerId,
         taxonomy_node_ids: taxonomyNodeIds,
+        audience_ids: audienceIds,
         source_type: sourceType,
         source_ref: sourceRef,
       });
@@ -606,52 +609,39 @@ export function CreateAssetPage() {
               <Typography variant="subtitle2" gutterBottom sx={{ mb: 1.5 }}>
                 Classification
               </Typography>
-              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2, mb: 1.5 }}>
-                <MetadataMultiSelect
-                  groupKey="product_suite"
-                  values={productSuiteIds}
-                  onChange={(ids) => {
-                    setProductSuiteIds(ids);
-                    handleFieldChange('productSuite');
-                  }}
-                  label="Product Suite"
-                  placeholder="Select product suites"
-                  error={!!fieldErrors.productSuite}
-                  required={publishAction === 'publish-now' || publishAction === 'schedule'}
-                />
-                <MetadataMultiSelect
-                  groupKey="product"
-                  values={productIds}
-                  onChange={(ids) => {
-                    setProductIds(ids);
-                    handleFieldChange('product');
-                  }}
-                  label="Product"
-                  placeholder="Select products"
-                  error={!!fieldErrors.product}
-                  required={publishAction === 'publish-now' || publishAction === 'schedule'}
-                />
-              </Box>
+              <MetadataSection
+                entityType="content"
+                entityId="new"
+                productIds={productIds}
+                onProductIdsChange={(ids) => {
+                  setProductIds(ids);
+                  handleFieldChange('product');
+                }}
+                productSuiteIds={productSuiteIds}
+                onProductSuiteIdsChange={(ids) => {
+                  setProductSuiteIds(ids);
+                  handleFieldChange('productSuite');
+                }}
+                topicTagIds={tagIds}
+                onTopicTagIdsChange={setTagIds}
+                audienceIds={audienceIds}
+                onAudienceIdsChange={setAudienceIds}
+                shouldShowError={(fieldKey) => {
+                  if (fieldKey === 'product_ids') return !!fieldErrors.product;
+                  if (fieldKey === 'product_suite_ids') return !!fieldErrors.productSuite;
+                  return false;
+                }}
+              />
               {(fieldErrors.productSuite || fieldErrors.product) && (
-                <FormHelperText error sx={{ mb: 1 }}>
+                <FormHelperText error sx={{ mb: 1, mt: 1 }}>
                   {fieldErrors.productSuite || fieldErrors.product}
                 </FormHelperText>
               )}
               {(publishAction === 'publish-now' || publishAction === 'schedule') && !fieldErrors.productSuite && !fieldErrors.product && (
-                <FormHelperText sx={{ mb: 1 }}>
+                <FormHelperText sx={{ mb: 1, mt: 1 }}>
                   Product suite and product are required to publish.
                 </FormHelperText>
               )}
-              <Box sx={{ mt: 1 }}>
-                <MetadataMultiSelect
-                  groupKey="topic_tag"
-                  values={tagIds}
-                  onChange={setTagIds}
-                  label="Tags"
-                  placeholder="Add tags"
-                  error={false}
-                />
-              </Box>
             </Box>
             
             {/* More Details Collapsible */}

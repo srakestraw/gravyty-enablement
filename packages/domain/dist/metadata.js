@@ -19,7 +19,7 @@ import { z } from 'zod';
  * - "product_suite" (was "product_concept")
  * - "topic_tag" (unchanged)
  */
-export const MetadataGroupKeySchema = z.enum(['product', 'product_suite', 'topic_tag', 'badge', 'audience']);
+export const MetadataGroupKeySchema = z.enum(['product', 'product_suite', 'topic_tag', 'badge', 'audience', 'entity_type']);
 /**
  * Metadata Option
  *

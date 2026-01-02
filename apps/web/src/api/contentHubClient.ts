@@ -14,6 +14,7 @@ export interface CreateAssetRequest {
   asset_type: 'deck' | 'doc' | 'image' | 'video' | 'logo' | 'worksheet' | 'link';
   owner_id?: string;
   metadata_node_ids?: string[];
+  audience_ids?: string[];
   source_type: 'UPLOAD' | 'LINK' | 'GOOGLE_DRIVE';
   source_ref?: Record<string, unknown>;
 }

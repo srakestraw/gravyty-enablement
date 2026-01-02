@@ -1,45 +1,20 @@
 /**
- * Content Hub - Asset Domain Model
+ * Unified Search Domain Types
  *
- * Represents a logical asset (e.g., "Q1 Sales Deck") that can have multiple versions.
+ * Types for searching and filtering across multiple entity types
+ * (Courses, Learning Paths, Role Playing, Content/Assets, Content Kits)
  */
 import { z } from 'zod';
 /**
- * Asset Type
- */
-export declare const AssetTypeSchema: z.ZodEnum<["deck", "doc", "image", "video", "logo", "worksheet", "link"]>;
-export type AssetType = z.infer<typeof AssetTypeSchema>;
-/**
- * Asset Source Type
- */
-export declare const AssetSourceTypeSchema: z.ZodEnum<["UPLOAD", "LINK", "GOOGLE_DRIVE"]>;
-export type AssetSourceType = z.infer<typeof AssetSourceTypeSchema>;
-/**
- * Source Reference (JSON)
+ * Unified Search Result
  *
- * Structure depends on sourceType:
- * - LINK: { url: string, preview?: string }
- * - GOOGLE_DRIVE: { driveFileId: string, driveMimeType: string, driveWebViewLink?: string, connectorId: string }
+ * Represents a search result that can be any entity type
  */
-export declare const SourceRefSchema: z.ZodRecord<z.ZodString, z.ZodUnknown>;
-export type SourceRef = z.infer<typeof SourceRefSchema>;
-/**
- * Asset
- *
- * Logical asset that can have multiple versions.
- */
-export declare const AssetSchema: z.ZodObject<{
-    asset_id: z.ZodString;
+export declare const UnifiedSearchResultSchema: z.ZodObject<{
+    entity_type: z.ZodEnum<["course", "learning_path", "role_playing", "content", "content_kit"]>;
+    entity_id: z.ZodString;
     title: z.ZodString;
-    description: z.ZodOptional<z.ZodString>;
-    asset_type: z.ZodEnum<["deck", "doc", "image", "video", "logo", "worksheet", "link"]>;
-    owner_id: z.ZodString;
-    metadata_node_ids: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
-    audience_ids: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
-    source_type: z.ZodEnum<["UPLOAD", "LINK", "GOOGLE_DRIVE"]>;
-    source_ref: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
-    current_published_version_id: z.ZodOptional<z.ZodString>;
-    pinned: z.ZodDefault<z.ZodBoolean>;
+    short_description: z.ZodOptional<z.ZodString>;
     cover_image: z.ZodOptional<z.ZodObject<{
         media_id: z.ZodString;
         type: z.ZodEnum<["image", "video", "document", "audio", "other"]>;
@@ -98,29 +73,42 @@ export declare const AssetSchema: z.ZodObject<{
         transcription_language?: string | undefined;
         transcription_error?: string | undefined;
     }>>;
-    created_at: z.ZodString;
-    created_by: z.ZodString;
+    metadata: z.ZodObject<{
+        product_ids: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
+        product_suite_ids: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
+        topic_tag_ids: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
+        audience_ids: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
+        badge_ids: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
+    }, "strip", z.ZodTypeAny, {
+        product_ids?: string[] | undefined;
+        product_suite_ids?: string[] | undefined;
+        topic_tag_ids?: string[] | undefined;
+        audience_ids?: string[] | undefined;
+        badge_ids?: string[] | undefined;
+    }, {
+        product_ids?: string[] | undefined;
+        product_suite_ids?: string[] | undefined;
+        topic_tag_ids?: string[] | undefined;
+        audience_ids?: string[] | undefined;
+        badge_ids?: string[] | undefined;
+    }>;
+    status: z.ZodOptional<z.ZodString>;
+    published_at: z.ZodOptional<z.ZodString>;
     updated_at: z.ZodString;
-    updated_by: z.ZodString;
-    entity_type: z.ZodDefault<z.ZodLiteral<"ASSET">>;
-    'metadata_node_id#status': z.ZodOptional<z.ZodString>;
-    'owner_id#updated_at': z.ZodOptional<z.ZodString>;
-    'pinned#updated_at': z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
-    created_at: string;
     title: string;
-    created_by: string;
-    audience_ids: string[];
+    metadata: {
+        product_ids?: string[] | undefined;
+        product_suite_ids?: string[] | undefined;
+        topic_tag_ids?: string[] | undefined;
+        audience_ids?: string[] | undefined;
+        badge_ids?: string[] | undefined;
+    };
     updated_at: string;
-    updated_by: string;
-    entity_type: "ASSET";
-    asset_id: string;
-    asset_type: "image" | "video" | "link" | "deck" | "doc" | "logo" | "worksheet";
-    owner_id: string;
-    metadata_node_ids: string[];
-    source_type: "UPLOAD" | "LINK" | "GOOGLE_DRIVE";
-    pinned: boolean;
-    description?: string | undefined;
+    entity_type: "content" | "course" | "learning_path" | "role_playing" | "content_kit";
+    entity_id: string;
+    status?: string | undefined;
+    short_description?: string | undefined;
     cover_image?: {
         type: "image" | "video" | "document" | "audio" | "other";
         created_at: string;
@@ -141,23 +129,21 @@ export declare const AssetSchema: z.ZodObject<{
         transcription_language?: string | undefined;
         transcription_error?: string | undefined;
     } | undefined;
-    source_ref?: Record<string, unknown> | undefined;
-    current_published_version_id?: string | undefined;
-    'metadata_node_id#status'?: string | undefined;
-    'owner_id#updated_at'?: string | undefined;
-    'pinned#updated_at'?: string | undefined;
+    published_at?: string | undefined;
 }, {
-    created_at: string;
     title: string;
-    created_by: string;
+    metadata: {
+        product_ids?: string[] | undefined;
+        product_suite_ids?: string[] | undefined;
+        topic_tag_ids?: string[] | undefined;
+        audience_ids?: string[] | undefined;
+        badge_ids?: string[] | undefined;
+    };
     updated_at: string;
-    updated_by: string;
-    asset_id: string;
-    asset_type: "image" | "video" | "link" | "deck" | "doc" | "logo" | "worksheet";
-    owner_id: string;
-    source_type: "UPLOAD" | "LINK" | "GOOGLE_DRIVE";
-    description?: string | undefined;
-    audience_ids?: string[] | undefined;
+    entity_type: "content" | "course" | "learning_path" | "role_playing" | "content_kit";
+    entity_id: string;
+    status?: string | undefined;
+    short_description?: string | undefined;
     cover_image?: {
         type: "image" | "video" | "document" | "audio" | "other";
         created_at: string;
@@ -178,14 +164,50 @@ export declare const AssetSchema: z.ZodObject<{
         transcription_language?: string | undefined;
         transcription_error?: string | undefined;
     } | undefined;
-    entity_type?: "ASSET" | undefined;
-    metadata_node_ids?: string[] | undefined;
-    source_ref?: Record<string, unknown> | undefined;
-    current_published_version_id?: string | undefined;
-    pinned?: boolean | undefined;
-    'metadata_node_id#status'?: string | undefined;
-    'owner_id#updated_at'?: string | undefined;
-    'pinned#updated_at'?: string | undefined;
+    published_at?: string | undefined;
 }>;
-export type Asset = z.infer<typeof AssetSchema>;
-//# sourceMappingURL=asset.d.ts.map
+export type UnifiedSearchResult = z.infer<typeof UnifiedSearchResultSchema>;
+/**
+ * Unified Search Parameters
+ */
+export declare const UnifiedSearchParamsSchema: z.ZodObject<{
+    q: z.ZodOptional<z.ZodString>;
+    entity_types: z.ZodOptional<z.ZodArray<z.ZodEnum<["course", "learning_path", "role_playing", "content", "content_kit"]>, "many">>;
+    product_ids: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
+    product_suite_ids: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
+    topic_tag_ids: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
+    audience_ids: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
+    badge_ids: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
+    limit: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
+    cursor: z.ZodOptional<z.ZodString>;
+}, "strip", z.ZodTypeAny, {
+    limit: number;
+    product_ids?: string[] | undefined;
+    product_suite_ids?: string[] | undefined;
+    topic_tag_ids?: string[] | undefined;
+    audience_ids?: string[] | undefined;
+    badge_ids?: string[] | undefined;
+    q?: string | undefined;
+    entity_types?: ("content" | "course" | "learning_path" | "role_playing" | "content_kit")[] | undefined;
+    cursor?: string | undefined;
+}, {
+    product_ids?: string[] | undefined;
+    product_suite_ids?: string[] | undefined;
+    topic_tag_ids?: string[] | undefined;
+    audience_ids?: string[] | undefined;
+    badge_ids?: string[] | undefined;
+    q?: string | undefined;
+    entity_types?: ("content" | "course" | "learning_path" | "role_playing" | "content_kit")[] | undefined;
+    limit?: number | undefined;
+    cursor?: string | undefined;
+}>;
+export type UnifiedSearchParams = z.infer<typeof UnifiedSearchParamsSchema>;
+/**
+ * Unified Search Response
+ */
+export interface UnifiedSearchResponse {
+    results: UnifiedSearchResult[];
+    next_cursor?: string;
+    total?: number;
+}
+//# sourceMappingURL=search.d.ts.map

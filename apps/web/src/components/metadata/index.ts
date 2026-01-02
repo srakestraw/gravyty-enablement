@@ -6,5 +6,7 @@
 
 export { MetadataSelect } from './MetadataSelect';
 export { MetadataMultiSelect } from './MetadataMultiSelect';
+export { MetadataSection } from './MetadataSection';
 export type { MetadataSelectProps } from './MetadataSelect';
 export type { MetadataMultiSelectProps } from './MetadataMultiSelect';
+export type { MetadataSectionProps } from './MetadataSection';

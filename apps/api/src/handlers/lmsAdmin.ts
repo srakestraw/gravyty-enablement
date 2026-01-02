@@ -981,6 +981,14 @@ export async function createPath(req: AuthenticatedRequest, res: Response) {
     product_suite: z.string().optional(), // Was "product_concept"
     topic_tags: z.array(z.string()).optional(),
     badges: z.array(z.string()).optional(),
+    audience_ids: z.array(z.string()).optional(),
+    cover_image: z.object({
+      media_id: z.string(),
+      type: z.enum(['image', 'video', 'document', 'audio', 'other']),
+      url: z.string().url(),
+      created_at: z.string(),
+      created_by: z.string(),
+    }).optional(),
     courses: z.array(z.object({
       course_id: z.string(),
       order: z.number(),
@@ -1020,6 +1028,8 @@ export async function createPath(req: AuthenticatedRequest, res: Response) {
       product_suite,
       topic_tags: parsed.data.topic_tags || [],
       badges: parsed.data.badges || [],
+      audience_ids: parsed.data.audience_ids || [],
+      cover_image: parsed.data.cover_image,
       courses: (parsed.data.courses || []).map((c) => ({
         course_id: c.course_id,
         order: c.order,
@@ -1151,6 +1161,14 @@ export async function updatePath(req: AuthenticatedRequest, res: Response) {
     product_suite: z.string().optional(), // Was "product_concept"
     topic_tags: z.array(z.string()).optional(),
     badges: z.array(z.string()).optional(),
+    audience_ids: z.array(z.string()).optional(),
+    cover_image: z.object({
+      media_id: z.string(),
+      type: z.enum(['image', 'video', 'document', 'audio', 'other']),
+      url: z.string().url(),
+      created_at: z.string(),
+      created_by: z.string(),
+    }).optional(),
     courses: z.array(z.object({
       course_id: z.string(),
       order: z.number(),
@@ -1853,10 +1871,14 @@ export async function presignMediaUpload(req: AuthenticatedRequest, res: Respons
   const PresignSchema = z.object({
     media_type: z.enum(['cover', 'video', 'poster', 'attachment']),
     course_id: z.string().optional(),
+    path_id: z.string().optional(),
+    kit_id: z.string().optional(),
+    role_playing_id: z.string().optional(),
+    asset_id: z.string().optional(),
     lesson_id: z.string().optional(),
     filename: z.string(),
     content_type: z.string(),
-    temporary: z.boolean().optional(), // Flag to mark upload as temporary (for unsaved courses)
+    temporary: z.boolean().optional(), // Flag to mark upload as temporary (for unsaved entities)
   });
   
   const parsed = PresignSchema.safeParse(req.body);
@@ -1880,16 +1902,37 @@ export async function presignMediaUpload(req: AuthenticatedRequest, res: Respons
     // Build S3 key according to convention
     let s3Key = '';
     if (parsed.data.media_type === 'cover') {
+      // Determine entity type and ID for cover images
+      let entityId: string | undefined;
+      let entityPrefix: string | undefined;
+      
       if (parsed.data.course_id && parsed.data.course_id !== 'new') {
-        s3Key = `covers/${parsed.data.course_id}/${sanitizedFilename}`;
+        entityId = parsed.data.course_id;
+        entityPrefix = 'courses';
+      } else if (parsed.data.path_id && parsed.data.path_id !== 'new') {
+        entityId = parsed.data.path_id;
+        entityPrefix = 'paths';
+      } else if (parsed.data.kit_id && parsed.data.kit_id !== 'new') {
+        entityId = parsed.data.kit_id;
+        entityPrefix = 'kits';
+      } else if (parsed.data.role_playing_id && parsed.data.role_playing_id !== 'new') {
+        entityId = parsed.data.role_playing_id;
+        entityPrefix = 'role-playing';
+      } else if (parsed.data.asset_id && parsed.data.asset_id !== 'new') {
+        entityId = parsed.data.asset_id;
+        entityPrefix = 'assets';
+      }
+      
+      if (entityId && entityPrefix) {
+        s3Key = `covers/${entityPrefix}/${entityId}/${sanitizedFilename}`;
       } else if (parsed.data.temporary) {
-        // Temporary media for unsaved courses/assets - use temp prefix
+        // Temporary media for unsaved entities - use temp prefix
         s3Key = `temp/covers/${mediaId}/${sanitizedFilename}`;
       } else {
         res.status(400).json({
           error: {
             code: 'VALIDATION_ERROR',
-            message: 'course_id is required for cover images (or set temporary=true for unsaved entities)',
+            message: 'Entity ID (course_id, path_id, kit_id, role_playing_id, or asset_id) is required for cover images (or set temporary=true for unsaved entities)',
           },
           request_id: requestId,
         });
@@ -1905,7 +1948,7 @@ export async function presignMediaUpload(req: AuthenticatedRequest, res: Respons
       res.status(400).json({
         error: {
           code: 'VALIDATION_ERROR',
-          message: 'Invalid media_type/course_id/lesson_id combination',
+          message: 'Invalid media_type/entity_id/lesson_id combination',
         },
         request_id: requestId,
       });

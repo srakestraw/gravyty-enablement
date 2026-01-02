@@ -26,8 +26,8 @@ export declare const CommentSchema: z.ZodObject<{
     created_at: string;
     user_id: string;
     body: string;
-    asset_id: string;
     entity_type: "COMMENT";
+    asset_id: string;
     comment_id: string;
     updated_at?: string | undefined;
     version_id?: string | undefined;

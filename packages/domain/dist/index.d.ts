@@ -5,5 +5,7 @@ export { UserRoleSchema, type UserRole, CognitoUserStatusSchema, type CognitoUse
 export * from './lms/index.js';
 export * from './metadata.js';
 export * from './metadata-normalization.js';
+export * from './metadata-config.js';
 export * from './content-hub/index.js';
+export * from './search.js';
 //# sourceMappingURL=index.d.ts.map

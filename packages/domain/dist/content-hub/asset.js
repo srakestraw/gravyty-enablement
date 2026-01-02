@@ -49,6 +49,7 @@ export const AssetSchema = z.object({
     owner_id: z.string(),
     // Metadata
     metadata_node_ids: z.array(z.string()).default([]),
+    audience_ids: z.array(z.string()).default([]), // Multi-select audience IDs
     // Source information
     source_type: AssetSourceTypeSchema,
     source_ref: SourceRefSchema.optional(),

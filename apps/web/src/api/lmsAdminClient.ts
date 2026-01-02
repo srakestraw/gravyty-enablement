@@ -114,6 +114,8 @@ export interface CreatePathRequest {
   product_concept?: string;
   topic_tags?: string[];
   badges?: string[];
+  audience_ids?: string[];
+  cover_image?: MediaRef;
   courses?: Array<{
     course_id: string;
     order: number;
@@ -130,6 +132,8 @@ export interface UpdatePathRequest {
   product_concept?: string;
   topic_tags?: string[];
   badges?: string[];
+  audience_ids?: string[];
+  cover_image?: MediaRef;
   courses?: Array<{
     course_id: string;
     order: number;
@@ -179,10 +183,14 @@ export interface UpdateCertificateTemplateRequest {
 export interface PresignMediaUploadRequest {
   media_type: 'cover' | 'video' | 'poster' | 'attachment';
   course_id?: string;
+  path_id?: string;
+  kit_id?: string;
+  role_playing_id?: string;
+  asset_id?: string;
   lesson_id?: string;
   filename: string;
   content_type: string;
-  temporary?: boolean; // Flag to mark upload as temporary (for unsaved courses)
+  temporary?: boolean; // Flag to mark upload as temporary (for unsaved entities)
 }
 
 export interface PresignMediaUploadResponse {

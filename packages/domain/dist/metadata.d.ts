@@ -19,7 +19,7 @@ import { z } from 'zod';
  * - "product_suite" (was "product_concept")
  * - "topic_tag" (unchanged)
  */
-export declare const MetadataGroupKeySchema: z.ZodEnum<["product", "product_suite", "topic_tag", "badge", "audience"]>;
+export declare const MetadataGroupKeySchema: z.ZodEnum<["product", "product_suite", "topic_tag", "badge", "audience", "entity_type"]>;
 export type MetadataGroupKey = z.infer<typeof MetadataGroupKeySchema>;
 /**
  * Metadata Option
@@ -29,7 +29,7 @@ export type MetadataGroupKey = z.infer<typeof MetadataGroupKeySchema>;
  */
 export declare const MetadataOptionSchema: z.ZodObject<{
     option_id: z.ZodString;
-    group_key: z.ZodEnum<["product", "product_suite", "topic_tag", "badge", "audience"]>;
+    group_key: z.ZodEnum<["product", "product_suite", "topic_tag", "badge", "audience", "entity_type"]>;
     label: z.ZodString;
     slug: z.ZodString;
     sort_order: z.ZodDefault<z.ZodNumber>;
@@ -50,7 +50,7 @@ export declare const MetadataOptionSchema: z.ZodObject<{
     updated_at: string;
     updated_by: string;
     option_id: string;
-    group_key: "product" | "product_suite" | "topic_tag" | "badge" | "audience";
+    group_key: "product" | "product_suite" | "topic_tag" | "badge" | "audience" | "entity_type";
     label: string;
     slug: string;
     sort_order: number;
@@ -65,7 +65,7 @@ export declare const MetadataOptionSchema: z.ZodObject<{
     updated_at: string;
     updated_by: string;
     option_id: string;
-    group_key: "product" | "product_suite" | "topic_tag" | "badge" | "audience";
+    group_key: "product" | "product_suite" | "topic_tag" | "badge" | "audience" | "entity_type";
     label: string;
     slug: string;
     status?: "archived" | "active" | undefined;
@@ -81,7 +81,7 @@ export type MetadataOption = z.infer<typeof MetadataOptionSchema>;
  * Create Metadata Option Request
  */
 export declare const CreateMetadataOptionSchema: z.ZodObject<{
-    group_key: z.ZodEnum<["product", "product_suite", "topic_tag", "badge", "audience"]>;
+    group_key: z.ZodEnum<["product", "product_suite", "topic_tag", "badge", "audience", "entity_type"]>;
     label: z.ZodString;
     slug: z.ZodOptional<z.ZodString>;
     sort_order: z.ZodOptional<z.ZodNumber>;
@@ -89,7 +89,7 @@ export declare const CreateMetadataOptionSchema: z.ZodObject<{
     color: z.ZodOptional<z.ZodString>;
     short_description: z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
-    group_key: "product" | "product_suite" | "topic_tag" | "badge" | "audience";
+    group_key: "product" | "product_suite" | "topic_tag" | "badge" | "audience" | "entity_type";
     label: string;
     short_description?: string | undefined;
     slug?: string | undefined;
@@ -97,7 +97,7 @@ export declare const CreateMetadataOptionSchema: z.ZodObject<{
     parent_id?: string | undefined;
     color?: string | undefined;
 }, {
-    group_key: "product" | "product_suite" | "topic_tag" | "badge" | "audience";
+    group_key: "product" | "product_suite" | "topic_tag" | "badge" | "audience" | "entity_type";
     label: string;
     short_description?: string | undefined;
     slug?: string | undefined;

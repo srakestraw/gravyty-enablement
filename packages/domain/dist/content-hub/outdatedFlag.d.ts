@@ -22,8 +22,8 @@ export declare const OutdatedFlagSchema: z.ZodObject<{
 }, "strip", z.ZodTypeAny, {
     created_at: string;
     user_id: string;
-    asset_id: string;
     entity_type: "OUTDATED_FLAG";
+    asset_id: string;
     flag_id: string;
     resolved_at?: string | undefined;
     resolved_by?: string | undefined;
@@ -59,8 +59,8 @@ export declare const UpdateRequestSchema: z.ZodObject<{
 }, "strip", z.ZodTypeAny, {
     created_at: string;
     user_id: string;
-    asset_id: string;
     entity_type: "UPDATE_REQUEST";
+    asset_id: string;
     request_id: string;
     message?: string | undefined;
     resolved_at?: string | undefined;

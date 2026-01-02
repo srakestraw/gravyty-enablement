@@ -41,10 +41,14 @@ export interface MediaSelectModalProps {
   mediaType: 'cover' | 'video' | 'poster' | 'attachment';
   title?: string;
   courseId?: string;
+  pathId?: string;
+  kitId?: string;
+  rolePlayingId?: string;
+  assetId?: string;
   lessonId?: string;
   onTemporaryMediaCreated?: (mediaId: string) => void; // Callback when temporary media is uploaded
   // For AI prompt suggestion
-  entityType?: 'course' | 'asset' | 'role-playing';
+  entityType?: 'course' | 'asset' | 'role-playing' | 'path' | 'kit';
   entityTitle?: string;
   entityShortDescription?: string;
   entityDescription?: string;
@@ -57,6 +61,10 @@ export function MediaSelectModal({
   mediaType,
   title = 'Select Media',
   courseId,
+  pathId,
+  kitId,
+  rolePlayingId,
+  assetId,
   lessonId,
   onTemporaryMediaCreated,
   entityType = 'course',
@@ -304,17 +312,85 @@ export function MediaSelectModal({
     setErrorMessage(null);
 
     try {
-      // Mark as temporary if courseId is 'new' (unsaved course)
-      const isTemporary = courseId === 'new';
+      // Determine entity ID based on entity type
+      let entityId: string | undefined;
+      let isTemporary = false;
       
-      const presignResponse = await lmsAdminApi.presignMediaUpload({
+      if (entityType === 'course') {
+        entityId = courseId;
+        isTemporary = courseId === 'new';
+        // For non-cover media types, lessonId is required
+        if (mediaType !== 'cover' && !lessonId) {
+          throw new Error('Lesson ID is required for video, poster, and attachment media types');
+        }
+      } else if (entityType === 'path') {
+        entityId = pathId;
+        isTemporary = pathId === 'new';
+      } else if (entityType === 'kit') {
+        entityId = kitId;
+        isTemporary = kitId === 'new';
+      } else if (entityType === 'role-playing') {
+        entityId = rolePlayingId;
+        isTemporary = rolePlayingId === 'new';
+      } else if (entityType === 'asset') {
+        entityId = assetId;
+        isTemporary = assetId === 'new';
+      } else {
+        throw new Error(`Unsupported entity type: ${entityType}`);
+      }
+      
+      // For cover images, entity ID is optional if temporary
+      // For other media types, entity ID is required
+      if (!isTemporary && !entityId && mediaType !== 'cover') {
+        throw new Error(`Entity ID is required for ${mediaType} media type`);
+      }
+      
+      // Build presign request payload
+      const presignPayload: {
+        media_type: 'cover' | 'video' | 'poster' | 'attachment';
+        course_id?: string;
+        path_id?: string;
+        kit_id?: string;
+        role_playing_id?: string;
+        asset_id?: string;
+        lesson_id?: string;
+        filename: string;
+        content_type: string;
+        temporary?: boolean;
+      } = {
         media_type: mediaType,
-        course_id: courseId,
-        lesson_id: lessonId,
         filename: selectedFile.name,
         content_type: selectedFile.type,
         temporary: isTemporary,
-      });
+      };
+      
+      // Add entity-specific ID
+      if (entityType === 'course') {
+        if (courseId) {
+          presignPayload.course_id = courseId;
+        }
+        if (lessonId) {
+          presignPayload.lesson_id = lessonId;
+        }
+      } else if (entityType === 'path') {
+        if (pathId) {
+          presignPayload.path_id = pathId;
+        }
+      } else if (entityType === 'kit') {
+        if (kitId) {
+          presignPayload.kit_id = kitId;
+        }
+      } else if (entityType === 'role-playing') {
+        if (rolePlayingId) {
+          presignPayload.role_playing_id = rolePlayingId;
+        }
+      } else if (entityType === 'asset') {
+        if (assetId) {
+          presignPayload.asset_id = assetId;
+        }
+      }
+      
+      const presignResponse = await lmsAdminApi.presignMediaUpload(presignPayload);
 
       if ('error' in presignResponse) {
         throw new Error(presignResponse.error.message || 'Failed to get upload URL');
@@ -574,9 +650,16 @@ export function MediaSelectModal({
             entityDescription={entityDescription}
             entityType={entityType}
             mediaType={mediaType}
-            courseId={courseId}
+            courseId={entityType === 'course' ? courseId : undefined}
             lessonId={lessonId}
-            temporary={courseId === 'new'}
+            temporary={
+              entityType === 'course' ? courseId === 'new' :
+              entityType === 'path' ? pathId === 'new' :
+              entityType === 'kit' ? kitId === 'new' :
+              entityType === 'role-playing' ? rolePlayingId === 'new' :
+              entityType === 'asset' ? assetId === 'new' :
+              false
+            }
             onImageGenerated={onSelect}
             onClose={onClose}
           />
@@ -585,9 +668,16 @@ export function MediaSelectModal({
         {tab === 'unsplash' && isCoverImage && (
           <UnsplashTab
             mediaType={mediaType}
-            courseId={courseId}
+            courseId={entityType === 'course' ? courseId : undefined}
             lessonId={lessonId}
-            temporary={courseId === 'new'}
+            temporary={
+              entityType === 'course' ? courseId === 'new' :
+              entityType === 'path' ? pathId === 'new' :
+              entityType === 'kit' ? kitId === 'new' :
+              entityType === 'role-playing' ? rolePlayingId === 'new' :
+              entityType === 'asset' ? assetId === 'new' :
+              false
+            }
             onImageSelected={onSelect}
             onClose={onClose}
           />

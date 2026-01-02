@@ -20,8 +20,6 @@ import {
   Checkbox,
   Alert,
   CircularProgress,
-  Autocomplete,
-  Chip,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -44,7 +42,9 @@ import { useAdminCourses } from '../../../hooks/useAdminCourses';
 import { lmsAdminApi } from '../../../api/lmsAdminClient';
 import { validatePathPublish, getValidationSummary, validatePathDraft } from '../../../validations/lmsValidations';
 import { PublishReadinessPanel } from '../../../components/admin/learning/PublishReadinessPanel';
-import type { LearningPath, LearningPathCourseRef } from '@gravyty/domain';
+import { CoverImageSelector } from '../../../components/shared/CoverImageSelector';
+import { MetadataSection } from '../../../components/metadata';
+import type { LearningPath, LearningPathCourseRef, MediaRef } from '@gravyty/domain';
 
 export function AdminPathEditorPage() {
   const { pathId } = useParams<{ pathId: string }>();
@@ -58,7 +58,12 @@ export function AdminPathEditorPage() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [shortDescription, setShortDescription] = useState('');
-  const [topicTags, setTopicTags] = useState<string[]>([]);
+  const [productIds, setProductIds] = useState<string[]>([]);
+  const [productSuiteIds, setProductSuiteIds] = useState<string[]>([]);
+  const [topicTagIds, setTopicTagIds] = useState<string[]>([]);
+  const [audienceIds, setAudienceIds] = useState<string[]>([]);
+  const [badgeIds, setBadgeIds] = useState<string[]>([]);
+  const [coverImage, setCoverImage] = useState<MediaRef | null>(null);
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -78,7 +83,12 @@ export function AdminPathEditorPage() {
       setTitle(data.path.title);
       setDescription(data.path.description || '');
       setShortDescription(data.path.short_description || '');
-      setTopicTags(data.path.topic_tags || []);
+      setProductIds(data.path.product_ids || []);
+      setProductSuiteIds(data.path.product_suite_ids || []);
+      setTopicTagIds(data.path.topic_tag_ids || []);
+      setAudienceIds(data.path.audience_ids || []);
+      setBadgeIds(data.path.badges || []);
+      setCoverImage(data.path.cover_image || null);
     }
   }, [data]);
 
@@ -91,8 +101,11 @@ export function AdminPathEditorPage() {
         status: 'draft',
         version: 1,
         courses: [],
-        topic_tags: [],
+        topic_tag_ids: [],
         badges: [],
+        audience_ids: [],
+        product_ids: [],
+        product_suite_ids: [],
         created_at: new Date().toISOString(),
         created_by: '',
         updated_at: new Date().toISOString(),
@@ -186,12 +199,15 @@ export function AdminPathEditorPage() {
 
     try {
       if (isNew) {
-        const response = await lmsAdminApi.createPath({
+        const response =         await lmsAdminApi.createPath({
           title: title.trim(),
           description: description.trim() || undefined,
           short_description: shortDescription.trim() || undefined,
-          topic_tags: topicTags,
+          topic_tags: topicTagIds,
+          badges: badgeIds,
+          audience_ids: audienceIds,
           courses: path.courses,
+          cover_image: coverImage || undefined,
         });
 
         if ('data' in response) {
@@ -202,8 +218,11 @@ export function AdminPathEditorPage() {
           title: title.trim(),
           description: description.trim() || undefined,
           short_description: shortDescription.trim() || undefined,
-          topic_tags: topicTags,
+          topic_tags: topicTagIds,
+          badges: badgeIds,
+          audience_ids: audienceIds,
           courses: path.courses,
+          cover_image: coverImage || undefined,
         });
         await refetch();
         
@@ -248,7 +267,12 @@ export function AdminPathEditorPage() {
       setTitle(pathResponse.data.path.title);
       setDescription(pathResponse.data.path.description || '');
       setShortDescription(pathResponse.data.path.short_description || '');
-      setTopicTags(pathResponse.data.path.topic_tags || []);
+      setProductIds(pathResponse.data.path.product_ids || []);
+      setProductSuiteIds(pathResponse.data.path.product_suite_ids || []);
+      setTopicTagIds(pathResponse.data.path.topic_tag_ids || []);
+      setAudienceIds(pathResponse.data.path.audience_ids || []);
+      setBadgeIds(pathResponse.data.path.badges || []);
+      setCoverImage(pathResponse.data.path.cover_image || null);
     }
     setDiscardDialogOpen(false);
   };
@@ -376,21 +400,37 @@ export function AdminPathEditorPage() {
               margin="normal"
             />
 
-            <Autocomplete
-              multiple
-              freeSolo
-              options={[]}
-              value={topicTags}
-              onChange={(_, newValue) => setTopicTags(newValue)}
-              renderInput={(params) => (
-                <TextField {...params} label="Topic Tags" placeholder="Add tags" margin="normal" />
-              )}
-              renderTags={(value, getTagProps) =>
-                value.map((option, index) => (
-                  <Chip label={option} {...getTagProps({ index })} key={index} />
-                ))
-              }
-            />
+            {/* Metadata Section */}
+            <Box sx={{ mt: 2 }}>
+              <MetadataSection
+                entityType="learning_path"
+                entityId={path?.path_id || 'new'}
+                productIds={productIds}
+                onProductIdsChange={setProductIds}
+                productSuiteIds={productSuiteIds}
+                onProductSuiteIdsChange={setProductSuiteIds}
+                topicTagIds={topicTagIds}
+                onTopicTagIdsChange={setTopicTagIds}
+                audienceIds={audienceIds}
+                onAudienceIdsChange={setAudienceIds}
+                badgeIds={badgeIds}
+                onBadgeIdsChange={setBadgeIds}
+              />
+            </Box>
+
+            {/* Cover Image */}
+            <Box sx={{ mt: 2 }}>
+              <CoverImageSelector
+                entityType="path"
+                entityId={path?.path_id}
+                coverImage={coverImage}
+                entityTitle={title}
+                entityShortDescription={shortDescription}
+                entityDescription={description}
+                onCoverImageSelected={(mediaRef) => setCoverImage(mediaRef)}
+                onCoverImageRemoved={() => setCoverImage(null)}
+              />
+            </Box>
           </Paper>
         </Grid>
 
