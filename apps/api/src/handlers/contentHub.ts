@@ -41,7 +41,7 @@ export async function createAsset(req: AuthenticatedRequest, res: Response) {
       description: z.string().optional(),
       asset_type: z.enum(['deck', 'doc', 'image', 'video', 'logo', 'worksheet', 'link']),
       owner_id: z.string().optional(), // Defaults to current user
-      taxonomy_node_ids: z.array(z.string()).default([]),
+      metadata_node_ids: z.array(z.string()).default([]),
       source_type: z.enum(['UPLOAD', 'LINK', 'GOOGLE_DRIVE']),
       source_ref: z.record(z.unknown()).optional(),
       cover_image: MediaRefSchema.optional(),
@@ -53,7 +53,6 @@ export async function createAsset(req: AuthenticatedRequest, res: Response) {
         error: {
           code: 'VALIDATION_ERROR',
           message: 'Invalid request body',
-          details: parsed.error.errors,
         },
         request_id: requestId,
       };
@@ -71,7 +70,7 @@ export async function createAsset(req: AuthenticatedRequest, res: Response) {
       description: parsed.data.description,
       asset_type: parsed.data.asset_type,
       owner_id: parsed.data.owner_id || userId,
-      taxonomy_node_ids: parsed.data.taxonomy_node_ids,
+      metadata_node_ids: parsed.data.metadata_node_ids,
       source_type: parsed.data.source_type,
       source_ref: parsed.data.source_ref,
       cover_image: parsed.data.cover_image,
@@ -133,7 +132,7 @@ export async function listAssets(req: AuthenticatedRequest, res: Response) {
   const requestId = req.headers['x-request-id'] as string;
   
   try {
-    const taxonomyNodeId = req.query.taxonomy_node_id as string | undefined;
+    const metadataNodeId = req.query.metadata_node_id as string | undefined;
     const assetType = req.query.asset_type as string | undefined;
     const status = req.query.status as string | undefined; // Filter by published version status
     const pinned = req.query.pinned === 'true' ? true : req.query.pinned === 'false' ? false : undefined;
@@ -142,7 +141,7 @@ export async function listAssets(req: AuthenticatedRequest, res: Response) {
     const cursor = req.query.cursor as string | undefined;
     
     const result = await assetRepo.list({
-      taxonomyNodeId,
+      metadataNodeId,
       assetType,
       status,
       pinned,
@@ -222,7 +221,7 @@ export async function updateAsset(req: AuthenticatedRequest, res: Response) {
       description: z.string().optional(),
       asset_type: z.enum(['deck', 'doc', 'image', 'video', 'logo', 'worksheet', 'link']).optional(),
       owner_id: z.string().optional(),
-      taxonomy_node_ids: z.array(z.string()).optional(),
+      metadata_node_ids: z.array(z.string()).optional(),
       cover_image: MediaRefSchema.optional().nullable(),
     });
     
@@ -232,7 +231,6 @@ export async function updateAsset(req: AuthenticatedRequest, res: Response) {
         error: {
           code: 'VALIDATION_ERROR',
           message: 'Invalid request body',
-          details: parsed.error.errors,
         },
         request_id: requestId,
       };
@@ -241,10 +239,14 @@ export async function updateAsset(req: AuthenticatedRequest, res: Response) {
     }
     
     const userId = req.user?.user_id || 'unknown';
-    const asset = await assetRepo.update(assetId, {
-      ...parsed.data,
+    // Convert null cover_image to undefined for type compatibility
+    const { cover_image, ...restData } = parsed.data;
+    const updates: Partial<Asset> = {
+      ...restData,
       updated_by: userId,
-    });
+      ...(cover_image !== null && { cover_image }), // Only include if not null
+    };
+    const asset = await assetRepo.update(assetId, updates);
     
     const response: ApiSuccessResponse<{ asset: Asset }> = {
       data: { asset },
@@ -290,7 +292,6 @@ export async function initUpload(req: AuthenticatedRequest, res: Response) {
         error: {
           code: 'VALIDATION_ERROR',
           message: 'Invalid request body',
-          details: parsed.error.errors,
         },
         request_id: requestId,
       };
@@ -406,7 +407,6 @@ export async function completeUpload(req: AuthenticatedRequest, res: Response) {
         error: {
           code: 'VALIDATION_ERROR',
           message: 'Invalid request body',
-          details: parsed.error.errors,
         },
         request_id: requestId,
       };

@@ -20,6 +20,9 @@ import {
   Tabs,
   Tab,
   Grid,
+  Menu,
+  MenuItem,
+  Divider,
 } from '@mui/material';
 import {
   Image as ImageIcon,
@@ -32,6 +35,9 @@ import {
   CheckCircle as SavedIcon,
   Refresh as RefreshIcon,
   Error as ErrorIcon,
+  MoreVert as MoreVertIcon,
+  Archive as ArchiveIcon,
+  Unarchive as RestoreIcon,
 } from '@mui/icons-material';
 import { LessonEditor } from './LessonEditor';
 import { DetailsTabContent } from './DetailsTabContent';
@@ -62,8 +68,12 @@ export interface EditorPanelProps {
   onPublish?: () => void;
   onPreview?: () => void;
   onDiscardChanges?: () => void;
+  onArchive?: () => void;
+  onRestore?: () => void;
   onDelete?: () => void;
   onCancel?: () => void;
+  archiving?: boolean;
+  restoring?: boolean;
   deleting?: boolean;
   issuesCount?: number | (() => number);
   validation?: { errorsCount: number }; // Alternative: pass validation object directly
@@ -103,8 +113,12 @@ export function EditorPanel({
   onPublish,
   onPreview,
   onDiscardChanges,
+  onArchive,
+  onRestore,
   onDelete,
   onCancel,
+  archiving = false,
+  restoring = false,
   deleting = false,
   issuesCount = 0,
   validation,
@@ -203,6 +217,46 @@ export function EditorPanel({
       setEditingTitle(course.title || '');
     }
   }, [course?.title]);
+
+  // Menu state for more actions (Discard/Delete)
+  const [moreMenuAnchor, setMoreMenuAnchor] = useState<HTMLElement | null>(null);
+  const isMoreMenuOpen = Boolean(moreMenuAnchor);
+
+  const handleMoreMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
+    setMoreMenuAnchor(event.currentTarget);
+  };
+
+  const handleMoreMenuClose = () => {
+    setMoreMenuAnchor(null);
+  };
+
+  const handleDiscardClick = () => {
+    handleMoreMenuClose();
+    if (onDiscardChanges) {
+      onDiscardChanges();
+    }
+  };
+
+  const handleArchiveClick = () => {
+    handleMoreMenuClose();
+    if (onArchive) {
+      onArchive();
+    }
+  };
+
+  const handleRestoreClick = () => {
+    handleMoreMenuClose();
+    if (onRestore) {
+      onRestore();
+    }
+  };
+
+  const handleDeleteClick = () => {
+    handleMoreMenuClose();
+    if (onDelete) {
+      onDelete();
+    }
+  };
 
   const handleTitleBlur = () => {
     setIsEditingTitle(false);
@@ -420,19 +474,6 @@ export function EditorPanel({
                   </span>
                 </Tooltip>
               )}
-              {!isNew && onDiscardChanges && (
-                <Tooltip title="Discard unsaved changes">
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    startIcon={<RefreshIcon />}
-                    onClick={onDiscardChanges}
-                    disabled={saving}
-                  >
-                    Discard
-                  </Button>
-                </Tooltip>
-              )}
               {onSave && (
                 <Button
                   variant="contained"
@@ -456,16 +497,73 @@ export function EditorPanel({
                   {publishing ? 'Publishing...' : 'Publish'}
                 </Button>
               )}
-              {onDelete && !isNew && (
-                <Button
-                  variant="outlined"
-                  color="error"
-                  size="small"
-                  onClick={onDelete}
-                  disabled={deleting}
-                >
-                  {deleting ? 'Deleting...' : 'Delete'}
-                </Button>
+              {/* More actions menu (Discard/Archive/Restore/Delete) - positioned before Cancel */}
+              {(!isNew && (onDiscardChanges || onArchive || onRestore || onDelete)) && (
+                <>
+                  <Tooltip title="More actions">
+                    <IconButton
+                      size="small"
+                      onClick={handleMoreMenuOpen}
+                      disabled={saving || archiving || restoring || deleting}
+                    >
+                      <MoreVertIcon />
+                    </IconButton>
+                  </Tooltip>
+                  <Menu
+                    anchorEl={moreMenuAnchor}
+                    open={isMoreMenuOpen}
+                    onClose={handleMoreMenuClose}
+                    anchorOrigin={{
+                      vertical: 'bottom',
+                      horizontal: 'right',
+                    }}
+                    transformOrigin={{
+                      vertical: 'top',
+                      horizontal: 'right',
+                    }}
+                  >
+                    {!isNew && onDiscardChanges && (
+                      <MenuItem
+                        onClick={handleDiscardClick}
+                        disabled={saving}
+                        sx={{ color: 'error.main' }}
+                      >
+                        <RefreshIcon sx={{ mr: 1, fontSize: 20 }} />
+                        Discard changes
+                      </MenuItem>
+                    )}
+                    {!isNew && onDiscardChanges && (onArchive || onRestore || onDelete) && <Divider />}
+                    {onArchive && !isNew && course.status !== 'archived' && (
+                      <MenuItem
+                        onClick={handleArchiveClick}
+                        disabled={archiving}
+                      >
+                        <ArchiveIcon sx={{ mr: 1, fontSize: 20 }} />
+                        {archiving ? 'Archiving...' : 'Archive course'}
+                      </MenuItem>
+                    )}
+                    {onRestore && !isNew && course.status === 'archived' && (
+                      <MenuItem
+                        onClick={handleRestoreClick}
+                        disabled={restoring}
+                      >
+                        <RestoreIcon sx={{ mr: 1, fontSize: 20 }} />
+                        {restoring ? 'Restoring...' : 'Restore course'}
+                      </MenuItem>
+                    )}
+                    {(onArchive || onRestore) && onDelete && !isNew && <Divider />}
+                    {onDelete && !isNew && (
+                      <MenuItem
+                        onClick={handleDeleteClick}
+                        disabled={deleting}
+                        sx={{ color: 'error.main' }}
+                      >
+                        <DeleteIcon sx={{ mr: 1, fontSize: 20 }} />
+                        {deleting ? 'Deleting...' : 'Delete course'}
+                      </MenuItem>
+                    )}
+                  </Menu>
+                </>
               )}
               {onCancel && (
                 <Button size="small" onClick={onCancel}>

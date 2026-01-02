@@ -23,7 +23,7 @@ interface BaseStackProps extends cdk.NestedStackProps {
   lmsAssignmentsTable: dynamodb.Table;
   lmsCertificatesTable: dynamodb.Table;
   lmsTranscriptsTable: dynamodb.Table;
-  taxonomyTable: dynamodb.Table;
+  metadataTable: dynamodb.Table;
   lmsMediaBucket: s3.Bucket;
   allowedOrigins: string[];
 }
@@ -59,7 +59,7 @@ export class BaseStack extends cdk.NestedStack {
     props.lmsAssignmentsTable.grantReadWriteData(this.lambdaRole);
     props.lmsCertificatesTable.grantReadWriteData(this.lambdaRole);
     props.lmsTranscriptsTable.grantReadWriteData(this.lambdaRole);
-    props.taxonomyTable.grantReadWriteData(this.lambdaRole);
+    props.metadataTable.grantReadWriteData(this.lambdaRole);
 
     // Grant LMS S3 permissions (read/write on all objects in bucket)
     props.lmsMediaBucket.grantReadWrite(this.lambdaRole);
@@ -321,9 +321,12 @@ export class BaseStack extends cdk.NestedStack {
           LMS_ASSIGNMENTS_TABLE: props.lmsAssignmentsTable.tableName,
           LMS_CERTIFICATES_TABLE: props.lmsCertificatesTable.tableName,
           LMS_TRANSCRIPTS_TABLE: props.lmsTranscriptsTable.tableName,
-          TAXONOMY_TABLE: props.taxonomyTable.tableName,
+          METADATA_TABLE: props.metadataTable.tableName,
           // LMS S3 Bucket
           LMS_MEDIA_BUCKET: props.lmsMediaBucket.bucketName,
+          // GCP/Vertex AI configuration
+          GOOGLE_CLOUD_PROJECT: process.env.GOOGLE_CLOUD_PROJECT || process.env.GCP_PROJECT_ID || '',
+          GOOGLE_CLOUD_REGION: process.env.GOOGLE_CLOUD_REGION || process.env.GCP_REGION || 'us-central1',
         },
       });
     } else {

@@ -1,29 +1,29 @@
 /**
- * Taxonomy API Handlers
+ * Metadata API Handlers
  * 
- * Handlers for taxonomy management endpoints
+ * Handlers for metadata management endpoints
  */
 
 import { Response } from 'express';
 import { z } from 'zod';
 import { AuthenticatedRequest, ApiSuccessResponse } from '../types';
-import { taxonomyRepo } from '../storage/dynamo/taxonomyRepo';
+import { metadataRepo } from '../storage/dynamo/metadataRepo';
 import type {
-  TaxonomyGroupKey,
-  CreateTaxonomyOption,
-  UpdateTaxonomyOption,
-  MergeTaxonomyOption,
+  MetadataGroupKey,
+  CreateMetadataOption,
+  UpdateMetadataOption,
+  MergeMetadataOption,
 } from '@gravyty/domain';
 
 /**
- * GET /v1/taxonomy/:groupKey/options
- * List taxonomy options for a group
+ * GET /v1/metadata/:groupKey/options
+ * List metadata options for a group
  */
-export async function listTaxonomyOptions(req: AuthenticatedRequest, res: Response) {
+export async function listMetadataOptions(req: AuthenticatedRequest, res: Response) {
   const requestId = req.headers['x-request-id'] as string;
   
   try {
-    const groupKey = req.params.groupKey as TaxonomyGroupKey;
+    const groupKey = req.params.groupKey as MetadataGroupKey;
     const query = req.query.query as string | undefined;
     const includeArchived = req.query.include_archived === 'true';
     const parentId = req.query.parent_id as string | undefined;
@@ -31,7 +31,7 @@ export async function listTaxonomyOptions(req: AuthenticatedRequest, res: Respon
     const cursor = req.query.cursor as string | undefined;
 
     // Validate group key
-    const validGroupKeys: TaxonomyGroupKey[] = ['product', 'product_suite', 'topic_tag', 'badge'];
+    const validGroupKeys: MetadataGroupKey[] = ['product', 'product_suite', 'topic_tag', 'badge', 'audience'];
     if (!validGroupKeys.includes(groupKey)) {
       res.status(400).json({
         error: {
@@ -43,7 +43,7 @@ export async function listTaxonomyOptions(req: AuthenticatedRequest, res: Respon
       return;
     }
 
-    const result = await taxonomyRepo.listOptions({
+    const result = await metadataRepo.listOptions({
       group_key: groupKey,
       query,
       include_archived: includeArchived,
@@ -61,11 +61,11 @@ export async function listTaxonomyOptions(req: AuthenticatedRequest, res: Respon
     };
     res.json(response);
   } catch (error) {
-    console.error(`[${requestId}] Error listing taxonomy options:`, error);
+    console.error(`[${requestId}] Error listing metadata options:`, error);
     res.status(500).json({
       error: {
         code: 'INTERNAL_ERROR',
-        message: error instanceof Error ? error.message : 'Failed to list taxonomy options',
+        message: error instanceof Error ? error.message : 'Failed to list metadata options',
       },
       request_id: requestId,
     });
@@ -73,11 +73,11 @@ export async function listTaxonomyOptions(req: AuthenticatedRequest, res: Respon
 }
 
 /**
- * POST /v1/taxonomy/:groupKey/options
- * Create a new taxonomy option
+ * POST /v1/metadata/:groupKey/options
+ * Create a new metadata option
  * Requires: Admin role
  */
-export async function createTaxonomyOption(req: AuthenticatedRequest, res: Response) {
+export async function createMetadataOption(req: AuthenticatedRequest, res: Response) {
   const requestId = req.headers['x-request-id'] as string;
   const userId = req.user?.user_id;
   
@@ -90,10 +90,10 @@ export async function createTaxonomyOption(req: AuthenticatedRequest, res: Respo
   }
 
   try {
-    const groupKey = req.params.groupKey as TaxonomyGroupKey;
+    const groupKey = req.params.groupKey as MetadataGroupKey;
 
     // Validate group key
-    const validGroupKeys: TaxonomyGroupKey[] = ['product', 'product_suite', 'topic_tag', 'badge'];
+    const validGroupKeys: MetadataGroupKey[] = ['product', 'product_suite', 'topic_tag', 'badge', 'audience'];
     if (!validGroupKeys.includes(groupKey)) {
       res.status(400).json({
         error: {
@@ -126,12 +126,12 @@ export async function createTaxonomyOption(req: AuthenticatedRequest, res: Respo
       return;
     }
 
-    const createData: CreateTaxonomyOption = {
+    const createData: CreateMetadataOption = {
       group_key: groupKey,
       ...parsed.data,
     };
 
-    const option = await taxonomyRepo.createOption(createData, userId);
+    const option = await metadataRepo.createOption(createData, userId);
 
     const response: ApiSuccessResponse<{ option: typeof option }> = {
       data: { option },
@@ -139,12 +139,12 @@ export async function createTaxonomyOption(req: AuthenticatedRequest, res: Respo
     };
     res.status(201).json(response);
   } catch (error) {
-    console.error(`[${requestId}] Error creating taxonomy option:`, error);
+    console.error(`[${requestId}] Error creating metadata option:`, error);
     const statusCode = error instanceof Error && error.message.includes('not found') ? 404 : 500;
     res.status(statusCode).json({
       error: {
         code: statusCode === 404 ? 'NOT_FOUND' : 'INTERNAL_ERROR',
-        message: error instanceof Error ? error.message : 'Failed to create taxonomy option',
+        message: error instanceof Error ? error.message : 'Failed to create metadata option',
       },
       request_id: requestId,
     });
@@ -152,11 +152,11 @@ export async function createTaxonomyOption(req: AuthenticatedRequest, res: Respo
 }
 
 /**
- * PATCH /v1/taxonomy/options/:optionId
- * Update a taxonomy option (rename, reorder, archive)
+ * PATCH /v1/metadata/options/:optionId
+ * Update a metadata option (rename, reorder, archive)
  * Requires: Admin role
  */
-export async function updateTaxonomyOption(req: AuthenticatedRequest, res: Response) {
+export async function updateMetadataOption(req: AuthenticatedRequest, res: Response) {
   const requestId = req.headers['x-request-id'] as string;
   const userId = req.user?.user_id;
   
@@ -194,9 +194,9 @@ export async function updateTaxonomyOption(req: AuthenticatedRequest, res: Respo
       return;
     }
 
-    const updates: UpdateTaxonomyOption = parsed.data;
+    const updates: UpdateMetadataOption = parsed.data;
 
-    const option = await taxonomyRepo.updateOption(optionId, updates, userId);
+    const option = await metadataRepo.updateOption(optionId, updates, userId);
 
     const response: ApiSuccessResponse<{ option: typeof option }> = {
       data: { option },
@@ -204,12 +204,12 @@ export async function updateTaxonomyOption(req: AuthenticatedRequest, res: Respo
     };
     res.json(response);
   } catch (error) {
-    console.error(`[${requestId}] Error updating taxonomy option:`, error);
+    console.error(`[${requestId}] Error updating metadata option:`, error);
     const statusCode = error instanceof Error && error.message.includes('not found') ? 404 : 500;
     res.status(statusCode).json({
       error: {
         code: statusCode === 404 ? 'NOT_FOUND' : 'INTERNAL_ERROR',
-        message: error instanceof Error ? error.message : 'Failed to update taxonomy option',
+        message: error instanceof Error ? error.message : 'Failed to update metadata option',
       },
       request_id: requestId,
     });
@@ -217,21 +217,21 @@ export async function updateTaxonomyOption(req: AuthenticatedRequest, res: Respo
 }
 
 /**
- * GET /v1/taxonomy/options/:optionId
- * Get a single taxonomy option by ID
+ * GET /v1/metadata/options/:optionId
+ * Get a single metadata option by ID
  */
-export async function getTaxonomyOption(req: AuthenticatedRequest, res: Response) {
+export async function getMetadataOption(req: AuthenticatedRequest, res: Response) {
   const requestId = req.headers['x-request-id'] as string;
   
   try {
     const optionId = req.params.optionId;
-    const option = await taxonomyRepo.getOptionById(optionId);
+    const option = await metadataRepo.getOptionById(optionId);
 
     if (!option) {
       res.status(404).json({
         error: {
           code: 'NOT_FOUND',
-          message: `Taxonomy option ${optionId} not found`,
+          message: `Metadata option ${optionId} not found`,
         },
         request_id: requestId,
       });
@@ -244,11 +244,11 @@ export async function getTaxonomyOption(req: AuthenticatedRequest, res: Response
     };
     res.json(response);
   } catch (error) {
-    console.error(`[${requestId}] Error getting taxonomy option:`, error);
+    console.error(`[${requestId}] Error getting metadata option:`, error);
     res.status(500).json({
       error: {
         code: 'INTERNAL_ERROR',
-        message: error instanceof Error ? error.message : 'Failed to get taxonomy option',
+        message: error instanceof Error ? error.message : 'Failed to get metadata option',
       },
       request_id: requestId,
     });
@@ -256,19 +256,19 @@ export async function getTaxonomyOption(req: AuthenticatedRequest, res: Response
 }
 
 /**
- * GET /v1/taxonomy/:groupKey/options/:optionId/usage
- * Get usage count for a taxonomy option
+ * GET /v1/metadata/:groupKey/options/:optionId/usage
+ * Get usage count for a metadata option
  * Returns how many Courses and Resources reference this option
  */
-export async function getTaxonomyOptionUsage(req: AuthenticatedRequest, res: Response) {
+export async function getMetadataOptionUsage(req: AuthenticatedRequest, res: Response) {
   const requestId = req.headers['x-request-id'] as string;
   
   try {
-    const groupKey = req.params.groupKey as TaxonomyGroupKey;
+    const groupKey = req.params.groupKey as MetadataGroupKey;
     const optionId = req.params.optionId;
 
     // Validate group key
-    const validGroupKeys: TaxonomyGroupKey[] = ['product', 'product_suite', 'topic_tag', 'badge'];
+    const validGroupKeys: MetadataGroupKey[] = ['product', 'product_suite', 'topic_tag', 'badge', 'audience'];
     if (!validGroupKeys.includes(groupKey)) {
       res.status(400).json({
         error: {
@@ -281,19 +281,19 @@ export async function getTaxonomyOptionUsage(req: AuthenticatedRequest, res: Res
     }
 
     // Verify option exists
-    const option = await taxonomyRepo.getOptionById(optionId);
+    const option = await metadataRepo.getOptionById(optionId);
     if (!option) {
       res.status(404).json({
         error: {
           code: 'NOT_FOUND',
-          message: `Taxonomy option ${optionId} not found`,
+          message: `Metadata option ${optionId} not found`,
         },
         request_id: requestId,
       });
       return;
     }
 
-    const usage = await taxonomyRepo.getUsageCount(optionId, groupKey);
+    const usage = await metadataRepo.getUsageCount(optionId, groupKey);
 
     const response: ApiSuccessResponse<typeof usage> = {
       data: usage,
@@ -301,11 +301,11 @@ export async function getTaxonomyOptionUsage(req: AuthenticatedRequest, res: Res
     };
     res.json(response);
   } catch (error) {
-    console.error(`[${requestId}] Error getting taxonomy option usage:`, error);
+    console.error(`[${requestId}] Error getting metadata option usage:`, error);
     res.status(500).json({
       error: {
         code: 'INTERNAL_ERROR',
-        message: error instanceof Error ? error.message : 'Failed to get taxonomy option usage',
+        message: error instanceof Error ? error.message : 'Failed to get metadata option usage',
       },
       request_id: requestId,
     });
@@ -313,14 +313,14 @@ export async function getTaxonomyOptionUsage(req: AuthenticatedRequest, res: Res
 }
 
 /**
- * DELETE /v1/taxonomy/:groupKey/options/:optionId
- * Delete a taxonomy option (safe delete with dependency checks)
+ * DELETE /v1/metadata/:groupKey/options/:optionId
+ * Delete a metadata option (safe delete with dependency checks)
  * Requires: Admin role
  * 
  * Default behavior: safe delete only if usage == 0
  * If usage > 0, return 409 with message and suggested actions
  */
-export async function deleteTaxonomyOption(req: AuthenticatedRequest, res: Response) {
+export async function deleteMetadataOption(req: AuthenticatedRequest, res: Response) {
   const requestId = req.headers['x-request-id'] as string;
   const userId = req.user?.user_id;
   
@@ -333,12 +333,12 @@ export async function deleteTaxonomyOption(req: AuthenticatedRequest, res: Respo
   }
 
   try {
-    const groupKey = req.params.groupKey as TaxonomyGroupKey;
+    const groupKey = req.params.groupKey as MetadataGroupKey;
     const optionId = req.params.optionId;
     const force = req.query.force === 'true'; // Force delete even if in use (dangerous)
 
     // Validate group key
-    const validGroupKeys: TaxonomyGroupKey[] = ['product', 'product_suite', 'topic_tag', 'badge'];
+    const validGroupKeys: MetadataGroupKey[] = ['product', 'product_suite', 'topic_tag', 'badge', 'audience'];
     if (!validGroupKeys.includes(groupKey)) {
       res.status(400).json({
         error: {
@@ -351,7 +351,7 @@ export async function deleteTaxonomyOption(req: AuthenticatedRequest, res: Respo
     }
 
     // Check usage
-    const usage = await taxonomyRepo.getUsageCount(optionId, groupKey);
+    const usage = await metadataRepo.getUsageCount(optionId, groupKey);
     const totalUsage = usage.used_by_courses + usage.used_by_resources;
 
     if (totalUsage > 0 && !force) {
@@ -373,20 +373,20 @@ export async function deleteTaxonomyOption(req: AuthenticatedRequest, res: Respo
     }
 
     // Soft delete (set deleted_at)
-    await taxonomyRepo.deleteOption(optionId, userId);
+    await metadataRepo.deleteOption(optionId, userId);
 
     const response: ApiSuccessResponse<{ message: string }> = {
-      data: { message: 'Taxonomy option deleted successfully' },
+      data: { message: 'Metadata option deleted successfully' },
       request_id: requestId,
     };
     res.json(response);
   } catch (error) {
-    console.error(`[${requestId}] Error deleting taxonomy option:`, error);
+    console.error(`[${requestId}] Error deleting metadata option:`, error);
     const statusCode = error instanceof Error && error.message.includes('not found') ? 404 : 500;
     res.status(statusCode).json({
       error: {
         code: statusCode === 404 ? 'NOT_FOUND' : 'INTERNAL_ERROR',
-        message: error instanceof Error ? error.message : 'Failed to delete taxonomy option',
+        message: error instanceof Error ? error.message : 'Failed to delete metadata option',
       },
       request_id: requestId,
     });
@@ -394,12 +394,12 @@ export async function deleteTaxonomyOption(req: AuthenticatedRequest, res: Respo
 }
 
 /**
- * POST /v1/taxonomy/:groupKey/options/:optionId/merge
- * Merge a taxonomy option into another option
+ * POST /v1/metadata/:groupKey/options/:optionId/merge
+ * Merge a metadata option into another option
  * Moves all references from source -> target, then archives or deletes source
  * Requires: Admin role
  */
-export async function mergeTaxonomyOption(req: AuthenticatedRequest, res: Response) {
+export async function mergeMetadataOption(req: AuthenticatedRequest, res: Response) {
   const requestId = req.headers['x-request-id'] as string;
   const userId = req.user?.user_id;
   
@@ -412,7 +412,7 @@ export async function mergeTaxonomyOption(req: AuthenticatedRequest, res: Respon
   }
 
   try {
-    const groupKey = req.params.groupKey as TaxonomyGroupKey;
+    const groupKey = req.params.groupKey as MetadataGroupKey;
     const sourceOptionId = req.params.optionId;
 
     const MergeSchema = z.object({
@@ -435,7 +435,7 @@ export async function mergeTaxonomyOption(req: AuthenticatedRequest, res: Respon
     const { target_option_id, delete_source } = parsed.data;
 
     // Validate group key
-    const validGroupKeys: TaxonomyGroupKey[] = ['product', 'product_suite', 'topic_tag', 'badge'];
+    const validGroupKeys: MetadataGroupKey[] = ['product', 'product_suite', 'topic_tag', 'badge', 'audience'];
     if (!validGroupKeys.includes(groupKey)) {
       res.status(400).json({
         error: {
@@ -448,14 +448,14 @@ export async function mergeTaxonomyOption(req: AuthenticatedRequest, res: Respon
     }
 
     // Verify both options exist and are in the same group
-    const sourceOption = await taxonomyRepo.getOptionById(sourceOptionId);
-    const targetOption = await taxonomyRepo.getOptionById(target_option_id);
+    const sourceOption = await metadataRepo.getOptionById(sourceOptionId);
+    const targetOption = await metadataRepo.getOptionById(target_option_id);
 
     if (!sourceOption) {
       res.status(404).json({
         error: {
           code: 'NOT_FOUND',
-          message: `Source taxonomy option ${sourceOptionId} not found`,
+          message: `Source metadata option ${sourceOptionId} not found`,
         },
         request_id: requestId,
       });
@@ -466,7 +466,7 @@ export async function mergeTaxonomyOption(req: AuthenticatedRequest, res: Respon
       res.status(404).json({
         error: {
           code: 'NOT_FOUND',
-          message: `Target taxonomy option ${target_option_id} not found`,
+          message: `Target metadata option ${target_option_id} not found`,
         },
         request_id: requestId,
       });
@@ -477,7 +477,7 @@ export async function mergeTaxonomyOption(req: AuthenticatedRequest, res: Respon
       res.status(400).json({
         error: {
           code: 'INVALID_MERGE',
-          message: 'Cannot merge options from different taxonomy groups',
+          message: 'Cannot merge options from different metadata groups',
         },
         request_id: requestId,
       });
@@ -485,7 +485,7 @@ export async function mergeTaxonomyOption(req: AuthenticatedRequest, res: Respon
     }
 
     // Get usage to migrate
-    const usage = await taxonomyRepo.getUsageCount(sourceOptionId, groupKey);
+    const usage = await metadataRepo.getUsageCount(sourceOptionId, groupKey);
 
     // Migrate references in Courses
     if (usage.used_by_courses > 0) {
@@ -499,9 +499,9 @@ export async function mergeTaxonomyOption(req: AuthenticatedRequest, res: Respon
 
     // Archive or delete source option
     if (delete_source) {
-      await taxonomyRepo.deleteOption(sourceOptionId, userId);
+      await metadataRepo.deleteOption(sourceOptionId, userId);
     } else {
-      await taxonomyRepo.updateOption(sourceOptionId, { status: 'archived' }, userId);
+      await metadataRepo.updateOption(sourceOptionId, { status: 'archived' }, userId);
     }
 
     const response: ApiSuccessResponse<{
@@ -510,7 +510,7 @@ export async function mergeTaxonomyOption(req: AuthenticatedRequest, res: Respon
       migrated_resources: number;
     }> = {
       data: {
-        message: 'Taxonomy option merged successfully',
+        message: 'Metadata option merged successfully',
         migrated_courses: usage.used_by_courses,
         migrated_resources: usage.used_by_resources,
       },
@@ -518,11 +518,11 @@ export async function mergeTaxonomyOption(req: AuthenticatedRequest, res: Respon
     };
     res.json(response);
   } catch (error) {
-    console.error(`[${requestId}] Error merging taxonomy option:`, error);
+    console.error(`[${requestId}] Error merging metadata option:`, error);
     res.status(500).json({
       error: {
         code: 'INTERNAL_ERROR',
-        message: error instanceof Error ? error.message : 'Failed to merge taxonomy option',
+        message: error instanceof Error ? error.message : 'Failed to merge metadata option',
       },
       request_id: requestId,
     });
@@ -537,7 +537,7 @@ export async function mergeTaxonomyOption(req: AuthenticatedRequest, res: Respon
  * the migration script for bulk updates.
  */
 async function migrateCourseReferences(
-  groupKey: TaxonomyGroupKey,
+  groupKey: MetadataGroupKey,
   sourceOptionId: string,
   targetOptionId: string
 ): Promise<void> {
@@ -558,7 +558,7 @@ async function migrateCourseReferences(
  * the migration script for bulk updates.
  */
 async function migrateResourceReferences(
-  groupKey: TaxonomyGroupKey,
+  groupKey: MetadataGroupKey,
   sourceOptionId: string,
   targetOptionId: string
 ): Promise<void> {

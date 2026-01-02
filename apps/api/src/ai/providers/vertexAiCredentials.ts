@@ -21,6 +21,7 @@ const GCP_REGION = process.env.GOOGLE_CLOUD_REGION || process.env.GCP_REGION || 
 let cachedCredentialsPath: string | null = null;
 let credentialsCacheTime: number = 0;
 const CREDENTIALS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+let cachedServiceAccount: any = null; // Cache parsed service account JSON
 
 /**
  * Get GCP service account credentials JSON from SSM Parameter Store
@@ -68,6 +69,9 @@ async function getServiceAccountCredentials(): Promise<string> {
         `Invalid service account JSON in SSM: ${error instanceof Error ? error.message : String(error)}`
       );
     }
+
+    // Cache parsed service account for project ID extraction
+    cachedServiceAccount = serviceAccount;
 
     // Write to temporary file (Lambda: /tmp, local: os.tmpdir())
     const tmpDir = process.env.LAMBDA_TASK_ROOT ? '/tmp' : tmpdir();
@@ -146,13 +150,40 @@ export async function initializeVertexAiCredentials(): Promise<void> {
 
 /**
  * Get GCP project ID
+ * Tries multiple sources:
+ * 1. Environment variables (GOOGLE_CLOUD_PROJECT or GCP_PROJECT_ID)
+ * 2. Service account JSON (project_id field) - if credentials are already loaded
  */
 export function getGcpProjectId(): string {
-  const projectId = GCP_PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT;
+  // First try environment variables
+  let projectId = GCP_PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT;
+  
+  // If not found, try to extract from cached service account JSON
+  if (!projectId && cachedServiceAccount) {
+    projectId = cachedServiceAccount.project_id;
+  }
+  
+  // If still not found, try to read from GOOGLE_APPLICATION_CREDENTIALS file
+  if (!projectId && process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    try {
+      const credsPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+      if (existsSync(credsPath)) {
+        const fs = require('fs');
+        const credsContent = fs.readFileSync(credsPath, 'utf8');
+        const creds = JSON.parse(credsContent);
+        if (creds.project_id) {
+          projectId = creds.project_id;
+        }
+      }
+    } catch (error) {
+      // Silently fail - we'll throw a better error below
+    }
+  }
+  
   if (!projectId) {
     throw new AIConfigError(
       'gemini',
-      'GCP project ID not configured. Please set GOOGLE_CLOUD_PROJECT or GCP_PROJECT_ID environment variable.'
+      'GCP project ID not configured. Please set GOOGLE_CLOUD_PROJECT or GCP_PROJECT_ID environment variable, or ensure the service account JSON contains a project_id field.'
     );
   }
   return projectId;

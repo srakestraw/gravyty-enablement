@@ -14,16 +14,21 @@ import {
   Paper,
   Chip,
   IconButton,
-  Button,
   Box,
   TableSortLabel,
+  Menu,
+  MenuItem,
+  Tooltip,
+  Divider,
 } from '@mui/material';
 import {
   Edit as EditIcon,
   Visibility as VisibilityIcon,
   Publish as PublishIcon,
   Archive as ArchiveIcon,
+  MoreVert as MoreVertIcon,
 } from '@mui/icons-material';
+import { useState } from 'react';
 import type { CourseSummary } from '@gravyty/domain';
 import {
   canEditCourse,
@@ -41,6 +46,7 @@ interface CoursesTableProps {
   onPublish?: (courseId: string) => void;
   onArchive?: (courseId: string) => void;
   publishing?: string | null;
+  archiving?: string | null;
   sortBy?: 'title' | 'updated' | 'status';
   sortOrder?: 'asc' | 'desc';
   onSortChange?: (field: 'title' | 'updated' | 'status') => void;
@@ -56,10 +62,21 @@ export function CoursesTable({
   onPublish,
   onArchive,
   publishing,
+  archiving,
   sortBy = 'updated',
   sortOrder = 'desc',
   onSortChange,
 }: CoursesTableProps) {
+  const [anchorEl, setAnchorEl] = useState<{ [key: string]: HTMLElement | null }>({});
+
+  const handleMenuOpen = (courseId: string, event: React.MouseEvent<HTMLElement>) => {
+    setAnchorEl({ ...anchorEl, [courseId]: event.currentTarget });
+  };
+
+  const handleMenuClose = (courseId: string) => {
+    setAnchorEl({ ...anchorEl, [courseId]: null });
+  };
+
   const canEdit = (course: CourseSummary) => {
     return canEditCourse(userRole, undefined, userId, 'any');
   };
@@ -168,42 +185,82 @@ export function CoursesTable({
                   : '-'}
               </TableCell>
               <TableCell align="right">
-                <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
-                  <IconButton
-                    size="small"
-                    onClick={() => onView(course.course_id)}
-                    title="View course"
-                  >
-                    <VisibilityIcon fontSize="small" />
-                  </IconButton>
-                  {canEdit(course) && onEdit && (
-                    <IconButton
-                      size="small"
-                      onClick={() => onEdit(course.course_id)}
-                      title="Edit course"
-                    >
-                      <EditIcon fontSize="small" />
-                    </IconButton>
-                  )}
-                  {canPublish(course) && onPublish && (
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      startIcon={<PublishIcon />}
-                      onClick={() => onPublish(course.course_id)}
-                      disabled={publishing === course.course_id}
-                    >
-                      {publishing === course.course_id ? 'Publishing...' : 'Publish'}
-                    </Button>
-                  )}
-                  {canArchive(course) && onArchive && (
-                    <IconButton
-                      size="small"
-                      onClick={() => onArchive(course.course_id)}
-                      title="Archive course"
-                    >
-                      <ArchiveIcon fontSize="small" />
-                    </IconButton>
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  {(onView || canEdit(course) || canPublish(course) || canArchive(course)) && (
+                    <>
+                      <Tooltip title="More actions">
+                        <IconButton
+                          size="small"
+                          onClick={(e) => handleMenuOpen(course.course_id, e)}
+                          disabled={publishing === course.course_id || archiving === course.course_id}
+                        >
+                          <MoreVertIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <Menu
+                        anchorEl={anchorEl[course.course_id] || null}
+                        open={Boolean(anchorEl[course.course_id])}
+                        onClose={() => handleMenuClose(course.course_id)}
+                        anchorOrigin={{
+                          vertical: 'bottom',
+                          horizontal: 'right',
+                        }}
+                        transformOrigin={{
+                          vertical: 'top',
+                          horizontal: 'right',
+                        }}
+                      >
+                        {onView && (
+                          <MenuItem
+                            onClick={() => {
+                              onView(course.course_id);
+                              handleMenuClose(course.course_id);
+                            }}
+                          >
+                            <VisibilityIcon sx={{ mr: 1, fontSize: 20 }} />
+                            View
+                          </MenuItem>
+                        )}
+                        {onView && (canEdit(course) || canPublish(course) || canArchive(course)) && (
+                          <Divider />
+                        )}
+                        {canEdit(course) && onEdit && (
+                          <MenuItem
+                            onClick={() => {
+                              onEdit(course.course_id);
+                              handleMenuClose(course.course_id);
+                            }}
+                          >
+                            <EditIcon sx={{ mr: 1, fontSize: 20 }} />
+                            Edit
+                          </MenuItem>
+                        )}
+                        {canPublish(course) && onPublish && (
+                          <MenuItem
+                            onClick={() => {
+                              onPublish(course.course_id);
+                              handleMenuClose(course.course_id);
+                            }}
+                            disabled={publishing === course.course_id}
+                          >
+                            <PublishIcon sx={{ mr: 1, fontSize: 20 }} />
+                            {publishing === course.course_id ? 'Publishing...' : 'Publish'}
+                          </MenuItem>
+                        )}
+                        {canArchive(course) && onArchive && (
+                          <MenuItem
+                            onClick={() => {
+                              onArchive(course.course_id);
+                              handleMenuClose(course.course_id);
+                            }}
+                            disabled={archiving === course.course_id}
+                          >
+                            <ArchiveIcon sx={{ mr: 1, fontSize: 20 }} />
+                            {archiving === course.course_id ? 'Archiving...' : 'Archive'}
+                          </MenuItem>
+                        )}
+                      </Menu>
+                    </>
                   )}
                 </Box>
               </TableCell>

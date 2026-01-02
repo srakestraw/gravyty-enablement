@@ -5,7 +5,7 @@
  * Supports advanced formatting: tables, code blocks, images, headings, etc.
  */
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { Underline } from '@tiptap/extension-underline';
@@ -41,8 +41,10 @@ import {
   TableChart,
   Title,
   DataObject,
+  AutoAwesome,
 } from '@mui/icons-material';
 import { useTheme } from '@mui/material/styles';
+import { AIAssistantModal } from './AIAssistantModal';
 
 export interface RichTextEditorProps {
   value: string;
@@ -74,6 +76,7 @@ export function RichTextEditor({
   inputRef,
 }: RichTextEditorProps) {
   const theme = useTheme();
+  const [aiModalOpen, setAiModalOpen] = useState(false);
 
   const editor = useEditor({
     extensions: [
@@ -181,6 +184,17 @@ export function RichTextEditor({
 
   const handleTable = () => {
     editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
+  };
+
+  const handleAIAssistant = () => {
+    setAiModalOpen(true);
+  };
+
+  const handleApplyAIContent = (content: string) => {
+    if (editor) {
+      editor.commands.setContent(content);
+      editor.commands.focus();
+    }
   };
 
   return (
@@ -388,6 +402,20 @@ export function RichTextEditor({
               </ToggleButton>
             </Tooltip>
           </ToggleButtonGroup>
+
+          {/* AI Assistant */}
+          <ToggleButtonGroup size="small">
+            <Tooltip title="AI Assistant">
+              <ToggleButton
+                value="ai"
+                onClick={handleAIAssistant}
+                disabled={disabled}
+                aria-label="AI Assistant"
+              >
+                <AutoAwesome fontSize="small" />
+              </ToggleButton>
+            </Tooltip>
+          </ToggleButtonGroup>
         </Paper>
 
         {/* Editor Content */}
@@ -485,6 +513,15 @@ export function RichTextEditor({
         </Box>
       </Box>
       {helperText && <FormHelperText>{helperText}</FormHelperText>}
+      
+      {/* AI Assistant Modal */}
+      <AIAssistantModal
+        open={aiModalOpen}
+        onClose={() => setAiModalOpen(false)}
+        onApply={handleApplyAIContent}
+        context={label}
+        existingContent={value || undefined}
+      />
     </FormControl>
   );
 }

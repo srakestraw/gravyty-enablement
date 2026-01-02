@@ -277,7 +277,7 @@ export async function createCourse(req: AuthenticatedRequest, res: Response) {
     const now = new Date().toISOString();
     const courseId = `course_${uuidv4()}`;
     
-    // Normalize taxonomy fields (map legacy to new names)
+    // Normalize metadata fields (map legacy to new names)
     const product = parsed.data.product ?? parsed.data.legacy_product_suite;
     const product_suite = parsed.data.product_suite ?? parsed.data.legacy_product_concept;
     const product_id = parsed.data.product_id ?? parsed.data.legacy_product_suite_id;
@@ -452,7 +452,7 @@ export async function updateCourse(req: AuthenticatedRequest, res: Response) {
   }
   
   try {
-    // Normalize taxonomy fields (map legacy to new names)
+    // Normalize metadata fields (map legacy to new names)
     const updates: any = { ...parsed.data };
     if (updates.product === undefined && updates.legacy_product_suite !== undefined) {
       updates.product = updates.legacy_product_suite;
@@ -1005,7 +1005,7 @@ export async function createPath(req: AuthenticatedRequest, res: Response) {
     const now = new Date().toISOString();
     const pathId = `path_${uuidv4()}`;
     
-    // Normalize taxonomy fields
+    // Normalize metadata fields
     const product = parsed.data.product;
     const product_suite = parsed.data.product_suite;
     
@@ -2630,6 +2630,84 @@ export async function generateAIImage(req: AuthenticatedRequest, res: Response) 
  * Download image from external URL (proxy to avoid CORS)
  * Returns the image as a blob that can be uploaded to S3
  */
+/**
+ * POST /v1/lms/admin/ai/chat-completion
+ * Create chat completion using AI service
+ */
+export async function chatCompletion(req: AuthenticatedRequest, res: Response) {
+  const requestId = req.headers['x-request-id'] as string;
+
+  try {
+    const ChatCompletionSchema = z.object({
+      prompt: z.string().min(1),
+      context: z.string().optional(),
+      existing_content: z.string().optional(),
+    });
+
+    const parsed = ChatCompletionSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: parsed.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', '),
+        },
+        request_id: requestId,
+      });
+      return;
+    }
+
+    const { prompt, context, existing_content } = parsed.data;
+
+    // Build messages array
+    const messages: ChatMessage[] = [];
+    
+    // Add system message if context is provided
+    if (context) {
+      messages.push({ role: 'system', content: `Context: ${context}` });
+    }
+    
+    // Add existing content as assistant message if provided
+    if (existing_content) {
+      messages.push({ role: 'assistant', content: existing_content });
+    }
+    
+    // Add user prompt
+    messages.push({ role: 'user', content: prompt });
+
+    // Use default provider for chat completion
+    const response = await createChatCompletion(messages, {
+      maxTokens: 2000,
+      temperature: 0.7,
+    });
+
+    const apiResponse: ApiSuccessResponse<{
+      content: string;
+      usage: {
+        promptTokens: number;
+        completionTokens: number;
+        totalTokens: number;
+      };
+    }> = {
+      data: {
+        content: response.content,
+        usage: response.usage,
+      },
+      request_id: requestId,
+    };
+
+    res.json(apiResponse);
+  } catch (error) {
+    console.error(`[${requestId}] Error creating chat completion:`, error);
+    res.status(500).json({
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: error instanceof Error ? error.message : 'Failed to create chat completion',
+      },
+      request_id: requestId,
+    });
+  }
+}
+
 export async function downloadAIImage(req: AuthenticatedRequest, res: Response) {
   const requestId = req.headers['x-request-id'] as string;
 

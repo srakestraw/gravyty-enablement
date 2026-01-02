@@ -61,7 +61,7 @@ export function AdminCourseEditorPage() {
     error: stateError,
     updateCourse,
     updateLessons,
-    refetch: refetchCourse,
+    refetch: refetchCourseFn,
   } = useCourseEditorState({
     courseId: courseId || 'new',
     isNew,
@@ -196,8 +196,12 @@ export function AdminCourseEditorPage() {
   });
   const [publishedCourses, setPublishedCourses] = useState<Array<{ course_id: string; title: string }>>([]);
   const [discardDialogOpen, setDiscardDialogOpen] = useState(false);
+  const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
+  const [restoreDialogOpen, setRestoreDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
+  const [archiving, setArchiving] = useState(false);
+  const [restoring, setRestoring] = useState(false);
   
   // Phase 2: Validation Hook (must be before editorActions)
   const validation = useCourseValidation({
@@ -350,7 +354,7 @@ export function AdminCourseEditorPage() {
     onUpdateCourse: updateCourse,
     onUpdateLessons: updateLessons,
     refetchCourse: async () => {
-      await refetch();
+      await refetchCourseFn();
     },
     temporaryMediaIds,
     cleanupTemporaryMedia,
@@ -688,6 +692,47 @@ export function AdminCourseEditorPage() {
     setDiscardDialogOpen(false);
   };
 
+  const handleArchive = async () => {
+    if (!course) return;
+    setArchiving(true);
+    try {
+      const response = await lmsAdminApi.archiveCourse(course.course_id);
+      if ('error' in response) {
+        alert(`Failed to archive course: ${response.error.message}`);
+      } else {
+        // Refetch course to update status
+        await refetchCourseFn();
+        setArchiveDialogOpen(false);
+        // Optionally navigate away or show success message
+      }
+    } catch (err) {
+      console.error('Failed to archive course:', err);
+      alert('Failed to archive course');
+    } finally {
+      setArchiving(false);
+    }
+  };
+
+  const handleRestore = async () => {
+    if (!course) return;
+    setRestoring(true);
+    try {
+      const response = await lmsAdminApi.restoreCourse(course.course_id);
+      if ('error' in response) {
+        alert(`Failed to restore course: ${response.error.message}`);
+      } else {
+        // Refetch course to update status
+        await refetchCourseFn();
+        setRestoreDialogOpen(false);
+      }
+    } catch (err) {
+      console.error('Failed to restore course:', err);
+      alert('Failed to restore course');
+    } finally {
+      setRestoring(false);
+    }
+  };
+
   const handleDelete = async () => {
     await editorActions.handleDelete();
     setDeleteDialogOpen(false);
@@ -804,7 +849,11 @@ export function AdminCourseEditorPage() {
                 onPublish={handlePublish}
                 onPreview={handlePreview}
                 onDiscardChanges={() => setDiscardDialogOpen(true)}
+                onArchive={() => setArchiveDialogOpen(true)}
+                onRestore={() => setRestoreDialogOpen(true)}
                 onDelete={() => setDeleteDialogOpen(true)}
+                archiving={archiving}
+                restoring={restoring}
                 deleting={editorActions.deleting}
                 onCancel={() => navigate('/enablement/admin/learning/courses')}
                 validation={validation}
@@ -899,6 +948,42 @@ export function AdminCourseEditorPage() {
           <Button onClick={() => setDiscardDialogOpen(false)}>Cancel</Button>
           <Button onClick={handleDiscardChanges} color="error" variant="contained">
             Discard Changes
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Archive Course Dialog */}
+      <Dialog open={archiveDialogOpen} onClose={() => !archiving && setArchiveDialogOpen(false)}>
+        <DialogTitle>Archive Course</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to archive "{course?.title || 'this course'}"? The course will be hidden from the course list but can be restored later.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setArchiveDialogOpen(false)} disabled={archiving}>
+            Cancel
+          </Button>
+          <Button onClick={handleArchive} variant="contained" disabled={archiving}>
+            {archiving ? 'Archiving...' : 'Archive'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Restore Course Dialog */}
+      <Dialog open={restoreDialogOpen} onClose={() => !restoring && setRestoreDialogOpen(false)}>
+        <DialogTitle>Restore Course</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to restore "{course?.title || 'this course'}"? The course will be restored to draft status and will appear in the course list again.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setRestoreDialogOpen(false)} disabled={restoring}>
+            Cancel
+          </Button>
+          <Button onClick={handleRestore} variant="contained" disabled={restoring}>
+            {restoring ? 'Restoring...' : 'Restore'}
           </Button>
         </DialogActions>
       </Dialog>

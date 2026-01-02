@@ -5,19 +5,19 @@
  */
 
 import { Box, Typography, Paper, Chip, Divider } from '@mui/material';
-import { useTaxonomyOptions } from '../../../hooks/useTaxonomyOptions';
-import { taxonomyApi } from '../../../api/taxonomyClient';
+import { useMetadataOptions } from '../../../hooks/useMetadataOptions';
+import { metadataApi } from '../../../api/metadataClient';
 import { useState, useEffect } from 'react';
-import type { Course, TaxonomyOption } from '@gravyty/domain';
+import type { Course, MetadataOption } from '@gravyty/domain';
 
 export interface CourseSummaryPanelProps {
   course: Course | null;
 }
 
 export function CourseSummaryPanel({ course }: CourseSummaryPanelProps) {
-  const [productOption, setProductOption] = useState<TaxonomyOption | null>(null);
-  const [productSuiteOption, setProductSuiteOption] = useState<TaxonomyOption | null>(null);
-  const [topicTagOptions, setTopicTagOptions] = useState<TaxonomyOption[]>([]);
+  const [productOption, setProductOption] = useState<MetadataOption | null>(null);
+  const [productSuiteOption, setProductSuiteOption] = useState<MetadataOption | null>(null);
+  const [topicTagOptions, setTopicTagOptions] = useState<MetadataOption[]>([]);
   const [loadingTaxonomy, setLoadingTaxonomy] = useState(false);
 
   // Fetch taxonomy option labels
@@ -30,7 +30,7 @@ export function CourseSummaryPanel({ course }: CourseSummaryPanelProps) {
         // Fetch Product
         if (course.product_id || course.product_suite_id) {
           const productId = course.product_id || course.product_suite_id;
-          const productRes = await taxonomyApi.getOption(productId!);
+          const productRes = await metadataApi.getOption(productId!);
           if ('data' in productRes) {
             setProductOption(productRes.data.option);
           }
@@ -41,7 +41,7 @@ export function CourseSummaryPanel({ course }: CourseSummaryPanelProps) {
         // Fetch Product Suite
         if (course.product_suite_id || course.product_concept_id) {
           const productSuiteId = course.product_suite_id || course.product_concept_id;
-          const productSuiteRes = await taxonomyApi.getOption(productSuiteId!);
+          const productSuiteRes = await metadataApi.getOption(productSuiteId!);
           if ('data' in productSuiteRes) {
             setProductSuiteOption(productSuiteRes.data.option);
           }
@@ -52,12 +52,12 @@ export function CourseSummaryPanel({ course }: CourseSummaryPanelProps) {
         // Fetch Topic Tags
         const topicTagIds = course.topic_tag_ids || [];
         if (topicTagIds.length > 0) {
-          const tagPromises = topicTagIds.map((id) => taxonomyApi.getOption(id));
+          const tagPromises = topicTagIds.map((id) => metadataApi.getOption(id));
           const tagResults = await Promise.all(tagPromises);
           const tags = tagResults
             .filter((r) => 'data' in r)
             .map((r) => ('data' in r ? r.data.option : null))
-            .filter((t): t is TaxonomyOption => t !== null);
+            .filter((t): t is MetadataOption => t !== null);
           setTopicTagOptions(tags);
         } else {
           setTopicTagOptions([]);

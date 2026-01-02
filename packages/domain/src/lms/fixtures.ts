@@ -61,6 +61,7 @@ export const sampleCourseDetail: CourseDetail = {
   product_suite_ids: [],
   topic_tags: ['sales', 'onboarding', 'fundamentals'],
   topic_tag_ids: [],
+  audience_ids: [],
   related_course_ids: ['course-2'],
   badges: [],
   badge_ids: [],

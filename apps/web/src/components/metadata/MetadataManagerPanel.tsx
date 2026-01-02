@@ -1,8 +1,8 @@
 /**
- * Taxonomy Manager Panel
+ * Metadata Manager Panel
  * 
- * Inline management panel for taxonomy options (rename, reorder, archive, color)
- * Used inside the TaxonomySelect/TaxonomyMultiSelect popover
+ * Inline management panel for metadata options (rename, reorder, archive, color)
+ * Used inside the MetadataSelect/MetadataMultiSelect popover
  */
 
 import { useState, useMemo } from 'react';
@@ -34,8 +34,8 @@ import {
   Check as CheckIcon,
   Close as CloseIcon,
 } from '@mui/icons-material';
-import { taxonomyApi } from '../../api/taxonomyClient';
-import type { TaxonomyOption, TaxonomyGroupKey } from '@gravyty/domain';
+import { metadataApi } from '../../api/metadataClient';
+import type { MetadataOption, MetadataGroupKey } from '@gravyty/domain';
 
 const COLOR_PALETTE = [
   '#1976d2', // blue
@@ -48,21 +48,21 @@ const COLOR_PALETTE = [
   '#5d4037', // brown
 ];
 
-export interface TaxonomyManagerPanelProps {
-  groupKey: TaxonomyGroupKey;
-  options: TaxonomyOption[];
+export interface MetadataManagerPanelProps {
+  groupKey: MetadataGroupKey;
+  options: MetadataOption[];
   parentId?: string;
-  onOptionsChange: (options: TaxonomyOption[]) => void;
+  onOptionsChange: (options: MetadataOption[]) => void;
   onClose: () => void;
 }
 
-export function TaxonomyManagerPanel({
+export function MetadataManagerPanel({
   groupKey,
   options,
   parentId,
   onOptionsChange,
   onClose,
-}: TaxonomyManagerPanelProps) {
+}: MetadataManagerPanelProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState('');
   const [editShortDescription, setEditShortDescription] = useState('');
@@ -78,7 +78,7 @@ export function TaxonomyManagerPanel({
   }, [options]);
 
   // Start editing
-  const handleStartEdit = (option: TaxonomyOption) => {
+  const handleStartEdit = (option: MetadataOption) => {
     setEditingId(option.option_id);
     setEditLabel(option.label);
     setEditShortDescription(option.short_description || '');
@@ -108,7 +108,7 @@ export function TaxonomyManagerPanel({
     onOptionsChange(optimisticOptions);
 
     try {
-      const response = await taxonomyApi.updateOption(optionId, {
+      const response = await metadataApi.updateOption(optionId, {
         label: editLabel.trim(),
         short_description: editShortDescription.trim() || null,
       });
@@ -146,7 +146,7 @@ export function TaxonomyManagerPanel({
 
     setCreating(true);
     try {
-      const response = await taxonomyApi.createOption(groupKey, {
+      const response = await metadataApi.createOption(groupKey, {
         label: newLabel.trim(),
         parent_id: parentId,
         short_description: newShortDescription.trim() || undefined,
@@ -168,7 +168,7 @@ export function TaxonomyManagerPanel({
   };
 
   // Archive/unarchive option
-  const handleToggleArchive = async (option: TaxonomyOption) => {
+  const handleToggleArchive = async (option: MetadataOption) => {
     const optionId = option.option_id;
     setUpdating((prev) => new Set(prev).add(optionId));
 
@@ -181,7 +181,7 @@ export function TaxonomyManagerPanel({
     onOptionsChange(optimisticOptions);
 
     try {
-      const response = await taxonomyApi.updateOption(optionId, {
+      const response = await metadataApi.updateOption(optionId, {
         archived_at: option.archived_at ? undefined : new Date().toISOString(),
       });
 
@@ -232,8 +232,8 @@ export function TaxonomyManagerPanel({
     try {
       // Update both options
       await Promise.all([
-        taxonomyApi.updateOption(optionId, { sort_order: targetOption.sort_order }),
-        taxonomyApi.updateOption(targetOption.option_id, { sort_order: option.sort_order }),
+        metadataApi.updateOption(optionId, { sort_order: targetOption.sort_order }),
+        metadataApi.updateOption(targetOption.option_id, { sort_order: option.sort_order }),
       ]);
 
       // Refetch to get updated list (or update manually)
@@ -272,7 +272,7 @@ export function TaxonomyManagerPanel({
     onOptionsChange(optimisticOptions);
 
     try {
-      const response = await taxonomyApi.updateOption(optionId, { color });
+      const response = await metadataApi.updateOption(optionId, { color });
 
       if ('error' in response) {
         // Rollback

@@ -460,9 +460,9 @@ export function AssetDetailPage() {
                 </Button>
               </Box>
             )}
-            {asset.taxonomy_node_ids.length > 0 && (
+            {asset.metadata_node_ids.length > 0 && (
               <Typography variant="body2">
-                <strong>Taxonomy:</strong> {asset.taxonomy_node_ids.join(', ')}
+                <strong>Metadata:</strong> {asset.metadata_node_ids.join(', ')}
               </Typography>
             )}
             

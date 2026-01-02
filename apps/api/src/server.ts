@@ -10,7 +10,7 @@ import * as analyticsHandlers from './handlers/analytics';
 import { createStorageRepos } from './storage/factory';
 import lmsRoutes from './routes/lms';
 import adminUsersRoutes from './routes/adminUsers';
-import taxonomyRoutes from './routes/taxonomy';
+import metadataRoutes from './routes/metadata';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -20,7 +20,20 @@ export const storageRepos = createStorageRepos();
 
 // Middleware
 app.use(cors());
-app.use(express.json({ limit: '50mb' }));
+// JSON parser - only parse when Content-Type is application/json
+// This allows raw body parsers on specific routes to work correctly
+app.use(express.json({ 
+  limit: '50mb',
+  type: (req) => {
+    // Skip JSON parsing for file upload routes - let route-specific raw parser handle it
+    if (req.path.includes('/media/') && req.path.includes('/upload') && req.method === 'PUT') {
+      return false;
+    }
+    // Only parse JSON content types
+    const contentType = req.headers['content-type'] || '';
+    return contentType.includes('application/json');
+  }
+}));
 app.use(requestIdMiddleware);
 app.use(apiRateLimiter); // Apply rate limiting to all routes
 app.use(jwtAuthMiddleware); // JWT authentication (falls back to dev headers if not configured)
@@ -51,8 +64,8 @@ v1.use('/lms/admin', lmsAdminRoutes);
 // Admin Users routes (Admin only)
 v1.use('/admin/users', requireRole('Admin'), adminUsersRoutes);
 
-// Taxonomy routes (Viewer+ for read, Admin for write)
-v1.use('/taxonomy', taxonomyRoutes);
+// Metadata routes (Viewer+ for read, Admin for write)
+v1.use('/metadata', metadataRoutes);
 
 // Content Hub routes (Viewer+)
 import contentHubRoutes from './routes/contentHub';

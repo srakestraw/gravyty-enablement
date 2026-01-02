@@ -140,7 +140,7 @@ export function SideNav() {
       icon: <AdminPanelSettingsOutlined fontSize="small" />,
       items: [
         { label: 'Users & Roles', path: '/enablement/admin/users', icon: <ManageAccountsOutlined fontSize="small" /> },
-        { label: 'Taxonomy', path: '/enablement/admin/taxonomy', icon: <CategoryOutlined fontSize="small" /> },
+        { label: 'Metadata', path: '/enablement/admin/metadata', icon: <CategoryOutlined fontSize="small" /> },
         { label: 'Integrations', path: '/enablement/admin/integrations', icon: <HubOutlined fontSize="small" /> },
         { label: 'Media Library', path: '/enablement/admin/learning/media', icon: <PermMediaOutlined fontSize="small" /> },
         { label: 'Assignments', path: '/enablement/admin/learning/assignments', icon: <AssignmentIndOutlined fontSize="small" /> },

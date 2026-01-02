@@ -15,7 +15,6 @@ import { assetRepo } from '../storage/dynamo/assetRepo';
 import { contentHubSubscriptionRepo } from '../storage/dynamo/contentHubSubscriptionRepo';
 import { createNotification } from '@gravyty/jobs';
 import { listUsers } from '../aws/cognitoClient';
-import { v4 as uuidv4 } from 'uuid';
 
 /**
  * Extract @mentions from comment body
@@ -37,7 +36,7 @@ function extractMentions(body: string): string[] {
 export async function createComment(req: AuthenticatedRequest, res: Response) {
   const requestId = req.headers['x-request-id'] as string;
   const assetId = req.params.id;
-  const userId = req.user!.userId;
+  const userId = req.user!.user_id;
   
   try {
     const CreateCommentSchema = z.object({
@@ -52,8 +51,8 @@ export async function createComment(req: AuthenticatedRequest, res: Response) {
         error: {
           code: 'VALIDATION_ERROR',
           message: 'Invalid request body',
-          details: parsed.error.errors,
         },
+        request_id: requestId,
       };
       return res.status(400).json(response);
     }
@@ -68,6 +67,7 @@ export async function createComment(req: AuthenticatedRequest, res: Response) {
           code: 'NOT_FOUND',
           message: `Asset ${assetId} not found`,
         },
+        request_id: requestId,
       };
       return res.status(404).json(response);
     }
@@ -79,8 +79,8 @@ export async function createComment(req: AuthenticatedRequest, res: Response) {
     const comment: Comment = {
       comment_id: commentId,
       asset_id: assetId,
-      version_id,
-      user_id: userId,
+      version_id: version_id || undefined,
+      user_id: userId!,
       body,
       parent_comment_id: parent_comment_id || undefined,
       created_at: now,
@@ -141,9 +141,9 @@ export async function createComment(req: AuthenticatedRequest, res: Response) {
             userId: user.username,
             type: 'info',
             title: 'You were mentioned in a comment',
-            message: `${req.user!.name || req.user!.email} mentioned you in a comment on "${asset.title}"`,
+            message: `${req.user!.email || 'Someone'} mentioned you in a comment on "${asset.title}"`,
             contentId: assetId,
-            notificationId: `mention:${commentId}:${user.username}`,
+            notificationId: `mention:${commentId}:${user.username || ''}`,
           });
         }
       } catch (err) {
@@ -159,7 +159,7 @@ export async function createComment(req: AuthenticatedRequest, res: Response) {
           userId: asset.owner_id,
           type: 'info',
           title: 'New comment on your asset',
-          message: `${req.user!.name || req.user!.email} commented on "${asset.title}"`,
+          message: `${req.user!.email || 'Someone'} commented on "${asset.title}"`,
           contentId: assetId,
           notificationId: `comment:${commentId}:${asset.owner_id}`,
         });
@@ -171,6 +171,7 @@ export async function createComment(req: AuthenticatedRequest, res: Response) {
     
     const response: ApiSuccessResponse<Comment> = {
       data: created,
+      request_id: requestId,
     };
     return res.status(201).json(response);
   } catch (error) {
@@ -180,6 +181,7 @@ export async function createComment(req: AuthenticatedRequest, res: Response) {
         code: 'INTERNAL_ERROR',
         message: error instanceof Error ? error.message : 'Failed to create comment',
       },
+      request_id: requestId,
     };
     return res.status(500).json(response);
   }
@@ -206,6 +208,7 @@ export async function listComments(req: AuthenticatedRequest, res: Response) {
     
     const response: ApiSuccessResponse<{ items: Comment[]; next_cursor?: string }> = {
       data: result,
+      request_id: requestId,
     };
     return res.status(200).json(response);
   } catch (error) {
@@ -215,6 +218,7 @@ export async function listComments(req: AuthenticatedRequest, res: Response) {
         code: 'INTERNAL_ERROR',
         message: error instanceof Error ? error.message : 'Failed to list comments',
       },
+      request_id: requestId,
     };
     return res.status(500).json(response);
   }
@@ -227,7 +231,7 @@ export async function listComments(req: AuthenticatedRequest, res: Response) {
 export async function resolveComment(req: AuthenticatedRequest, res: Response) {
   const requestId = req.headers['x-request-id'] as string;
   const commentId = req.params.id;
-  const userId = req.user!.userId;
+  const userId = req.user!.user_id;
   const userRole = req.user!.role;
   
   try {
@@ -239,6 +243,7 @@ export async function resolveComment(req: AuthenticatedRequest, res: Response) {
           code: 'NOT_FOUND',
           message: `Comment ${commentId} not found`,
         },
+        request_id: requestId,
       };
       return res.status(404).json(response);
     }
@@ -251,6 +256,7 @@ export async function resolveComment(req: AuthenticatedRequest, res: Response) {
           code: 'NOT_FOUND',
           message: `Asset ${comment.asset_id} not found`,
         },
+        request_id: requestId,
       };
       return res.status(404).json(response);
     }
@@ -262,6 +268,7 @@ export async function resolveComment(req: AuthenticatedRequest, res: Response) {
           code: 'FORBIDDEN',
           message: 'Only asset owners and Approvers can resolve comments',
         },
+        request_id: requestId,
       };
       return res.status(403).json(response);
     }
@@ -276,6 +283,7 @@ export async function resolveComment(req: AuthenticatedRequest, res: Response) {
     
     const response: ApiSuccessResponse<Comment> = {
       data: updated,
+      request_id: requestId,
     };
     return res.status(200).json(response);
   } catch (error) {
@@ -285,6 +293,7 @@ export async function resolveComment(req: AuthenticatedRequest, res: Response) {
         code: 'INTERNAL_ERROR',
         message: error instanceof Error ? error.message : 'Failed to resolve comment',
       },
+      request_id: requestId,
     };
     return res.status(500).json(response);
   }

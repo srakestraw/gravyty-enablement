@@ -23,7 +23,7 @@ export class EnablementPortalStack extends cdk.Stack {
   public readonly lmsAssignmentsTable: dynamodb.Table;
   public readonly lmsCertificatesTable: dynamodb.Table;
   public readonly lmsTranscriptsTable: dynamodb.Table;
-  public readonly taxonomyTable: dynamodb.Table;
+  public readonly metadataTable: dynamodb.Table;
   // LMS S3 Bucket
   public readonly lmsMediaBucket: s3.Bucket;
   public readonly apiRole: iam.Role;
@@ -200,9 +200,9 @@ export class EnablementPortalStack extends cdk.Stack {
       sortKey: { name: 'issued_at', type: dynamodb.AttributeType.STRING },
     });
 
-    // Taxonomy Table
-    this.taxonomyTable = new dynamodb.Table(this, 'Taxonomy', {
-      tableName: 'taxonomy',
+    // Metadata Table
+    this.metadataTable = new dynamodb.Table(this, 'Metadata', {
+      tableName: 'metadata',
       partitionKey: { name: 'option_id', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       removalPolicy: cdk.RemovalPolicy.RETAIN,
@@ -210,7 +210,7 @@ export class EnablementPortalStack extends cdk.Stack {
       encryption: dynamodb.TableEncryption.AWS_MANAGED,
     });
     // GSI: GroupKeyIndex
-    this.taxonomyTable.addGlobalSecondaryIndex({
+    this.metadataTable.addGlobalSecondaryIndex({
       indexName: 'GroupKeyIndex',
       partitionKey: { name: 'group_key', type: dynamodb.AttributeType.STRING },
       sortKey: { name: 'sort_order_label', type: dynamodb.AttributeType.STRING },
@@ -263,7 +263,7 @@ export class EnablementPortalStack extends cdk.Stack {
     this.lmsAssignmentsTable.grantReadWriteData(lambdaRole);
     this.lmsCertificatesTable.grantReadWriteData(lambdaRole);
     this.lmsTranscriptsTable.grantReadWriteData(lambdaRole);
-    this.taxonomyTable.grantReadWriteData(lambdaRole);
+    this.metadataTable.grantReadWriteData(lambdaRole);
 
     // Grant LMS S3 permissions (read/write on all objects in bucket)
     this.lmsMediaBucket.grantReadWrite(lambdaRole);
@@ -281,7 +281,7 @@ export class EnablementPortalStack extends cdk.Stack {
       lmsAssignmentsTable: this.lmsAssignmentsTable,
       lmsCertificatesTable: this.lmsCertificatesTable,
       lmsTranscriptsTable: this.lmsTranscriptsTable,
-      taxonomyTable: this.taxonomyTable,
+      metadataTable: this.metadataTable,
       lmsMediaBucket: this.lmsMediaBucket,
       allowedOrigins,
     });
@@ -454,10 +454,10 @@ export class EnablementPortalStack extends cdk.Stack {
       exportName: 'EnablementLmsCertificatesTableName',
     });
 
-    new cdk.CfnOutput(this, 'TaxonomyTableName', {
-      value: this.taxonomyTable.tableName,
-      description: 'DynamoDB table name for taxonomy',
-      exportName: 'EnablementTaxonomyTableName',
+    new cdk.CfnOutput(this, 'MetadataTableName', {
+      value: this.metadataTable.tableName,
+      description: 'DynamoDB table name for metadata',
+      exportName: 'EnablementMetadataTableName',
     });
 
     new cdk.CfnOutput(this, 'LmsMediaBucketName', {

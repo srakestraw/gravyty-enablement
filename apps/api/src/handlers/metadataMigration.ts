@@ -1,7 +1,7 @@
 /**
- * Taxonomy Migration API Handlers
+ * Metadata Migration API Handlers
  * 
- * Handlers for migrating legacy taxonomy data to controlled options
+ * Handlers for migrating legacy metadata data to controlled options
  */
 
 import { Response } from 'express';
@@ -16,14 +16,14 @@ import type { ContentItem } from '@gravyty/domain';
 const CONTENT_TABLE = process.env.DDB_TABLE_CONTENT || 'content_registry';
 
 /**
- * GET /v1/taxonomy/migration/scan
- * Scan Courses and Resources for legacy taxonomy values
+ * GET /v1/metadata/migration/scan
+ * Scan Courses and Resources for legacy metadata values
  */
-export async function scanLegacyTaxonomyValues(req: AuthenticatedRequest, res: Response) {
+export async function scanLegacyMetadataValues(req: AuthenticatedRequest, res: Response) {
   const requestId = req.headers['x-request-id'] as string;
   
   try {
-    const key = req.query.key as string | undefined; // Optional: filter by taxonomy key
+    const key = req.query.key as string | undefined; // Optional: filter by metadata key
 
     const legacyValues: {
       product_suite: Record<string, { courses: number; resources: number }>;
@@ -137,11 +137,11 @@ export async function scanLegacyTaxonomyValues(req: AuthenticatedRequest, res: R
     };
     res.json(response);
   } catch (error) {
-    console.error(`[${requestId}] Error scanning legacy taxonomy values:`, error);
+    console.error(`[${requestId}] Error scanning legacy metadata values:`, error);
     res.status(500).json({
       error: {
         code: 'INTERNAL_ERROR',
-        message: error instanceof Error ? error.message : 'Failed to scan legacy taxonomy values',
+        message: error instanceof Error ? error.message : 'Failed to scan legacy metadata values',
       },
       request_id: requestId,
     });
@@ -149,10 +149,10 @@ export async function scanLegacyTaxonomyValues(req: AuthenticatedRequest, res: R
 }
 
 /**
- * POST /v1/taxonomy/migration/apply
+ * POST /v1/metadata/migration/apply
  * Apply migration mapping to update Courses and Resources
  */
-export async function applyTaxonomyMigration(req: AuthenticatedRequest, res: Response) {
+export async function applyMetadataMigration(req: AuthenticatedRequest, res: Response) {
   const requestId = req.headers['x-request-id'] as string;
   const userId = req.user?.user_id;
   
@@ -217,11 +217,11 @@ export async function applyTaxonomyMigration(req: AuthenticatedRequest, res: Res
     };
     res.json(response);
   } catch (error) {
-    console.error(`[${requestId}] Error applying taxonomy migration:`, error);
+    console.error(`[${requestId}] Error applying metadata migration:`, error);
     res.status(500).json({
       error: {
         code: 'INTERNAL_ERROR',
-        message: error instanceof Error ? error.message : 'Failed to apply taxonomy migration',
+        message: error instanceof Error ? error.message : 'Failed to apply metadata migration',
       },
       request_id: requestId,
     });

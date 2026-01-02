@@ -26,6 +26,8 @@ router.delete('/courses/:courseId', requireRole('Admin'), lmsAdminHandlers.delet
 router.get('/courses/:courseId/lessons', lmsAdminHandlers.getAdminCourseLessons);
 router.put('/courses/:courseId/lessons', requireRole('Contributor'), lmsAdminHandlers.updateCourseLessons);
 router.post('/courses/:courseId/publish', requireRole('Approver'), lmsAdminHandlers.publishCourse);
+router.post('/courses/:courseId/archive', requireRole('Approver'), lmsAdminHandlers.archiveCourse);
+router.post('/courses/:courseId/restore', requireRole('Approver'), lmsAdminHandlers.restoreCourse);
 
 // Course Assets (Content Hub integration)
 router.post('/courses/:id/assets', requireRole('Contributor'), courseAssetHandlers.attachAssetToCourse);
@@ -54,16 +56,21 @@ router.post('/certificates/templates/:templateId/publish', requireRole('Approver
 router.post('/certificates/templates/:templateId/archive', requireRole('Approver'), lmsAdminHandlers.archiveCertificateTemplate);
 
 // Media Library admin
-router.get('/media', requireRole('Admin'), lmsAdminHandlers.listMedia);
-router.post('/media/presign', requireRole('Admin'), lmsAdminHandlers.presignMediaUpload);
-router.put('/media/:media_id/upload', requireRole('Admin'), rawBodyParser, lmsAdminHandlers.uploadMedia);
-router.delete('/media/:media_id', requireRole('Admin'), lmsAdminHandlers.deleteMedia);
+// Contributors can upload media for courses they're working on
+router.get('/media', requireRole('Contributor'), lmsAdminHandlers.listMedia);
+router.post('/media/presign', requireRole('Contributor'), lmsAdminHandlers.presignMediaUpload);
+router.put('/media/:media_id/upload', requireRole('Contributor'), rawBodyParser, lmsAdminHandlers.uploadMedia);
+router.get('/media/:media_id/url', requireRole('Contributor'), lmsAdminHandlers.getMediaUrl);
+router.delete('/media/:media_id', requireRole('Admin'), lmsAdminHandlers.deleteMedia); // Only Admins can delete
 router.post('/media/:media_id/transcribe', requireRole('Admin'), lmsAdminHandlers.startMediaTranscription);
 
 // AI Image Generation
 router.post('/ai/suggest-image-prompt', requireRole('Contributor'), lmsAdminHandlers.suggestImagePrompt);
 router.post('/ai/generate-image', requireRole('Contributor'), lmsAdminHandlers.generateAIImage);
 router.post('/ai/download-image', requireRole('Contributor'), lmsAdminHandlers.downloadAIImage);
+
+// AI Chat Completion
+router.post('/ai/chat-completion', requireRole('Contributor'), lmsAdminHandlers.chatCompletion);
 
 // Unsplash Integration
 router.get('/unsplash/search', requireRole('Contributor'), lmsAdminHandlers.searchUnsplash);

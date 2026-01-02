@@ -15,7 +15,7 @@ Kits support:
 - Cover image using the shared **Cover Image** component (same component used across the app)
 - Sections and ordered items
 - References to Content Hub items (canonical latest vs pinned version)
-- Kit-level taxonomy (Product Suite, Product, Tags)
+- Kit-level metadata (Product Suite, Product, Tags)
 - Kit-level pinning/featured discovery
 - Notifications for updates, expirations, and replacements within a kit
 - Comments and feedback on kits and kit items
@@ -61,7 +61,7 @@ Navigation and placeholder routes already exist - this PRD defines behaviors and
 - **Viewer**: uses kits, downloads items, marks complete, subscribes, comments.
 - **Contributor**: creates and edits kits (structure, items), drafts kits for approval.
 - **Owner/Approver**: approves kit publish, pins kits, manages kit governance.
-- **Admin**: manages taxonomy, roles/permissions, sharing policies, integration settings.
+- **Admin**: manages metadata, roles/permissions, sharing policies, integration settings.
 - **External recipient**: accesses a shared kit via a unique URL (optional in MVP).
 
 ---
@@ -126,7 +126,7 @@ Your placeholder routes exist. Recommended routes if they are not already set (k
   - Description (optional)
   - Audience (optional, eg SDR/AE/CSM)
   - Owner (default current user; editable by Admin/Approver)
-  - Taxonomy: Product Suite, Product, Tags (same taxonomy system as Content Hub items)
+  - Metadata: Product Suite, Product, Tags (same metadata system as Content Hub items)
   - Status: draft, scheduled, published, deprecated, archived
   - publishAt (optional), expireAt (optional)
 - Sections:
@@ -173,7 +173,7 @@ Your placeholder routes exist. Recommended routes if they are not already set (k
   - When expired, kit is hidden from default discovery; direct access shows expired state.
 - Publish requirements (recommended):
   - Title, at least one section, at least one item
-  - Required taxonomy fields (Product Suite, Product) present
+  - Required metadata fields (Product Suite, Product) present
 
 **Acceptance criteria**
 - Scheduled kits become visible at publishAt.
@@ -186,9 +186,9 @@ Your placeholder routes exist. Recommended routes if they are not already set (k
 - Kits landing includes:
   - Featured/Pinned kits
   - Recently updated kits
-  - Recommended kits based on taxonomy (optional)
+  - Recommended kits based on metadata (optional)
 - Search and filters:
-  - taxonomy filters (suite/product/tags)
+  - metadata filters (suite/product/tags)
   - owner
   - audience
   - status (authorized users)
@@ -198,7 +198,7 @@ Your placeholder routes exist. Recommended routes if they are not already set (k
 
 **Acceptance criteria**
 - Pinned kits appear at the top of the kits landing.
-- Kits can be filtered by taxonomy.
+- Kits can be filtered by metadata.
 
 ---
 
@@ -308,7 +308,7 @@ If you already built external share links for Content Hub items, extend the same
 ### 10.1 Kits landing
 - Pinned kits at top
 - Search bar
-- Taxonomy filters
+- Metadata filters
 - “Create kit” CTA (role-gated)
 - Cards show:
   - cover image (shared Cover Image component)
@@ -328,7 +328,7 @@ If you already built external share links for Content Hub items, extend the same
 
 ### 10.2 Create/Edit kit
 Two-column editor (recommended):
-- Left: kit metadata (title, taxonomy, audience, description)
+- Left: kit metadata (title, metadata tags, audience, description)
 - Right: sections and items builder
 - Item picker opens a drawer/modal using existing Content Hub search UI
 - Inline health preview as items are added (eg if item is expired, block add or warn)
@@ -336,7 +336,7 @@ Two-column editor (recommended):
 ### 10.3 Kit detail
 - Header:
   - cover image (shared Cover Image component)
-  - title, taxonomy chips, owner, last updated
+  - title, metadata chips, owner, last updated
   - subscribe button, share button (if enabled)
   - health summary (issues count)
 - Sections list with ordered items
@@ -367,7 +367,7 @@ Two-column editor (recommended):
 | Pin/unpin | No | No | Yes | Yes |
 | Archive/deprecate | No | No | Yes | Yes |
 | Share externally | Optional | Optional | Yes | Yes |
-| Manage taxonomy | No | No | No | Yes |
+| Manage metadata | No | No | No | Yes |
 
 ---
 
@@ -382,7 +382,7 @@ Two-column editor (recommended):
 - coverImageRef (nullable; points to shared Cover Image storage key or Content Hub item reference)
 - audience (optional)
 - ownerId
-- taxonomyNodeIds[] (suite/product/tags)
+- metadataNodeIds[] (suite/product/tags)
 - status: draft | scheduled | published | deprecated | archived
 - publishAt (nullable)
 - expireAt (nullable)
@@ -457,7 +457,7 @@ Two-column editor (recommended):
 
 ### Kits
 - POST /kits
-- GET /kits (filters: taxonomy, audience, pinned, status)
+- GET /kits (filters: metadata, audience, pinned, status)
 - GET /kits/:id
 - PATCH /kits/:id (metadata)
 - POST /kits/:id/pin
@@ -518,7 +518,7 @@ Two-column editor (recommended):
 ### MVP
 - Create/edit kits with sections and ordered items (referencing Content Hub items)
 - Canonical vs pinned version references
-- Kits landing with search, taxonomy filters, pinned kits
+- Kits landing with search, metadata filters, pinned kits
 - Kit detail with health badges and fix actions for owners
 - Kit subscriptions and in-app notifications (kit updated, item expired/expiring)
 - Comments on kits and kit items

@@ -4,7 +4,7 @@
  * Shared component for selecting cover images across courses, assets, and role-playing
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Box,
   Button,
@@ -20,6 +20,7 @@ import {
   Image as ImageIcon,
 } from '@mui/icons-material';
 import { MediaSelectModal } from '../admin/learning/MediaSelectModal';
+import { getMediaDisplayUrl } from '../../utils/mediaUrl';
 import type { MediaRef } from '@gravyty/domain';
 
 export interface CoverImageSelectorProps {
@@ -58,6 +59,16 @@ export function CoverImageSelector({
   label = 'Cover Image',
   showGuidance = true,
 }: CoverImageSelectorProps) {
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  
+  // Load presigned URL when coverImage changes
+  useEffect(() => {
+    if (coverImage) {
+      getMediaDisplayUrl(coverImage).then(setImageUrl);
+    } else {
+      setImageUrl(null);
+    }
+  }, [coverImage]);
   const [modalOpen, setModalOpen] = useState(false);
 
   const handleSelect = (mediaRef: MediaRef) => {
@@ -89,7 +100,7 @@ export function CoverImageSelector({
         )}
 
         {/* Current Cover Image Display */}
-        {coverImage?.url ? (
+        {coverImage && imageUrl ? (
           <Paper
             sx={{
               position: 'relative',
@@ -102,7 +113,7 @@ export function CoverImageSelector({
             }}
           >
             <img
-              src={coverImage.url}
+              src={imageUrl}
               alt="Cover"
               style={{
                 width: '100%',

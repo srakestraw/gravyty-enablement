@@ -14,7 +14,7 @@ Build **Content Hub**, a Digital Asset Management (DAM) capability inside the En
 - Asset upload and versioning
 - Scheduled publishing and expiration windows
 - Notifications for new versions, expiring soon, and expired assets
-- Pinning and taxonomy-based discovery
+- Pinning and metadata-based discovery
 - Comments for all authenticated users
 - External sharing via unique URLs with tracking and link expiration/revocation
 - Link assets (URL-based content)
@@ -28,7 +28,7 @@ Build **Content Hub**, a Digital Asset Management (DAM) capability inside the En
 1. Ensure users consistently use the latest approved asset.
 2. Prevent expired or deprecated assets from being unknowingly used.
 3. Provide clear lifecycle governance (draft, scheduled, published, deprecated, expired, archived).
-4. Enable fast discovery via pinning and taxonomy filters.
+4. Enable fast discovery via pinning and metadata filters.
 5. Enable feedback loops via comments and structured feedback actions.
 6. Enable safe external sharing with analytics and link controls.
 7. Enable reuse across Courses without uploading content twice.
@@ -55,7 +55,7 @@ Build **Content Hub**, a Digital Asset Management (DAM) capability inside the En
 - **Share Link**: unique URL for external sharing, trackable, expirable, revocable.
 - **Canonical share link**: link resolves to latest published version.
 - **Version share link**: link resolves to a specific version (immutable target).
-- **Taxonomy**: controlled categorization, used for discovery and governance.
+- **Metadata**: controlled categorization, used for discovery and governance.
 - **Course Attachment**: course references an asset or specific version without duplication.
 
 ---
@@ -66,7 +66,7 @@ Build **Content Hub**, a Digital Asset Management (DAM) capability inside the En
 - **Viewer**: consumes assets, downloads, subscribes, comments
 - **Contributor**: uploads, creates versions, schedules publish (if allowed)
 - **Owner/Approver**: approves publish, pins, deprecates, expires, resolves feedback
-- **Admin**: manages taxonomy, roles/permissions, integrations (Google Drive), system settings
+- **Admin**: manages metadata, roles/permissions, integrations (Google Drive), system settings
 
 ### External recipients
 - **Open link viewer**: anyone with the URL (tracked by session)
@@ -88,7 +88,7 @@ You already have navigation and placeholder routes. Recommended naming (adjust t
 - Optional: shares `/enablement/content-hub/shares`
 
 ### Admin
-- Taxonomy: `/admin/taxonomy` (or existing)
+- Metadata: `/admin/metadata` (or existing)
 - Google Drive integration: `/admin/integrations/google-drive`
 
 If route churn is risky, keep existing routes and update UI labels to Content Hub. If early, rename paths now for long-term consistency.
@@ -114,7 +114,7 @@ Each Asset has a `sourceType`:
 
 ## 8) User stories (high priority)
 
-1. As a contributor, I can upload a file, fill required metadata and taxonomy, and create a draft asset version.
+1. As a contributor, I can upload a file, fill required metadata fields, and create a draft asset version.
 2. As an approver, I can publish now or schedule publishAt for a version, with a required “what changed” note.
 3. As a user, I can subscribe to an asset and be notified when a new version is published.
 4. As a user, I can download an asset and be notified when the downloaded version expires.
@@ -130,7 +130,7 @@ Each Asset has a `sourceType`:
 
 ### 9.1 Asset creation, upload, and versioning
 **Requirements**
-- Create Asset record with metadata and taxonomy.
+- Create Asset record with metadata fields.
 - Upload creates a new Asset Version, does not overwrite prior versions.
 - Version history list and ability to open any version.
 - Store or compute `currentPublishedVersionId`.
@@ -228,11 +228,11 @@ Each Asset has a `sourceType`:
 - Title
 - Asset type (deck, doc, image, video, logo, worksheet, link)
 - Owner
-- Taxonomy node(s)
+- Metadata node(s)
 
 **Acceptance criteria**
-- Publish is blocked if required taxonomy or metadata is missing.
-- Search supports filtering by taxonomy.
+- Publish is blocked if required metadata fields are missing.
+- Search supports filtering by metadata.
 
 ---
 
@@ -308,7 +308,7 @@ Each Asset has a `sourceType`:
 ### 9.10 Link assets (URL content)
 **Requirements**
 - Create Asset with sourceType LINK and a URL.
-- Supports taxonomy, pinning, comments, subscriptions, publishAt/expireAt.
+- Supports metadata, pinning, comments, subscriptions, publishAt/expireAt.
 - Optional Open Graph preview.
 
 **Lifecycle**
@@ -384,7 +384,7 @@ Each Asset has a `sourceType`:
 - Primary actions: View/Download, Share, Subscribe, Comment
 - Banner when not latest: “Viewing v2. Latest is v3.” + CTA
 - Tabs:
-  - Overview (metadata, taxonomy)
+  - Overview (metadata fields)
   - Versions (timeline)
   - Comments
   - Shares (authorized)
@@ -419,7 +419,7 @@ Each Asset has a `sourceType`:
 | Approve publish | No | No | Yes | Yes |
 | Pin/unpin | No | No | Yes | Yes |
 | Deprecate/expire/archive | No | No | Yes | Yes |
-| Manage taxonomy | No | No | No | Yes |
+| Manage metadata | No | No | No | Yes |
 | Create share link | Yes (optional) | Yes | Yes | Yes |
 | Revoke share link | Own only | Own only | Yes | Yes |
 | View analytics | Limited | Limited | Yes | Yes |
@@ -437,7 +437,7 @@ Each Asset has a `sourceType`:
 - description
 - assetType
 - ownerId
-- taxonomyNodeIds[]
+- metadataNodeIds[]
 - sourceType: UPLOAD | LINK | GOOGLE_DRIVE
 - sourceRef (json):
   - LINK: { url, preview? }
@@ -472,7 +472,7 @@ Each Asset has a `sourceType`:
 
 **Subscription**
 - id
-- targetType: asset | taxonomy | collection | savedSearch
+- targetType: asset | metadata | collection | savedSearch
 - targetId
 - userId
 - triggers (json): newVersion, expiringSoon, expired, comments, mentions
@@ -564,9 +564,9 @@ Each Asset has a `sourceType`:
 
 ### Assets
 - POST /assets
-- GET /assets (filters: taxonomy, type, status, pinned)
+- GET /assets (filters: metadata, type, status, pinned)
 - GET /assets/:id
-- PATCH /assets/:id (metadata, owner, taxonomy)
+- PATCH /assets/:id (metadata fields, owner, metadata nodes)
 - POST /assets/:id/pin
 - DELETE /assets/:id/pin
 
@@ -636,7 +636,7 @@ User preferences:
 ## 15) Analytics and reporting (MVP)
 - Top assets by views/downloads (7/30/90 days)
 - Assets expiring soon
-- Assets with missing owner or taxonomy
+- Assets with missing owner or metadata
 - Search zero-result queries
 - External share performance:
   - views/downloads by share link
@@ -659,7 +659,7 @@ User preferences:
 - Asset expires but canonical link should resolve to latest published non-expired version, otherwise show expired state.
 - Drive file deleted or permissions revoked: mark “Source unavailable” and stop sync, preserve history.
 - Viewer bookmarks old version: show “not latest” banner and CTA to latest.
-- Taxonomy node changes: soft-deprecate taxonomy nodes rather than hard delete.
+- Metadata node changes: soft-deprecate metadata nodes rather than hard delete.
 
 ---
 
@@ -667,10 +667,10 @@ User preferences:
 
 ### MVP
 - Asset library, asset detail, versions, lifecycle states, scheduling, expiration
-- Taxonomy filtering + required metadata on publish
+- Metadata filtering + required metadata fields on publish
 - Pinning (global and contextual)
 - Comments for all authenticated users + mentions
-- Subscriptions (asset and taxonomy) + in-app notifications
+- Subscriptions (asset and metadata) + in-app notifications
 - Share links (canonical and version) with open and email-verified modes + tracking + expire/revoke
 - Link assets
 - Course attachments referencing assets (no duplication)
@@ -707,7 +707,7 @@ User preferences:
 6. Lifecycle scheduler (publishAt/expireAt) + state transitions
 7. Subscriptions + in-app notifications
 8. Share links + external landing + tracking events
-9. Pinning + taxonomy enforcement on publish
+9. Pinning + metadata enforcement on publish
 10. Google Drive connector + import + sync + version creation
 11. Usage tab (where used in courses) + admin dashboards
 

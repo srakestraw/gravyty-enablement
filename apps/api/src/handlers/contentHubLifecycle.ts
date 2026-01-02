@@ -35,7 +35,6 @@ export async function publishVersionHandler(req: AuthenticatedRequest, res: Resp
         error: {
           code: 'VALIDATION_ERROR',
           message: 'Invalid request body',
-          details: parsed.error.errors,
         },
         request_id: requestId,
       };
@@ -63,10 +62,10 @@ export async function publishVersionHandler(req: AuthenticatedRequest, res: Resp
       return;
     }
     
-    // Enforce publish requirements: taxonomy and required metadata
-    if (!asset.taxonomy_node_ids || asset.taxonomy_node_ids.length === 0) {
+    // Enforce publish requirements: metadata and required metadata
+    if (!asset.metadata_node_ids || asset.metadata_node_ids.length === 0) {
       res.status(400).json({
-        error: { code: 'VALIDATION_ERROR', message: 'Taxonomy is required to publish. Please assign taxonomy nodes to the asset.' },
+        error: { code: 'VALIDATION_ERROR', message: 'Metadata is required to publish. Please assign metadata nodes to the asset.' },
         request_id: requestId,
       });
       return;
@@ -139,7 +138,6 @@ export async function scheduleVersion(req: AuthenticatedRequest, res: Response) 
         error: {
           code: 'VALIDATION_ERROR',
           message: 'Invalid request body',
-          details: parsed.error.errors,
         },
         request_id: requestId,
       };
@@ -265,7 +263,6 @@ export async function setExpireAt(req: AuthenticatedRequest, res: Response) {
         error: {
           code: 'VALIDATION_ERROR',
           message: 'Invalid request body',
-          details: parsed.error.errors,
         },
         request_id: requestId,
       };

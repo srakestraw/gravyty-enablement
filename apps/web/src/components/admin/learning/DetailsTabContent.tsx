@@ -22,7 +22,7 @@ import {
   Image as ImageIcon,
   InfoOutlined as InfoIcon,
 } from '@mui/icons-material';
-import { TaxonomySelect, TaxonomyMultiSelect } from '../../taxonomy';
+import { MetadataSelect, MetadataMultiSelect } from '../../metadata';
 import { RichTextEditor } from '../../common/RichTextEditor';
 import { AssetPicker } from '../../content-hub/AssetPicker';
 import { CourseAssets } from '../../lms/CourseAssets';
@@ -83,6 +83,7 @@ export function DetailsTabContent({
   }, [productIds, productSuiteIds, course?.product_ids, course?.product_id]);
   const [topicTagIds, setTopicTagIds] = useState<string[]>([]);
   const [badgeIds, setBadgeIds] = useState<string[]>([]);
+  const [audienceIds, setAudienceIds] = useState<string[]>([]);
   const [title, setTitle] = useState('');
   const [shortDescription, setShortDescription] = useState('');
   const [description, setDescription] = useState('');
@@ -94,6 +95,7 @@ export function DetailsTabContent({
   const productRef = useRef<HTMLDivElement>(null);
   const productSuiteRef = useRef<HTMLDivElement>(null);
   const topicTagsRef = useRef<HTMLDivElement>(null);
+  const audienceRef = useRef<HTMLDivElement>(null);
   const coverImageRef = useRef<HTMLDivElement>(null);
   const badgesRef = useRef<HTMLDivElement>(null);
 
@@ -152,6 +154,7 @@ export function DetailsTabContent({
       setProductIds(courseProductIds);
       setProductSuiteIds(courseProductSuiteIds);
       setTopicTagIds(course.topic_tag_ids && course.topic_tag_ids.length > 0 ? course.topic_tag_ids : []);
+      setAudienceIds(course.audience_ids && course.audience_ids.length > 0 ? course.audience_ids : []);
       setBadgeIds(course.badge_ids && course.badge_ids.length > 0 ? course.badge_ids : []);
       setTitle(course.title || '');
       setShortDescription(course.short_description || '');
@@ -243,6 +246,15 @@ export function DetailsTabContent({
       }));
     }
 
+    if (audienceRef.current) {
+      unregisters.push(focusRegistry.register({
+        entityType: 'course',
+        entityId: course.course_id,
+        fieldKey: 'audience_ids',
+        ref: audienceRef,
+      }));
+    }
+
     if (coverImageRef.current) {
       unregisters.push(focusRegistry.register({
         entityType: 'course',
@@ -304,6 +316,9 @@ export function DetailsTabContent({
         break;
       case 'topic_tag_ids':
         updates = { topic_tag_ids: value };
+        break;
+      case 'audience_ids':
+        updates = { audience_ids: value };
         break;
       case 'badge_ids':
         updates = { badge_ids: value };
@@ -517,10 +532,10 @@ export function DetailsTabContent({
             {/* Product Suite */}
             <Grid item xs={12} sm={6}>
               <Box ref={productSuiteRef}>
-                <TaxonomyMultiSelect
+                <MetadataMultiSelect
                   groupKey="product_suite"
                   values={productSuiteIds}
-                  onChange={(optionIds) => {
+                  onChange={(optionIds: string[]) => {
                     console.log('[DetailsTabContent] Product Suite onChange called:', {
                       newOptionIds: optionIds,
                       currentProductSuiteIds: productSuiteIds,
@@ -543,10 +558,10 @@ export function DetailsTabContent({
             {/* Product */}
             <Grid item xs={12} sm={6}>
               <Box ref={productRef}>
-                <TaxonomyMultiSelect
+                <MetadataMultiSelect
                   groupKey="product"
                   values={productIds}
-                  onChange={(optionIds) => {
+                  onChange={(optionIds: string[]) => {
                     console.log('[DetailsTabContent] Product onChange called:', {
                       newOptionIds: optionIds,
                       currentProductIds: productIds,
@@ -570,10 +585,10 @@ export function DetailsTabContent({
             {/* Topic Tags */}
             <Grid item xs={12}>
               <Box ref={topicTagsRef}>
-                <TaxonomyMultiSelect
+                <MetadataMultiSelect
                   groupKey="topic_tag"
                   values={topicTagIds}
-                  onChange={(optionIds) => {
+                  onChange={(optionIds: string[]) => {
                     setTopicTagIds(optionIds);
                     handleCourseFieldChange('topic_tag_ids', optionIds);
                     if (markFieldTouched) {
@@ -584,6 +599,27 @@ export function DetailsTabContent({
                   placeholder="Add topic tags"
                   fullWidth
                   error={shouldShowError && shouldShowError('course', course.course_id, 'topic_tag_ids')}
+                />
+              </Box>
+            </Grid>
+
+            {/* Audience */}
+            <Grid item xs={12}>
+              <Box ref={audienceRef}>
+                <MetadataMultiSelect
+                  groupKey="audience"
+                  values={audienceIds}
+                  onChange={(optionIds: string[]) => {
+                    setAudienceIds(optionIds);
+                    handleCourseFieldChange('audience_ids', optionIds);
+                    if (markFieldTouched) {
+                      markFieldTouched('course', course.course_id, 'audience_ids');
+                    }
+                  }}
+                  label="Audience"
+                  placeholder="Select audiences"
+                  fullWidth
+                  error={shouldShowError && shouldShowError('course', course.course_id, 'audience_ids')}
                 />
               </Box>
             </Grid>
@@ -670,10 +706,10 @@ export function DetailsTabContent({
 
             {/* Badges */}
             <Box ref={badgesRef}>
-              <TaxonomyMultiSelect
+              <MetadataMultiSelect
                 groupKey="badge"
                 values={badgeIds}
-                onChange={(optionIds) => {
+                onChange={(optionIds: string[]) => {
                   setBadgeIds(optionIds);
                   handleCourseFieldChange('badge_ids', optionIds);
                   if (markFieldTouched) {

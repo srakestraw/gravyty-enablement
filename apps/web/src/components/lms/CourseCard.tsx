@@ -5,17 +5,18 @@
  */
 
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardActionArea, CardMedia, Box, Typography, Chip } from '@mui/material';
-import { PlayArrowOutlined } from '@mui/icons-material';
+import { Card, CardContent, CardActionArea, CardMedia, Box, Typography, Chip, IconButton } from '@mui/material';
+import { PlayArrowOutlined, MoreVert } from '@mui/icons-material';
 import type { CourseSummary } from '@gravyty/domain';
 import { formatDurationMinutes } from '../../utils/formatDuration';
 
 export interface CourseCardProps {
   course: CourseSummary;
   onClick: () => void;
+  onMenuClick?: (event: React.MouseEvent<HTMLElement>) => void;
 }
 
-export function CourseCard({ course, onClick }: CourseCardProps) {
+export function CourseCard({ course, onClick, onMenuClick }: CourseCardProps) {
   const [imageError, setImageError] = useState(false);
   const [imageLoading, setImageLoading] = useState(true);
 
@@ -48,12 +49,76 @@ export function CourseCard({ course, onClick }: CourseCardProps) {
     setImageError(false);
   };
 
+  const handleMenuClickInternal = (e: React.MouseEvent<HTMLElement>) => {
+    e.stopPropagation();
+    if (onMenuClick) {
+      onMenuClick(e);
+    }
+  };
+
   const hasImage = !!course.cover_image_url;
   const showPlaceholder = imageError || !hasImage;
   const showImage = hasImage && !imageError;
 
+  // Status label and color
+  const statusLabel = course.status === 'published' ? 'Published' : course.status === 'archived' ? 'Archived' : 'Draft';
+  const statusColor = course.status === 'published' ? 'success' : course.status === 'archived' ? 'default' : 'warning';
+
+  // Helper function to render pills with overflow handling
+  const renderPills = (items: string[], maxVisible: number = 2) => {
+    if (!items || items.length === 0) return null;
+    
+    const visible = items.slice(0, maxVisible);
+    const remaining = items.length - maxVisible;
+    
+    return (
+      <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', alignItems: 'center' }}>
+        {visible.map((item, index) => (
+          <Chip
+            key={index}
+            label={item}
+            size="small"
+            variant="outlined"
+            sx={{ height: 24, fontSize: '0.75rem' }}
+          />
+        ))}
+        {remaining > 0 && (
+          <Chip
+            label={`+${remaining}`}
+            size="small"
+            variant="outlined"
+            sx={{ height: 24, fontSize: '0.75rem', color: 'text.secondary' }}
+          />
+        )}
+      </Box>
+    );
+  };
+
+  // Products - currently single product, but ready for array
+  const products = course.product ? [course.product] : [];
+
   return (
     <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'visible' }}>
+      {/* Header with status and menu */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1.5, pb: 1 }}>
+        <Chip
+          label={statusLabel}
+          size="small"
+          color={statusColor}
+          variant={course.status === 'published' ? 'filled' : 'outlined'}
+          sx={{ height: 24 }}
+        />
+        {onMenuClick && (
+          <IconButton
+            size="small"
+            onClick={handleMenuClickInternal}
+            sx={{ p: 0.5 }}
+          >
+            <MoreVert fontSize="small" />
+          </IconButton>
+        )}
+      </Box>
+
       <CardActionArea 
         onClick={onClick} 
         sx={{ 
@@ -94,7 +159,7 @@ export function CourseCard({ course, onClick }: CourseCardProps) {
             <PlayArrowOutlined sx={{ fontSize: 48, color: 'grey.400' }} />
           </Box>
         )}
-        <CardContent sx={{ flexGrow: 1 }}>
+        <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
           <Typography variant="h6" component="h3" gutterBottom>
             {course.title}
           </Typography>
@@ -103,8 +168,46 @@ export function CourseCard({ course, onClick }: CourseCardProps) {
               {course.short_description}
             </Typography>
           )}
+
+          {/* Products Pills */}
+          {products.length > 0 && (
+            <Box sx={{ mb: 1.5 }}>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5, fontWeight: 500 }}>
+                Products:
+              </Typography>
+              {renderPills(products, 2)}
+            </Box>
+          )}
+
+          {/* Suite Pill */}
+          {course.product_suite && (
+            <Box sx={{ mb: 1.5 }}>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5, fontWeight: 500 }}>
+                Suite:
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                <Chip
+                  label={course.product_suite}
+                  size="small"
+                  variant="outlined"
+                  sx={{ height: 24, fontSize: '0.75rem' }}
+                />
+              </Box>
+            </Box>
+          )}
+
+          {/* Tags Pills */}
+          {course.topic_tags && course.topic_tags.length > 0 && (
+            <Box sx={{ mb: 1.5 }}>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5, fontWeight: 500 }}>
+                Tags:
+              </Typography>
+              {renderPills(course.topic_tags, 2)}
+            </Box>
+          )}
+
           {/* Metadata line: Duration · Difficulty · Updated Date */}
-          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap', mt: 'auto' }}>
+          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap', mt: 'auto', pt: 1 }}>
             {course.estimated_minutes && (
               <Typography variant="caption" color="text.secondary">
                 {formatDurationMinutes(course.estimated_minutes)}

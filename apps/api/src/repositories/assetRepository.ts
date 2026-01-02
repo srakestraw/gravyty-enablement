@@ -21,7 +21,7 @@ export interface AssetRepository {
    * List assets with filters
    */
   list(params: {
-    taxonomyNodeId?: string;
+    metadataNodeId?: string;
     assetType?: string;
     status?: string; // Filter by published version status
     pinned?: boolean;

@@ -25,7 +25,7 @@ export async function importFromGoogleDrive(req: AuthenticatedRequest, res: Resp
   const userId = req.user!.userId;
   
   try {
-    const { file_id, title, description, asset_type, taxonomy_ids } = req.body;
+    const { file_id, title, description, asset_type, metadata_node_ids } = req.body;
     
     if (!file_id) {
       const response: ApiErrorResponse = {
@@ -75,7 +75,7 @@ export async function importFromGoogleDrive(req: AuthenticatedRequest, res: Resp
       source_type: 'GOOGLE_DRIVE',
       source_ref: syncMetadata as any,
       owner_id: userId,
-      taxonomy_ids: taxonomy_ids || [],
+      metadata_node_ids: metadata_node_ids || [],
       pinned: false,
       created_at: now,
       updated_at: now,

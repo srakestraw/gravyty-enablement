@@ -10,20 +10,20 @@ import { CourseDetailsEditor } from './CourseDetailsEditor';
 import type { Course } from '@gravyty/domain';
 
 // Mock dependencies
-vi.mock('../../taxonomy', () => ({
-  TaxonomySelect: ({ value, onChange, label }: any) => (
-    <div data-testid={`taxonomy-select-${label}`}>
+vi.mock('../../metadata', () => ({
+  MetadataSelect: ({ value, onChange, label }: any) => (
+    <div data-testid={`metadata-select-${label}`}>
       <input
-        data-testid={`taxonomy-input-${label}`}
+        data-testid={`metadata-input-${label}`}
         value={value || ''}
         onChange={(e) => onChange?.(e.target.value)}
       />
     </div>
   ),
-  TaxonomyMultiSelect: ({ values, onChange, label }: any) => (
-    <div data-testid={`taxonomy-multi-select-${label}`}>
+  MetadataMultiSelect: ({ values, onChange, label }: any) => (
+    <div data-testid={`metadata-multi-select-${label}`}>
       <input
-        data-testid={`taxonomy-multi-input-${label}`}
+        data-testid={`metadata-multi-input-${label}`}
         value={Array.isArray(values) ? values.join(',') : ''}
         onChange={(e) => onChange?.(e.target.value.split(',').filter(Boolean))}
       />

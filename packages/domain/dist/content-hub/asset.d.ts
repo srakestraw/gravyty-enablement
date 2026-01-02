@@ -34,7 +34,7 @@ export declare const AssetSchema: z.ZodObject<{
     description: z.ZodOptional<z.ZodString>;
     asset_type: z.ZodEnum<["deck", "doc", "image", "video", "logo", "worksheet", "link"]>;
     owner_id: z.ZodString;
-    taxonomy_node_ids: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
+    metadata_node_ids: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
     source_type: z.ZodEnum<["UPLOAD", "LINK", "GOOGLE_DRIVE"]>;
     source_ref: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
     current_published_version_id: z.ZodOptional<z.ZodString>;
@@ -102,7 +102,7 @@ export declare const AssetSchema: z.ZodObject<{
     updated_at: z.ZodString;
     updated_by: z.ZodString;
     entity_type: z.ZodDefault<z.ZodLiteral<"ASSET">>;
-    'taxonomy_node_id#status': z.ZodOptional<z.ZodString>;
+    'metadata_node_id#status': z.ZodOptional<z.ZodString>;
     'owner_id#updated_at': z.ZodOptional<z.ZodString>;
     'pinned#updated_at': z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
@@ -114,7 +114,7 @@ export declare const AssetSchema: z.ZodObject<{
     asset_id: string;
     asset_type: "image" | "video" | "link" | "deck" | "doc" | "logo" | "worksheet";
     owner_id: string;
-    taxonomy_node_ids: string[];
+    metadata_node_ids: string[];
     source_type: "UPLOAD" | "LINK" | "GOOGLE_DRIVE";
     pinned: boolean;
     entity_type: "ASSET";
@@ -141,7 +141,7 @@ export declare const AssetSchema: z.ZodObject<{
     } | undefined;
     source_ref?: Record<string, unknown> | undefined;
     current_published_version_id?: string | undefined;
-    'taxonomy_node_id#status'?: string | undefined;
+    'metadata_node_id#status'?: string | undefined;
     'owner_id#updated_at'?: string | undefined;
     'pinned#updated_at'?: string | undefined;
 }, {
@@ -175,12 +175,12 @@ export declare const AssetSchema: z.ZodObject<{
         transcription_language?: string | undefined;
         transcription_error?: string | undefined;
     } | undefined;
-    taxonomy_node_ids?: string[] | undefined;
+    metadata_node_ids?: string[] | undefined;
     source_ref?: Record<string, unknown> | undefined;
     current_published_version_id?: string | undefined;
     pinned?: boolean | undefined;
     entity_type?: "ASSET" | undefined;
-    'taxonomy_node_id#status'?: string | undefined;
+    'metadata_node_id#status'?: string | undefined;
     'owner_id#updated_at'?: string | undefined;
     'pinned#updated_at'?: string | undefined;
 }>;

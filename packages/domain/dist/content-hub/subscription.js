@@ -1,7 +1,7 @@
 /**
  * Content Hub - Subscription Domain Model
  *
- * User subscriptions to assets, taxonomy nodes, or collections for notifications.
+ * User subscriptions to assets, metadata nodes, or collections for notifications.
  */
 import { z } from 'zod';
 /**
@@ -9,7 +9,7 @@ import { z } from 'zod';
  */
 export const SubscriptionTargetTypeSchema = z.enum([
     'asset',
-    'taxonomy',
+    'metadata',
     'collection',
     'savedSearch', // Phase 2
 ]);

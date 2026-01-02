@@ -63,9 +63,8 @@ import { AdminPathEditorPage } from './pages/admin/learning/AdminPathEditorPage'
 import { AdminLearningAssignmentsPage } from './pages/admin/learning/AdminLearningAssignmentsPage';
 import { AdminLearningCertificatesPage } from './pages/admin/learning/AdminLearningCertificatesPage';
 import { AdminLearningMediaPage } from './pages/admin/learning/AdminLearningMediaPage';
-import { AdminTaxonomyPage } from './pages/admin/learning/AdminTaxonomyPage';
-import { AdminTaxonomyDetailPage } from './pages/admin/learning/AdminTaxonomyDetailPage';
-import { TestCourseEditorState } from './pages/admin/learning/TestCourseEditorState';
+import { AdminMetadataPage } from './pages/admin/learning/AdminMetadataPage';
+import { AdminMetadataDetailPage } from './pages/admin/learning/AdminMetadataDetailPage';
 import { RequireLearningPermission } from './components/auth/RequireLearningPermission';
 
 const RETURN_TO_KEY = 'enablement_return_to';
@@ -628,19 +627,6 @@ function App() {
           </RequireAuth>
         }
       />
-      {/* Phase 1 Test Route - Remove after Phase 1 validation */}
-      <Route
-        path="/enablement/admin/learning/test-course-state/:courseId?"
-        element={
-          <RequireAuth>
-            <RequireAdmin>
-              <AppShell>
-                <TestCourseEditorState />
-              </AppShell>
-            </RequireAdmin>
-          </RequireAuth>
-        }
-      />
       <Route
         path="/enablement/admin/learning/paths/:pathId"
         element={
@@ -694,24 +680,24 @@ function App() {
         }
       />
       <Route
-        path="/enablement/admin/taxonomy"
+        path="/enablement/admin/metadata"
         element={
           <RequireAuth>
             <RequireAdmin>
               <AppShell>
-                <AdminTaxonomyPage />
+                <AdminMetadataPage />
               </AppShell>
             </RequireAdmin>
           </RequireAuth>
         }
       />
       <Route
-        path="/enablement/admin/taxonomy/:key"
+        path="/enablement/admin/metadata/:key"
         element={
           <RequireAuth>
             <RequireAdmin>
               <AppShell>
-                <AdminTaxonomyDetailPage />
+                <AdminMetadataDetailPage />
               </AppShell>
             </RequireAdmin>
           </RequireAuth>

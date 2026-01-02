@@ -61,8 +61,8 @@ export const AssetSchema = z.object({
   // Ownership
   owner_id: z.string(),
   
-  // Taxonomy
-  taxonomy_node_ids: z.array(z.string()).default([]),
+  // Metadata
+  metadata_node_ids: z.array(z.string()).default([]),
   
   // Source information
   source_type: AssetSourceTypeSchema,
@@ -87,7 +87,7 @@ export const AssetSchema = z.object({
   entity_type: z.literal('ASSET').default('ASSET'),
   
   // GSI attributes
-  'taxonomy_node_id#status': z.string().optional(), // For ByTaxonomyStatusUpdated GSI
+  'metadata_node_id#status': z.string().optional(), // For ByMetadataStatusUpdated GSI
   'owner_id#updated_at': z.string().optional(), // For ByOwnerUpdated GSI
   'pinned#updated_at': z.string().optional(), // For ByPinnedUpdated GSI
 });

@@ -54,7 +54,7 @@ The Enablement Portal serves as a single source of truth for enablement material
 
 - **Content Management**: CRUD operations for enablement content with file attachments
 - **Learning Management System (LMS)**: Courses, lessons, learning paths, assignments, and certificates
-- **Taxonomy Management**: Hierarchical taxonomy system for content organization
+- **Metadata Management**: Hierarchical metadata system for content organization
 - **User & Role Management**: Admin interface for user lifecycle and role assignment
 - **Analytics & Events**: Event tracking and analytics for content usage
 - **Notifications**: User notification system for content updates and assignments
@@ -175,12 +175,12 @@ apps/api/src/
 │   ├── lms.ts             # LMS endpoints
 │   ├── lmsAdmin.ts        # LMS admin endpoints
 │   ├── adminUsers.ts      # User management
-│   └── taxonomy.ts        # Taxonomy endpoints
+│   └── metadata.ts       # Metadata endpoints
 ├── handlers/              # Request handlers
 │   ├── lms.ts
 │   ├── lmsAdmin.ts
 │   ├── adminUsers.ts
-│   ├── taxonomy.ts
+│   ├── metadata.ts
 │   ├── analytics.ts
 │   └── events.ts
 ├── storage/               # Storage abstraction layer
@@ -234,7 +234,7 @@ apps/web/src/
 │   ├── shell/            # App shell (header, nav)
 │   ├── admin/            # Admin components
 │   ├── learning/         # Learning components
-│   └── taxonomy/         # Taxonomy components
+│   └── metadata/         # Metadata components
 ├── contexts/             # React contexts
 │   ├── AuthContext.tsx
 │   └── ShellLayoutContext.tsx
@@ -274,7 +274,7 @@ Shared domain models, validators, and business logic used by both API and web ap
 packages/domain/src/
 ├── index.ts              # Public exports
 ├── types.ts              # Base types
-├── taxonomy.ts           # Taxonomy models
+├── metadata.ts           # Metadata models
 ├── lms/                  # LMS domain models
 │   ├── course.ts
 │   ├── lesson.ts
@@ -283,7 +283,7 @@ packages/domain/src/
 │   ├── progress.ts
 │   ├── certificates.ts
 │   └── media.ts
-└── taxonomy-normalization.ts
+└── metadata-normalization.ts
 ```
 
 #### Key Features
@@ -330,7 +330,7 @@ infra/lib/
 - `lms_assignments`: Course assignments
 - `lms_certificates`: Certificate records
 - `lms_transcripts`: Video transcripts
-- `taxonomy`: Taxonomy hierarchy
+- `metadata`: Metadata hierarchy
 
 **2. S3 Buckets**
 - `enablement-content`: Content files (PDFs, videos, images)
@@ -511,27 +511,28 @@ infra/lib/
 - Get certificate by ID: GetItem on PK
 - Get user certificates: Query GSI with `user_id = X`
 
-#### Taxonomy Table (`taxonomy`)
+#### Metadata Table (`metadata`)
 
-**Purpose**: Store hierarchical taxonomy structure
+**Purpose**: Store hierarchical metadata structure
 
 **Primary Key**:
-- **PK**: `taxonomy_id` (String)
+- **PK**: `option_id` (String)
 
-**GSI**: `ByParentIndex`
-- **GSI PK**: `parent_id` (String)
-- **GSI SK**: `order_index` (Number)
+**GSI**: `GroupKeyIndex`
+- **GSI PK**: `group_key` (String)
+- **GSI SK**: `sort_order_label` (String)
 
 **Attributes**:
-- `taxonomy_id`, `name`, `type` (product_suite, product_concept, tag)
+- `option_id`, `group_key`, `label`, `slug` (product, product_suite, topic_tag, badge)
 - `parent_id` (String, optional)
-- `order_index` (Number)
-- `description` (String, optional)
-- `created_at`, `updated_at`
+- `sort_order` (Number)
+- `color` (String, optional)
+- `archived_at` (String, optional)
+- `created_at`, `updated_at`, `created_by`, `updated_by`
 
 **Access Patterns**:
-- Get taxonomy item by ID: GetItem on PK
-- Get children of parent: Query GSI with `parent_id = X`, sorted by `order_index`
+- Get metadata option by ID: GetItem on PK
+- Get options by group: Query GSI with `group_key = X`, sorted by `sort_order_label`
 
 ### S3 Bucket Structure
 
@@ -766,7 +767,7 @@ DDB_TABLE_LMS_PROGRESS=lms_progress
 DDB_TABLE_LMS_ASSIGNMENTS=lms_assignments
 DDB_TABLE_LMS_CERTIFICATES=lms_certificates
 DDB_TABLE_LMS_TRANSCRIPTS=lms_transcripts
-DDB_TABLE_TAXONOMY=taxonomy
+METADATA_TABLE=metadata
 ENABLEMENT_CONTENT_BUCKET=<bucket-name>
 LMS_MEDIA_BUCKET=<bucket-name>
 PRESIGNED_UPLOAD_EXPIRY_SECONDS=300
@@ -1036,13 +1037,13 @@ VITE_COGNITO_USER_POOL_DOMAIN=<cognito-domain>
 
 **Shared Resources**:
 - **LMS Tables**: `lms_courses`, `lms_lessons`, `lms_paths`, `lms_progress`, `lms_assignments`, `lms_certificates`, `lms_transcripts`
-- **Taxonomy Table**: `taxonomy`
+- **Metadata Table**: `metadata`
 - **Content Tables**: `content_registry`, `notifications`, `subscriptions`, `events`
 - **S3 Buckets**: `enablement-content`, `lms-media`
 
 **Implications**:
 - Courses created locally (with `STORAGE_BACKEND=aws`) will appear in production
-- Taxonomy options created/updated locally will appear in production
+- Metadata options created/updated locally will appear in production
 - Data created in production will be visible in local development
 - Exercise caution when testing destructive operations locally
 
@@ -1053,7 +1054,7 @@ To create a separate dev environment later:
    ```
    LMS_COURSES_TABLE=lms_courses_dev
    LMS_LESSONS_TABLE=lms_lessons_dev
-   TAXONOMY_TABLE=taxonomy_dev
+   METADATA_TABLE=metadata_dev
    DDB_TABLE_CONTENT=content_registry_dev
    # ... etc
    ```
@@ -1129,7 +1130,7 @@ packages/jobs → packages/domain
 - [x] Progress tracking
 - [x] Assignments
 - [x] Certificates
-- [x] Taxonomy system
+- [x] Metadata system
 
 ### Phase 3: AI & Search (In Progress)
 - [ ] OpenAI integration for RAG

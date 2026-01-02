@@ -1,13 +1,13 @@
 /**
  * Content Hub - Subscription Domain Model
  *
- * User subscriptions to assets, taxonomy nodes, or collections for notifications.
+ * User subscriptions to assets, metadata nodes, or collections for notifications.
  */
 import { z } from 'zod';
 /**
  * Subscription Target Type
  */
-export declare const SubscriptionTargetTypeSchema: z.ZodEnum<["asset", "taxonomy", "collection", "savedSearch"]>;
+export declare const SubscriptionTargetTypeSchema: z.ZodEnum<["asset", "metadata", "collection", "savedSearch"]>;
 export type SubscriptionTargetType = z.infer<typeof SubscriptionTargetTypeSchema>;
 /**
  * Subscription Triggers
@@ -39,7 +39,7 @@ export type SubscriptionTriggers = z.infer<typeof SubscriptionTriggersSchema>;
  */
 export declare const SubscriptionSchema: z.ZodObject<{
     subscription_id: z.ZodString;
-    target_type: z.ZodEnum<["asset", "taxonomy", "collection", "savedSearch"]>;
+    target_type: z.ZodEnum<["asset", "metadata", "collection", "savedSearch"]>;
     target_id: z.ZodString;
     user_id: z.ZodString;
     triggers: z.ZodDefault<z.ZodObject<{
@@ -70,7 +70,7 @@ export declare const SubscriptionSchema: z.ZodObject<{
     user_id: string;
     subscription_id: string;
     entity_type: "SUBSCRIPTION";
-    target_type: "asset" | "taxonomy" | "collection" | "savedSearch";
+    target_type: "metadata" | "asset" | "collection" | "savedSearch";
     target_id: string;
     triggers: {
         expired: boolean;
@@ -85,7 +85,7 @@ export declare const SubscriptionSchema: z.ZodObject<{
     created_at: string;
     user_id: string;
     subscription_id: string;
-    target_type: "asset" | "taxonomy" | "collection" | "savedSearch";
+    target_type: "metadata" | "asset" | "collection" | "savedSearch";
     target_id: string;
     entity_type?: "SUBSCRIPTION" | undefined;
     triggers?: {

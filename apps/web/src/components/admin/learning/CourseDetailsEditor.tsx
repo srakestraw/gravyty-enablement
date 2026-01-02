@@ -26,7 +26,7 @@ import {
   Image as ImageIcon,
   InfoOutlined as InfoIcon,
 } from '@mui/icons-material';
-import { TaxonomySelect, TaxonomyMultiSelect } from '../../taxonomy';
+import { MetadataSelect, MetadataMultiSelect } from '../../metadata';
 import { RichTextEditor } from '../../common/RichTextEditor';
 import { AssetPicker } from '../../content-hub/AssetPicker';
 import { CourseAssets } from '../../lms/CourseAssets';
@@ -265,7 +265,7 @@ export function CourseDetailsEditor({
             {/* Product Suite */}
             <Grid item xs={12} sm={6}>
               <Box ref={productSuiteRef}>
-                <TaxonomyMultiSelect
+                <MetadataMultiSelect
                   groupKey="product_suite"
                   values={
                     (course.product_suite_ids && course.product_suite_ids.length > 0)
@@ -285,7 +285,7 @@ export function CourseDetailsEditor({
             {/* Product */}
             <Grid item xs={12} sm={6}>
               <Box ref={productRef}>
-                <TaxonomyMultiSelect
+                <MetadataMultiSelect
                   groupKey="product"
                   values={
                     (course.product_ids && course.product_ids.length > 0)
@@ -305,7 +305,7 @@ export function CourseDetailsEditor({
             {/* Topic Tags */}
             <Grid item xs={12}>
               <Box ref={topicTagsRef}>
-                <TaxonomyMultiSelect
+                <MetadataMultiSelect
                   groupKey="topic_tag"
                   values={course.topic_tag_ids && course.topic_tag_ids.length > 0 ? course.topic_tag_ids : []}
                   onChange={(optionIds) => {

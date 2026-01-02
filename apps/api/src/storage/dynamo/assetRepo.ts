@@ -23,8 +23,8 @@ export class DynamoAssetRepo implements AssetRepository {
         // Asset fields
         ...asset,
         // GSI attributes
-        'taxonomy_node_id#status': asset.taxonomy_node_ids.length > 0 
-          ? `${asset.taxonomy_node_ids[0]}#published` 
+        'metadata_node_id#status': asset.metadata_node_ids.length > 0 
+          ? `${asset.metadata_node_ids[0]}#published` 
           : undefined,
         'updated_at#asset_id': `${asset.updated_at}#${asset.asset_id}`,
         'owner_id#updated_at': `${asset.owner_id}#${asset.updated_at}`,
@@ -53,7 +53,7 @@ export class DynamoAssetRepo implements AssetRepository {
   }
 
   async list(params: {
-    taxonomyNodeId?: string;
+    metadataNodeId?: string;
     assetType?: string;
     status?: string;
     pinned?: boolean;
@@ -64,18 +64,18 @@ export class DynamoAssetRepo implements AssetRepository {
     const limit = params.limit || 50;
     
     // Use appropriate GSI based on filters
-    if (params.taxonomyNodeId && params.status) {
-      // Use ByTaxonomyStatusUpdated GSI
+    if (params.metadataNodeId && params.status) {
+      // Use ByMetadataStatusUpdated GSI
       const command = new QueryCommand({
         TableName: TABLE_NAME,
-        IndexName: 'ByTaxonomyStatusUpdated',
+        IndexName: 'ByMetadataStatusUpdated',
         KeyConditionExpression: '#gsi_pk = :gsi_pk',
         ExpressionAttributeNames: {
-          '#gsi_pk': 'taxonomy_node_id#status',
+          '#gsi_pk': 'metadata_node_id#status',
           '#entity_type': 'entity_type',
         },
         ExpressionAttributeValues: {
-          ':gsi_pk': `${params.taxonomyNodeId}#${params.status}`,
+          ':gsi_pk': `${params.metadataNodeId}#${params.status}`,
           ':entity_type': 'ASSET',
         },
         FilterExpression: '#entity_type = :entity_type',

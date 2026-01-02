@@ -248,9 +248,9 @@ const tables = [
     ],
     BillingMode: 'PAY_PER_REQUEST',
   },
-  // Taxonomy Table
+  // Metadata Table
   {
-    TableName: process.env.TAXONOMY_TABLE || 'taxonomy',
+    TableName: process.env.METADATA_TABLE || 'metadata',
     KeySchema: [
       { AttributeName: 'option_id', KeyType: 'HASH' },
     ],

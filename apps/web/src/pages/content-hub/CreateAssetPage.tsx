@@ -50,13 +50,13 @@ import { isErrorResponse, usersApi, type AdminUser } from '../../lib/apiClient';
 import type { AssetType, AssetSourceType } from '@gravyty/domain';
 import { useAuth } from '../../contexts/AuthContext';
 import { isContributorOrHigher, isApproverOrHigher, isAdmin } from '../../lib/roles';
-import { TaxonomySelect } from '../../components/taxonomy/TaxonomySelect';
-import { TaxonomyMultiSelect } from '../../components/taxonomy/TaxonomyMultiSelect';
+import { MetadataSelect } from '../../components/metadata/MetadataSelect';
+import { MetadataMultiSelect } from '../../components/metadata/MetadataMultiSelect';
 import { PlaceholderPage } from '../../components/shared/PlaceholderPage';
 import { CoverImageSelector } from '../../components/shared/CoverImageSelector';
-import { useTaxonomyOptions } from '../../hooks/useTaxonomyOptions';
-import { taxonomyApi } from '../../api/taxonomyClient';
-import type { TaxonomyOption, MediaRef } from '@gravyty/domain';
+import { useMetadataOptions } from '../../hooks/useMetadataOptions';
+import { metadataApi } from '../../api/metadataClient';
+import type { MetadataOption, MediaRef } from '@gravyty/domain';
 
 type PublishAction = 'draft' | 'publish-now' | 'schedule';
 
@@ -108,9 +108,9 @@ export function CreateAssetPage() {
   const [userOptions, setUserOptions] = useState<AdminUser[]>([]);
   const [userSearchLoading, setUserSearchLoading] = useState(false);
   
-  // Taxonomy options for summary
-  const { options: productSuiteOptions } = useTaxonomyOptions('product_suite');
-  const { options: productOptions } = useTaxonomyOptions('product');
+  // Metadata options for summary
+  const { options: productSuiteOptions } = useMetadataOptions('product_suite');
+  const { options: productOptions } = useMetadataOptions('product');
   const [productSuiteLabel, setProductSuiteLabel] = useState<string>('');
   const [productLabel, setProductLabel] = useState<string>('');
   
@@ -607,7 +607,7 @@ export function CreateAssetPage() {
                 Classification
               </Typography>
               <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2, mb: 1.5 }}>
-                <TaxonomyMultiSelect
+                <MetadataMultiSelect
                   groupKey="product_suite"
                   values={productSuiteIds}
                   onChange={(ids) => {
@@ -619,7 +619,7 @@ export function CreateAssetPage() {
                   error={!!fieldErrors.productSuite}
                   required={publishAction === 'publish-now' || publishAction === 'schedule'}
                 />
-                <TaxonomyMultiSelect
+                <MetadataMultiSelect
                   groupKey="product"
                   values={productIds}
                   onChange={(ids) => {
@@ -643,7 +643,7 @@ export function CreateAssetPage() {
                 </FormHelperText>
               )}
               <Box sx={{ mt: 1 }}>
-                <TaxonomyMultiSelect
+                <MetadataMultiSelect
                   groupKey="topic_tag"
                   values={tagIds}
                   onChange={setTagIds}

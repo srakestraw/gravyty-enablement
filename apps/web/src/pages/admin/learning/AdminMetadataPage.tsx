@@ -1,10 +1,11 @@
 /**
- * Admin Taxonomy Landing Page
+ * Admin Metadata Landing Page
  * 
- * Landing page for taxonomy management - shows cards for each taxonomy key
+ * Landing page for metadata management - shows cards for each metadata key
  */
 
 import { useNavigate } from 'react-router-dom';
+import { useMemo } from 'react';
 import {
   Box,
   Typography,
@@ -16,17 +17,17 @@ import {
   Alert,
 } from '@mui/material';
 import { CategoryOutlined } from '@mui/icons-material';
-import { useTaxonomyOptions } from '../../../hooks/useTaxonomyOptions';
-import type { TaxonomyGroupKey } from '@gravyty/domain';
+import { useMetadataOptions } from '../../../hooks/useMetadataOptions';
+import type { MetadataGroupKey } from '@gravyty/domain';
 import { track } from '../../../lib/telemetry';
 
-interface TaxonomyKeyInfo {
-  key: TaxonomyGroupKey;
+interface MetadataKeyInfo {
+  key: MetadataGroupKey;
   label: string;
   description: string;
 }
 
-const TAXONOMY_KEYS: TaxonomyKeyInfo[] = [
+const METADATA_KEYS: MetadataKeyInfo[] = [
   {
     key: 'product',
     label: 'Product',
@@ -47,25 +48,37 @@ const TAXONOMY_KEYS: TaxonomyKeyInfo[] = [
     label: 'Badges',
     description: 'Badges that can be earned by completing courses',
   },
+  {
+    key: 'audience',
+    label: 'Audience',
+    description: 'Target audience for courses and content',
+  },
 ];
 
-export function AdminTaxonomyPage() {
+export function AdminMetadataPage() {
   const navigate = useNavigate();
 
-  // Fetch counts for each taxonomy key
-  const productQuery = useTaxonomyOptions('product', { include_archived: true });
-  const productSuiteQuery = useTaxonomyOptions('product_suite', { include_archived: true });
-  const topicTagQuery = useTaxonomyOptions('topic_tag', { include_archived: true });
-  const badgeQuery = useTaxonomyOptions('badge', { include_archived: true });
+  // Fetch counts for each metadata key
+  const productQuery = useMetadataOptions('product', { include_archived: true });
+  const productSuiteQuery = useMetadataOptions('product_suite', { include_archived: true });
+  const topicTagQuery = useMetadataOptions('topic_tag', { include_archived: true });
+  const badgeQuery = useMetadataOptions('badge', { include_archived: true });
+  const audienceQuery = useMetadataOptions('audience', { include_archived: true });
 
-  const loading = productQuery.loading || productSuiteQuery.loading || topicTagQuery.loading || badgeQuery.loading;
+  const loading = productQuery.loading || productSuiteQuery.loading || topicTagQuery.loading || badgeQuery.loading || audienceQuery.loading;
 
-  const getCounts = (key: TaxonomyGroupKey) => {
+  // Sort metadata keys alphabetically by label
+  const sortedMetadataKeys = useMemo(() => {
+    return [...METADATA_KEYS].sort((a, b) => a.label.localeCompare(b.label));
+  }, []);
+
+  const getCounts = (key: MetadataGroupKey) => {
     let options: typeof productQuery.options = [];
     if (key === 'product') options = productQuery.options;
     else if (key === 'product_suite') options = productSuiteQuery.options;
     else if (key === 'topic_tag') options = topicTagQuery.options;
     else if (key === 'badge') options = badgeQuery.options;
+    else if (key === 'audience') options = audienceQuery.options;
 
     const active = options.filter((opt) => !opt.archived_at).length;
     const archived = options.filter((opt) => opt.archived_at).length;
@@ -79,9 +92,9 @@ export function AdminTaxonomyPage() {
     return { active, archived, lastUpdated };
   };
 
-  const handleCardClick = (key: TaxonomyGroupKey) => {
-    track('lms_taxonomy_options_viewed', { key });
-    navigate(`/enablement/admin/taxonomy/${key}`);
+  const handleCardClick = (key: MetadataGroupKey) => {
+    track('lms_metadata_options_viewed', { key });
+    navigate(`/enablement/admin/metadata/${key}`);
   };
 
   if (loading) {
@@ -96,7 +109,7 @@ export function AdminTaxonomyPage() {
     <Box sx={{ p: 3 }}>
       <Box sx={{ mb: 4 }}>
         <Typography variant="h4" gutterBottom>
-          Taxonomy
+          Metadata
         </Typography>
         <Typography variant="body2" color="text.secondary">
           Manage controlled values used across Courses and Resources.
@@ -104,7 +117,7 @@ export function AdminTaxonomyPage() {
       </Box>
 
       <Grid container spacing={3}>
-        {TAXONOMY_KEYS.map((info) => {
+        {sortedMetadataKeys.map((info) => {
           const { active, archived, lastUpdated } = getCounts(info.key);
           return (
             <Grid item xs={12} sm={6} md={4} key={info.key}>

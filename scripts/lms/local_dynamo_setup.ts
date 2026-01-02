@@ -152,6 +152,28 @@ const tables = [
     BillingMode: 'PAY_PER_REQUEST',
   },
   {
+    TableName: process.env.METADATA_TABLE || 'metadata',
+    KeySchema: [
+      { AttributeName: 'option_id', KeyType: 'HASH' },
+    ],
+    AttributeDefinitions: [
+      { AttributeName: 'option_id', AttributeType: 'S' },
+      { AttributeName: 'group_key', AttributeType: 'S' },
+      { AttributeName: 'sort_order_label', AttributeType: 'S' },
+    ],
+    GlobalSecondaryIndexes: [
+      {
+        IndexName: 'GroupKeyIndex',
+        KeySchema: [
+          { AttributeName: 'group_key', KeyType: 'HASH' },
+          { AttributeName: 'sort_order_label', KeyType: 'RANGE' },
+        ],
+        Projection: { ProjectionType: 'ALL' },
+      },
+    ],
+    BillingMode: 'PAY_PER_REQUEST',
+  },
+  {
     TableName: process.env.DDB_TABLE_EVENTS || 'events',
     KeySchema: [
       { AttributeName: 'date_bucket', KeyType: 'HASH' },

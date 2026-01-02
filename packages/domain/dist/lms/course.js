@@ -55,6 +55,7 @@ export const CourseSchema = z.object({
     product_suite_id: z.string().optional(), // Legacy single value (use product_suite_ids)
     product_suite_ids: z.array(z.string()).default([]), // Multi-select product suite IDs
     topic_tag_ids: z.array(z.string()).default([]),
+    audience_ids: z.array(z.string()).default([]), // Multi-select audience IDs
     // Legacy fields (for backward compatibility - will be normalized on read)
     // These are kept in schema but should not be written going forward
     legacy_product_suite: z.string().optional(), // Old product_suite -> maps to product
@@ -66,7 +67,7 @@ export const CourseSchema = z.object({
     cover_image: MediaRefSchema.optional(),
     // Badges
     badges: z.array(CourseBadgeSchema).default([]), // Legacy badges (kept for backward compatibility)
-    badge_ids: z.array(z.string()).default([]), // New taxonomy-based badge IDs
+    badge_ids: z.array(z.string()).default([]), // New metadata-based badge IDs
     // Structure
     sections: z.array(CourseSectionSchema).default([]),
     // Versioning and publishing

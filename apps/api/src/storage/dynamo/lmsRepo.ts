@@ -15,7 +15,7 @@ import {
 } from '@aws-sdk/lib-dynamodb';
 import { dynamoDocClient } from '../../aws/dynamoClient';
 import { createHash } from 'crypto';
-import { normalizeTaxonomyFieldsFromStorage } from '@gravyty/domain';
+import { normalizeMetadataFieldsFromStorage } from '@gravyty/domain';
 import type {
   Course,
   CourseSummary,
@@ -88,8 +88,8 @@ export class LmsRepo {
     });
 
     const { Items = [], LastEvaluatedKey } = await dynamoDocClient.send(command);
-    // Normalize taxonomy fields before converting to summary
-    let courses = (Items as Course[]).map((c) => normalizeTaxonomyFieldsFromStorage(c) as Course).map(this.toCourseSummary);
+    // Normalize metadata fields before converting to summary
+    let courses = (Items as Course[]).map((c) => normalizeMetadataFieldsFromStorage(c) as Course).map(this.toCourseSummary);
 
     // Apply client-side filters
     if (params.query) {
@@ -114,7 +114,7 @@ export class LmsRepo {
       const badgeIds = params.badges || [params.badge!];
       // Filter by badge - check both legacy badges and new badge_ids
       const coursesWithBadges = (Items as Course[]).filter((c) => {
-        const normalizedCourse = normalizeTaxonomyFieldsFromStorage(c) as Course;
+        const normalizedCourse = normalizeMetadataFieldsFromStorage(c) as Course;
         // Check new badge_ids first, fallback to legacy badges
         if (normalizedCourse.badge_ids && normalizedCourse.badge_ids.length > 0) {
           return normalizedCourse.badge_ids.some((id) => badgeIds.includes(id));
@@ -169,8 +169,8 @@ export class LmsRepo {
       return null;
     }
 
-    // Normalize taxonomy fields (map legacy to new names)
-    const course = normalizeTaxonomyFieldsFromStorage(courseRaw) as Course;
+    // Normalize metadata fields (map legacy to new names)
+    const course = normalizeMetadataFieldsFromStorage(courseRaw) as Course;
     return course;
   }
 
@@ -209,8 +209,8 @@ export class LmsRepo {
     });
 
     const { Items = [], LastEvaluatedKey } = await dynamoDocClient.send(command);
-    // Normalize taxonomy fields before converting to summary
-    const paths = (Items as LearningPath[]).map((p) => normalizeTaxonomyFieldsFromStorage(p) as LearningPath).map(this.toPathSummary);
+    // Normalize metadata fields before converting to summary
+    const paths = (Items as LearningPath[]).map((p) => normalizeMetadataFieldsFromStorage(p) as LearningPath).map(this.toPathSummary);
 
     const nextCursor = LastEvaluatedKey
       ? Buffer.from(JSON.stringify(LastEvaluatedKey)).toString('base64')
@@ -1273,6 +1273,72 @@ export class LmsRepo {
     await dynamoDocClient.send(command);
     
     return published;
+  }
+
+  /**
+   * Archive a course (set status to 'archived')
+   */
+  async archiveCourse(courseId: string, userId: string): Promise<Course> {
+    const now = new Date().toISOString();
+    
+    // Get course
+    const course = await this.getCourseDraftOrPublished(courseId);
+    if (!course) {
+      throw new Error(`Course ${courseId} not found`);
+    }
+    
+    if (course.status === 'archived') {
+      throw new Error('Course is already archived');
+    }
+    
+    // Update course status to archived
+    const archived: Course = {
+      ...course,
+      status: 'archived',
+      updated_at: now,
+      updated_by: userId,
+    };
+    
+    const command = new PutCommand({
+      TableName: LMS_COURSES_TABLE,
+      Item: archived,
+    });
+    await dynamoDocClient.send(command);
+    
+    return archived;
+  }
+
+  /**
+   * Restore an archived course (set status back to 'draft')
+   */
+  async restoreCourse(courseId: string, userId: string): Promise<Course> {
+    const now = new Date().toISOString();
+    
+    // Get course
+    const course = await this.getCourseDraftOrPublished(courseId);
+    if (!course) {
+      throw new Error(`Course ${courseId} not found`);
+    }
+    
+    if (course.status !== 'archived') {
+      throw new Error('Course is not archived');
+    }
+    
+    // Update course status back to draft
+    const restored: Course = {
+      ...course,
+      status: 'draft',
+      updated_at: now,
+      updated_by: userId,
+    };
+    
+    const command = new PutCommand({
+      TableName: LMS_COURSES_TABLE,
+      Item: restored,
+    });
+    await dynamoDocClient.send(command);
+    
+    return restored;
   }
 
   /**

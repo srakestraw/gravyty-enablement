@@ -20,7 +20,7 @@ import { assetRepo } from '../storage/dynamo/assetRepo';
  */
 export async function createSubscription(req: AuthenticatedRequest, res: Response) {
   const requestId = req.headers['x-request-id'] as string;
-  const userId = req.user!.userId;
+  const userId = req.user!.user_id;
   
   try {
     const CreateSubscriptionSchema = z.object({
@@ -35,8 +35,8 @@ export async function createSubscription(req: AuthenticatedRequest, res: Respons
         error: {
           code: 'VALIDATION_ERROR',
           message: 'Invalid request body',
-          details: parsed.error.errors,
         },
+        request_id: requestId,
       };
       return res.status(400).json(response);
     }
@@ -52,6 +52,7 @@ export async function createSubscription(req: AuthenticatedRequest, res: Respons
             code: 'NOT_FOUND',
             message: `Asset ${target_id} not found`,
           },
+          request_id: requestId,
         };
         return res.status(404).json(response);
       }
@@ -60,10 +61,11 @@ export async function createSubscription(req: AuthenticatedRequest, res: Respons
     // Check if subscription already exists
     const existing = await contentHubSubscriptionRepo.findByUserAndTarget(userId, target_type, target_id);
     if (existing) {
-      const response: ApiSuccessResponse<Subscription> = {
-        data: existing,
-      };
-      return res.status(200).json(response);
+    const response: ApiSuccessResponse<Subscription> = {
+      data: existing,
+      request_id: requestId,
+    };
+    return res.status(200).json(response);
     }
     
     // Create subscription
@@ -92,6 +94,7 @@ export async function createSubscription(req: AuthenticatedRequest, res: Respons
     
     const response: ApiSuccessResponse<Subscription> = {
       data: created,
+      request_id: requestId,
     };
     return res.status(201).json(response);
   } catch (error) {
@@ -101,6 +104,7 @@ export async function createSubscription(req: AuthenticatedRequest, res: Respons
         code: 'INTERNAL_ERROR',
         message: error instanceof Error ? error.message : 'Failed to create subscription',
       },
+      request_id: requestId,
     };
     return res.status(500).json(response);
   }
@@ -112,7 +116,7 @@ export async function createSubscription(req: AuthenticatedRequest, res: Respons
  */
 export async function listSubscriptions(req: AuthenticatedRequest, res: Response) {
   const requestId = req.headers['x-request-id'] as string;
-  const userId = req.user!.userId;
+  const userId = req.user!.user_id;
   
   try {
     const target_type = req.query.target_type as string | undefined;
@@ -127,6 +131,7 @@ export async function listSubscriptions(req: AuthenticatedRequest, res: Response
     
     const response: ApiSuccessResponse<{ items: Subscription[]; next_cursor?: string }> = {
       data: result,
+      request_id: requestId,
     };
     return res.status(200).json(response);
   } catch (error) {
@@ -136,6 +141,7 @@ export async function listSubscriptions(req: AuthenticatedRequest, res: Response
         code: 'INTERNAL_ERROR',
         message: error instanceof Error ? error.message : 'Failed to list subscriptions',
       },
+      request_id: requestId,
     };
     return res.status(500).json(response);
   }
@@ -148,13 +154,14 @@ export async function listSubscriptions(req: AuthenticatedRequest, res: Response
 export async function deleteSubscription(req: AuthenticatedRequest, res: Response) {
   const requestId = req.headers['x-request-id'] as string;
   const subscriptionId = req.params.id;
-  const userId = req.user!.userId;
+  const userId = req.user!.user_id;
   
   try {
     await contentHubSubscriptionRepo.delete(subscriptionId, userId);
     
     const response: ApiSuccessResponse<void> = {
       data: undefined,
+      request_id: requestId,
     };
     return res.status(200).json(response);
   } catch (error) {
@@ -166,6 +173,7 @@ export async function deleteSubscription(req: AuthenticatedRequest, res: Respons
           code: 'NOT_FOUND',
           message: `Subscription ${subscriptionId} not found`,
         },
+        request_id: requestId,
       };
       return res.status(404).json(response);
     }
@@ -175,6 +183,7 @@ export async function deleteSubscription(req: AuthenticatedRequest, res: Respons
         code: 'INTERNAL_ERROR',
         message: error instanceof Error ? error.message : 'Failed to delete subscription',
       },
+      request_id: requestId,
     };
     return res.status(500).json(response);
   }
@@ -186,7 +195,7 @@ export async function deleteSubscription(req: AuthenticatedRequest, res: Respons
  */
 export async function checkSubscription(req: AuthenticatedRequest, res: Response) {
   const requestId = req.headers['x-request-id'] as string;
-  const userId = req.user!.userId;
+  const userId = req.user!.user_id;
   
   try {
     const target_type = req.query.target_type as string;
@@ -198,6 +207,7 @@ export async function checkSubscription(req: AuthenticatedRequest, res: Response
           code: 'VALIDATION_ERROR',
           message: 'target_type and target_id are required',
         },
+        request_id: requestId,
       };
       return res.status(400).json(response);
     }
@@ -213,6 +223,7 @@ export async function checkSubscription(req: AuthenticatedRequest, res: Response
         subscribed: !!subscription,
         subscription: subscription || undefined,
       },
+      request_id: requestId,
     };
     return res.status(200).json(response);
   } catch (error) {
@@ -222,6 +233,7 @@ export async function checkSubscription(req: AuthenticatedRequest, res: Response
         code: 'INTERNAL_ERROR',
         message: error instanceof Error ? error.message : 'Failed to check subscription',
       },
+      request_id: requestId,
     };
     return res.status(500).json(response);
   }

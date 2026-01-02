@@ -27,7 +27,7 @@ export interface ContentHubSubscriptionRepository {
   }): Promise<{ items: Subscription[]; next_cursor?: string }>;
 
   /**
-   * List subscriptions for a target (asset, taxonomy, etc.)
+   * List subscriptions for a target (asset, metadata, etc.)
    */
   listByTarget(targetType: string, targetId: string, options?: {
     limit?: number;

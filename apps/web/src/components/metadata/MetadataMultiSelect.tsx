@@ -1,7 +1,7 @@
 /**
- * Taxonomy Multi-Select Component
+ * Metadata Multi-Select Component
  * 
- * Multi-select with chips for taxonomy options (Topic Tags)
+ * Multi-select with chips for metadata options (Topic Tags)
  * Provides Notion-like UX: typeahead, chips, keyboard navigation, optional inline create
  */
 
@@ -19,16 +19,16 @@ import {
   ListItemText,
 } from '@mui/material';
 import { Add as AddIcon, Settings as SettingsIcon } from '@mui/icons-material';
-import { useTaxonomyOptions } from '../../hooks/useTaxonomyOptions';
-import { taxonomyApi } from '../../api/taxonomyClient';
+import { useMetadataOptions } from '../../hooks/useMetadataOptions';
+import { metadataApi } from '../../api/metadataClient';
 import { useAuth } from '../../contexts/AuthContext';
 import { isAdmin } from '../../lib/roles';
-import { TaxonomyManagerPanel } from './TaxonomyManagerPanel';
-import type { TaxonomyGroupKey, TaxonomyOption } from '@gravyty/domain';
+import { MetadataManagerPanel } from './MetadataManagerPanel';
+import type { MetadataGroupKey, MetadataOption } from '@gravyty/domain';
 
-export interface TaxonomyMultiSelectProps {
-  groupKey: TaxonomyGroupKey;
-  values: string[]; // Array of taxonomy option IDs
+export interface MetadataMultiSelectProps {
+  groupKey: MetadataGroupKey;
+  values: string[]; // Array of metadata option IDs
   onChange: (optionIds: string[]) => void;
   label?: string;
   placeholder?: string;
@@ -38,7 +38,7 @@ export interface TaxonomyMultiSelectProps {
   fullWidth?: boolean;
 }
 
-export function TaxonomyMultiSelect({
+export function MetadataMultiSelect({
   groupKey,
   values,
   onChange,
@@ -58,7 +58,7 @@ export function TaxonomyMultiSelect({
   const [managerAnchor, setManagerAnchor] = useState<HTMLElement | null>(null);
 
   // Fetch options with query filter (include archived for manager)
-  const { options, loading, setOptions: setOptionsState } = useTaxonomyOptions(groupKey, {
+  const { options, loading, setOptions: setOptionsState } = useMetadataOptions(groupKey, {
     query: query || undefined,
     include_archived: managerOpen, // Include archived when manager is open
   });
@@ -74,12 +74,12 @@ export function TaxonomyMultiSelect({
 
     setCreating(true);
     try {
-      const response = await taxonomyApi.createOption(groupKey, {
+      const response = await metadataApi.createOption(groupKey, {
         label: label.trim(),
       });
 
       if ('error' in response) {
-        console.error('Failed to create taxonomy option:', response.error);
+        console.error('Failed to create metadata option:', response.error);
         return;
       }
 
@@ -87,7 +87,7 @@ export function TaxonomyMultiSelect({
       onChange([...values, response.data.option.option_id]);
       setQuery('');
     } catch (err) {
-      console.error('Error creating taxonomy option:', err);
+      console.error('Error creating metadata option:', err);
     } finally {
       setCreating(false);
     }
@@ -126,7 +126,7 @@ export function TaxonomyMultiSelect({
         created_by: '',
         updated_at: '',
         updated_by: '',
-      } as TaxonomyOption);
+      } as MetadataOption);
     }
     
     // Add manage options row if user can manage
@@ -141,7 +141,7 @@ export function TaxonomyMultiSelect({
         created_by: '',
         updated_at: '',
         updated_by: '',
-      } as TaxonomyOption);
+      } as MetadataOption);
     }
     
     return baseOptions;
@@ -211,11 +211,14 @@ export function TaxonomyMultiSelect({
         ))
       }
       renderOption={(props, option) => {
+        const { key, ...otherProps } = props;
+        
         if (option.option_id === '__create__') {
           return (
             <Box
+              key={key}
               component="li"
-              {...props}
+              {...otherProps}
               sx={{
                 display: 'flex',
                 alignItems: 'center',
@@ -233,8 +236,9 @@ export function TaxonomyMultiSelect({
         if (option.option_id === '__manage__') {
           return (
             <ListItem
+              key={key}
               component="li"
-              {...props}
+              {...otherProps}
               onClick={(e) => {
                 e.stopPropagation();
                 setManagerAnchor(e.currentTarget);
@@ -260,7 +264,7 @@ export function TaxonomyMultiSelect({
         }
 
         return (
-          <Box component="li" {...props}>
+          <Box key={key} component="li" {...otherProps}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
               {option.color && (
                 <Box
@@ -315,7 +319,7 @@ export function TaxonomyMultiSelect({
           sx: { mt: 0.5 },
         }}
       >
-        <TaxonomyManagerPanel
+        <MetadataManagerPanel
           groupKey={groupKey}
           options={options}
           onOptionsChange={(updatedOptions) => {

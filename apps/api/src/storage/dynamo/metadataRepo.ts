@@ -1,8 +1,8 @@
 /**
- * Taxonomy Data Access Layer
+ * Metadata Data Access Layer
  * 
- * Repository for accessing taxonomy DynamoDB table.
- * Implements data access methods for taxonomy options.
+ * Repository for accessing metadata DynamoDB table.
+ * Implements data access methods for metadata options.
  */
 
 import {
@@ -15,11 +15,11 @@ import {
 } from '@aws-sdk/lib-dynamodb';
 import { dynamoDocClient } from '../../aws/dynamoClient';
 import type {
-  TaxonomyOption,
-  TaxonomyGroupKey,
-  CreateTaxonomyOption,
-  UpdateTaxonomyOption,
-  TaxonomyOptionUsageResponse,
+  MetadataOption,
+  MetadataGroupKey,
+  CreateMetadataOption,
+  UpdateMetadataOption,
+  MetadataOptionUsageResponse,
 } from '@gravyty/domain';
 import { v4 as uuidv4 } from 'uuid';
 import { LMS_COURSES_TABLE } from './lmsRepo';
@@ -27,9 +27,9 @@ import type { Course } from '@gravyty/domain';
 import type { ContentItem } from '@gravyty/domain';
 
 /**
- * Taxonomy Table Name (from environment variable)
+ * Metadata Table Name (from environment variable)
  */
-export const TAXONOMY_TABLE = process.env.TAXONOMY_TABLE || 'taxonomy';
+export const METADATA_TABLE = process.env.METADATA_TABLE || 'metadata';
 
 /**
  * Content Registry Table Name (from environment variable)
@@ -37,29 +37,29 @@ export const TAXONOMY_TABLE = process.env.TAXONOMY_TABLE || 'taxonomy';
 const CONTENT_TABLE = process.env.DDB_TABLE_CONTENT || 'content_registry';
 
 /**
- * Taxonomy Repository
+ * Metadata Repository
  */
-export class TaxonomyRepo {
+export class MetadataRepo {
   /**
-   * List taxonomy options for a group
+   * List metadata options for a group
    * 
    * Supports query filtering and returns results sorted by sort_order then label.
    * Archived options are excluded unless explicitly requested.
    */
   async listOptions(params: {
-    group_key: TaxonomyGroupKey;
+    group_key: MetadataGroupKey;
     query?: string;
     include_archived?: boolean;
     parent_id?: string;
     limit?: number;
     cursor?: string;
-  }): Promise<{ items: TaxonomyOption[]; next_cursor?: string }> {
+  }): Promise<{ items: MetadataOption[]; next_cursor?: string }> {
     const limit = Math.min(params.limit || 50, 200); // Pagination guard
 
     // Use GroupKeyIndex GSI (PK=group_key, SK=sort_order_label)
     // Sort key format: zero-padded sort_order + label for proper sorting
     const command = new QueryCommand({
-      TableName: TAXONOMY_TABLE,
+      TableName: METADATA_TABLE,
       IndexName: 'GroupKeyIndex',
       KeyConditionExpression: '#group_key = :group_key',
       ExpressionAttributeNames: {
@@ -76,11 +76,24 @@ export class TaxonomyRepo {
     });
 
     const { Items = [], LastEvaluatedKey } = await dynamoDocClient.send(command);
-    let options = (Items as TaxonomyOption[]);
+    let options = (Items as MetadataOption[]);
 
     // Filter by parent_id if provided
-    if (params.parent_id !== undefined) {
-      options = options.filter((opt) => opt.parent_id === params.parent_id);
+    // For hierarchical metadata (e.g., product filtered by product_suite), show options that:
+    // 1. Match the parent_id exactly, OR
+    // 2. Have no parent_id set (null/undefined) - for backward compatibility with existing data
+    // Note: If no products match the parent_id, we show all products to allow selection until data is properly configured
+    if (params.parent_id !== undefined && params.parent_id !== null) {
+      const matchingOptions = options.filter((opt) => 
+        opt.parent_id === params.parent_id || 
+        opt.parent_id === null || 
+        opt.parent_id === undefined
+      );
+      // If we have matching options, use them; otherwise show all (for backward compatibility during migration)
+      if (matchingOptions.length > 0) {
+        options = matchingOptions;
+      }
+      // If no matching options, keep all options (allows selection until parent_id is set on products)
     }
 
     // Filter archived unless explicitly included
@@ -121,27 +134,27 @@ export class TaxonomyRepo {
   }
 
   /**
-   * Get taxonomy option by ID
+   * Get metadata option by ID
    */
-  async getOptionById(optionId: string): Promise<TaxonomyOption | null> {
+  async getOptionById(optionId: string): Promise<MetadataOption | null> {
     const command = new GetCommand({
-      TableName: TAXONOMY_TABLE,
+      TableName: METADATA_TABLE,
       Key: {
         option_id: optionId,
       },
     });
 
     const { Item } = await dynamoDocClient.send(command);
-    return (Item as TaxonomyOption) || null;
+    return (Item as MetadataOption) || null;
   }
 
   /**
-   * Create a new taxonomy option
+   * Create a new metadata option
    */
   async createOption(
-    data: CreateTaxonomyOption,
+    data: CreateMetadataOption,
     userId: string
-  ): Promise<TaxonomyOption> {
+  ): Promise<MetadataOption> {
     const now = new Date().toISOString();
     const optionId = uuidv4();
 
@@ -154,9 +167,9 @@ export class TaxonomyRepo {
       if (!parent) {
         throw new Error(`Parent option ${data.parent_id} not found`);
       }
-      // If product_suite (new), parent must be product
-      if (data.group_key === 'product_suite' && parent.group_key !== 'product') {
-        throw new Error('Product suite parent must be a product');
+      // Product is a child of Product Suite (product_suite is the parent)
+      if (data.group_key === 'product' && parent.group_key !== 'product_suite') {
+        throw new Error('Product parent must be a product suite');
       }
     }
 
@@ -164,7 +177,7 @@ export class TaxonomyRepo {
     // Create sort key: zero-padded sort_order (10 digits) + label for proper sorting
     const sortKey = `${String(sortOrder).padStart(10, '0')}#${data.label}`;
 
-    const option: TaxonomyOption & { sort_order_label?: string } = {
+    const option: MetadataOption & { sort_order_label?: string } = {
       option_id: optionId,
       group_key: data.group_key,
       label: data.label,
@@ -182,7 +195,7 @@ export class TaxonomyRepo {
     };
 
     const command = new PutCommand({
-      TableName: TAXONOMY_TABLE,
+      TableName: METADATA_TABLE,
       Item: option,
     });
 
@@ -191,16 +204,16 @@ export class TaxonomyRepo {
   }
 
   /**
-   * Update a taxonomy option
+   * Update a metadata option
    */
   async updateOption(
     optionId: string,
-    updates: UpdateTaxonomyOption,
+    updates: UpdateMetadataOption,
     userId: string
-  ): Promise<TaxonomyOption> {
+  ): Promise<MetadataOption> {
     const existing = await this.getOptionById(optionId);
     if (!existing) {
-      throw new Error(`Taxonomy option ${optionId} not found`);
+      throw new Error(`Metadata option ${optionId} not found`);
     }
 
     const now = new Date().toISOString();
@@ -297,7 +310,7 @@ export class TaxonomyRepo {
     expressionAttributeValues[':updated_by'] = userId;
 
     const command = new UpdateCommand({
-      TableName: TAXONOMY_TABLE,
+      TableName: METADATA_TABLE,
       Key: {
         option_id: optionId,
       },
@@ -308,15 +321,15 @@ export class TaxonomyRepo {
     });
 
     const { Attributes } = await dynamoDocClient.send(command);
-    return Attributes as TaxonomyOption;
+    return Attributes as MetadataOption;
   }
 
   /**
-   * Get usage count for a taxonomy option
+   * Get usage count for a metadata option
    * 
    * Checks how many Courses and Resources reference this option
    */
-  async getUsageCount(optionId: string, groupKey: TaxonomyGroupKey): Promise<TaxonomyOptionUsageResponse> {
+  async getUsageCount(optionId: string, groupKey: MetadataGroupKey): Promise<MetadataOptionUsageResponse> {
     let courseCount = 0;
     let resourceCount = 0;
     const sampleCourseIds: string[] = [];
@@ -350,6 +363,11 @@ export class TaxonomyRepo {
           }
           // Fallback to legacy badges
           return c.badges?.some((badge) => badge.badge_id === optionId);
+        });
+      } else if (groupKey === 'audience') {
+        // Filter courses that have this audience_id in their audience_ids array
+        courses = courses.filter((c) => {
+          return c.audience_ids && c.audience_ids.includes(optionId);
         });
       }
       
@@ -405,10 +423,10 @@ export class TaxonomyRepo {
   }
 
   /**
-   * Build filter expression for checking taxonomy option usage
+   * Build filter expression for checking metadata option usage
    */
   private buildUsageFilterExpression(
-    groupKey: TaxonomyGroupKey,
+    groupKey: MetadataGroupKey,
     optionId: string,
     type: 'course' | 'resource' = 'course'
   ): {
@@ -446,23 +464,30 @@ export class TaxonomyRepo {
       // For badges, we'll filter in memory after scanning (DynamoDB can't easily filter nested arrays)
       // Return empty filter to scan all, then filter in memory
       return { attributeNames, attributeValues };
+    } else if (groupKey === 'audience') {
+      attributeNames['#audience_ids'] = 'audience_ids';
+      return {
+        filterExpression: 'contains(#audience_ids, :optionId)',
+        attributeNames,
+        attributeValues,
+      };
     }
     
     return { attributeNames, attributeValues };
   }
 
   /**
-   * Delete a taxonomy option (soft delete by setting deleted_at)
+   * Delete a metadata option (soft delete by setting deleted_at)
    */
   async deleteOption(optionId: string, userId: string): Promise<void> {
     const existing = await this.getOptionById(optionId);
     if (!existing) {
-      throw new Error(`Taxonomy option ${optionId} not found`);
+      throw new Error(`Metadata option ${optionId} not found`);
     }
 
     const now = new Date().toISOString();
     const command = new UpdateCommand({
-      TableName: TAXONOMY_TABLE,
+      TableName: METADATA_TABLE,
       Key: {
         option_id: optionId,
       },
@@ -483,12 +508,12 @@ export class TaxonomyRepo {
   }
 
   /**
-   * Hard delete a taxonomy option (permanent removal)
+   * Hard delete a metadata option (permanent removal)
    * Only use when usage count is 0
    */
   async hardDeleteOption(optionId: string): Promise<void> {
     const command = new DeleteCommand({
-      TableName: TAXONOMY_TABLE,
+      TableName: METADATA_TABLE,
       Key: {
         option_id: optionId,
       },
@@ -512,5 +537,5 @@ export class TaxonomyRepo {
 }
 
 // Export singleton instance
-export const taxonomyRepo = new TaxonomyRepo();
+export const metadataRepo = new MetadataRepo();
 

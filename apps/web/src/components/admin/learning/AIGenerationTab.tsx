@@ -162,7 +162,20 @@ export function AIGenerationTab({
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to upload image';
       console.error('[AIGenerationTab] Error uploading image:', err);
-      setError(errorMessage);
+      
+      // Provide more helpful error messages
+      let displayMessage = errorMessage;
+      if (errorMessage.includes('Access Denied') || errorMessage.includes('ACCESS_DENIED')) {
+        displayMessage = 'Access denied. Please check your permissions and try again.';
+      } else if (errorMessage.includes('S3') || errorMessage.includes('S3_ERROR')) {
+        displayMessage = 'Failed to upload to storage. Please try again.';
+      } else if (errorMessage.includes('NOT_FOUND')) {
+        displayMessage = 'Upload session expired. Please generate a new image and try again.';
+      } else if (errorMessage.includes('Network') || errorMessage.includes('fetch')) {
+        displayMessage = 'Network error. Please check your connection and try again.';
+      }
+      
+      setError(displayMessage);
       // Keep modal open on error so user can see the error and try again
     } finally {
       setUploading(false);

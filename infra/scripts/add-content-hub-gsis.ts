@@ -16,9 +16,9 @@ const tableName = process.env.DDB_TABLE_CONTENT || 'content_registry';
 
 const gsis = [
   {
-    IndexName: 'ByTaxonomyStatusUpdated',
+    IndexName: 'ByMetadataStatusUpdated',
     KeySchema: [
-      { AttributeName: 'taxonomy_node_id#status', KeyType: 'HASH' },
+      { AttributeName: 'metadata_node_id#status', KeyType: 'HASH' },
       { AttributeName: 'updated_at#asset_id', KeyType: 'RANGE' },
     ],
     Projection: { ProjectionType: 'ALL' },
@@ -75,8 +75,8 @@ async function addGSIs() {
         TableName: tableName,
         AttributeDefinitions: [
           // Add attribute definitions for the GSI keys
-          ...(gsi.KeySchema.some(ks => ks.AttributeName.includes('taxonomy_node_id#status')) 
-            ? [{ AttributeName: 'taxonomy_node_id#status', AttributeType: 'S' }] : []),
+          ...(gsi.KeySchema.some(ks => ks.AttributeName.includes('metadata_node_id#status')) 
+            ? [{ AttributeName: 'metadata_node_id#status', AttributeType: 'S' }] : []),
           ...(gsi.KeySchema.some(ks => ks.AttributeName.includes('updated_at#asset_id'))
             ? [{ AttributeName: 'updated_at#asset_id', AttributeType: 'S' }] : []),
           ...(gsi.KeySchema.some(ks => ks.AttributeName === 'pinned')

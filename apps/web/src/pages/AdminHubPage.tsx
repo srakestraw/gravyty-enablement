@@ -162,17 +162,17 @@ export function AdminHubPage() {
           Governance
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-          Manage taxonomy, media assets, assignments, and certificate templates
+          Manage metadata, media assets, assignments, and certificate templates
         </Typography>
       </Box>
 
       <Grid container spacing={3}>
         <Grid item xs={12} sm={6} md={4}>
           <HubTile
-            title="Taxonomy"
+            title="Metadata"
             description="Manage controlled values used across Courses and Resources"
             icon={<CategoryOutlined />}
-            path="/enablement/admin/taxonomy"
+            path="/enablement/admin/metadata"
           />
         </Grid>
         <Grid item xs={12} sm={6} md={4}>

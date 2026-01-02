@@ -1,22 +1,22 @@
 /**
- * Taxonomy API Client
+ * Metadata API Client
  * 
- * Client for taxonomy API endpoints
+ * Client for metadata API endpoints
  */
 
 import { apiFetch } from '../lib/apiClient';
 import type {
-  TaxonomyOption,
-  TaxonomyGroupKey,
-  CreateTaxonomyOption,
-  UpdateTaxonomyOption,
-  TaxonomyOptionUsageResponse,
-  MergeTaxonomyOption,
+  MetadataOption,
+  MetadataGroupKey,
+  CreateMetadataOption,
+  UpdateMetadataOption,
+  MetadataOptionUsageResponse,
+  MergeMetadataOption,
 } from '@gravyty/domain';
 
-const BASE_URL = '/v1/taxonomy';
+const BASE_URL = '/v1/metadata';
 
-export interface ListTaxonomyOptionsParams {
+export interface ListMetadataOptionsParams {
   query?: string;
   include_archived?: boolean;
   parent_id?: string;
@@ -24,30 +24,30 @@ export interface ListTaxonomyOptionsParams {
   cursor?: string;
 }
 
-export interface ListTaxonomyOptionsResponse {
-  options: TaxonomyOption[];
+export interface ListMetadataOptionsResponse {
+  options: MetadataOption[];
   next_cursor?: string;
 }
 
-export interface CreateTaxonomyOptionResponse {
-  option: TaxonomyOption;
+export interface CreateMetadataOptionResponse {
+  option: MetadataOption;
 }
 
-export interface UpdateTaxonomyOptionResponse {
-  option: TaxonomyOption;
+export interface UpdateMetadataOptionResponse {
+  option: MetadataOption;
 }
 
-export interface GetTaxonomyOptionResponse {
-  option: TaxonomyOption;
+export interface GetMetadataOptionResponse {
+  option: MetadataOption;
 }
 
-export const taxonomyApi = {
+export const metadataApi = {
   /**
-   * List taxonomy options for a group
+   * List metadata options for a group
    */
   async listOptions(
-    groupKey: TaxonomyGroupKey,
-    params?: ListTaxonomyOptionsParams
+    groupKey: MetadataGroupKey,
+    params?: ListMetadataOptionsParams
   ) {
     const queryParams = new URLSearchParams();
     if (params?.query) queryParams.append('query', params.query);
@@ -59,24 +59,24 @@ export const taxonomyApi = {
     const queryString = queryParams.toString();
     const url = `${BASE_URL}/${groupKey}/options${queryString ? `?${queryString}` : ''}`;
 
-    return apiFetch<ListTaxonomyOptionsResponse>(url);
+    return apiFetch<ListMetadataOptionsResponse>(url);
   },
 
   /**
-   * Get a single taxonomy option by ID
+   * Get a single metadata option by ID
    */
   async getOption(optionId: string) {
-    return apiFetch<GetTaxonomyOptionResponse>(`${BASE_URL}/options/${optionId}`);
+    return apiFetch<GetMetadataOptionResponse>(`${BASE_URL}/options/${optionId}`);
   },
 
   /**
-   * Create a new taxonomy option
+   * Create a new metadata option
    */
   async createOption(
-    groupKey: TaxonomyGroupKey,
-    data: Omit<CreateTaxonomyOption, 'group_key'>
+    groupKey: MetadataGroupKey,
+    data: Omit<CreateMetadataOption, 'group_key'>
   ) {
-    return apiFetch<CreateTaxonomyOptionResponse>(`${BASE_URL}/${groupKey}/options`, {
+    return apiFetch<CreateMetadataOptionResponse>(`${BASE_URL}/${groupKey}/options`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -86,10 +86,10 @@ export const taxonomyApi = {
   },
 
   /**
-   * Update a taxonomy option
+   * Update a metadata option
    */
-  async updateOption(optionId: string, data: UpdateTaxonomyOption) {
-    return apiFetch<UpdateTaxonomyOptionResponse>(`${BASE_URL}/options/${optionId}`, {
+  async updateOption(optionId: string, data: UpdateMetadataOption) {
+    return apiFetch<UpdateMetadataOptionResponse>(`${BASE_URL}/options/${optionId}`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
@@ -99,18 +99,18 @@ export const taxonomyApi = {
   },
 
   /**
-   * Get usage count for a taxonomy option
+   * Get usage count for a metadata option
    */
-  async getUsage(groupKey: TaxonomyGroupKey, optionId: string) {
-    return apiFetch<{ data: TaxonomyOptionUsageResponse }>(
+  async getUsage(groupKey: MetadataGroupKey, optionId: string) {
+    return apiFetch<{ data: MetadataOptionUsageResponse }>(
       `${BASE_URL}/${groupKey}/options/${optionId}/usage`
     );
   },
 
   /**
-   * Delete a taxonomy option
+   * Delete a metadata option
    */
-  async deleteOption(groupKey: TaxonomyGroupKey, optionId: string, force?: boolean) {
+  async deleteOption(groupKey: MetadataGroupKey, optionId: string, force?: boolean) {
     const url = `${BASE_URL}/${groupKey}/options/${optionId}${force ? '?force=true' : ''}`;
     return apiFetch<{ data: { message: string } }>(url, {
       method: 'DELETE',
@@ -118,10 +118,10 @@ export const taxonomyApi = {
   },
 
   /**
-   * Merge a taxonomy option into another
+   * Merge a metadata option into another
    */
   async mergeOption(
-    groupKey: TaxonomyGroupKey,
+    groupKey: MetadataGroupKey,
     sourceOptionId: string,
     targetOptionId: string,
     deleteSource?: boolean
@@ -144,5 +144,4 @@ export const taxonomyApi = {
     });
   },
 };
-
 

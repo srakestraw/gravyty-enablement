@@ -1,7 +1,7 @@
 /**
- * Admin Taxonomy Detail Page
+ * Admin Metadata Detail Page
  * 
- * Detail page for managing options within a specific taxonomy key
+ * Detail page for managing options within a specific metadata key
  */
 
 import { useState, useMemo, useEffect } from 'react';
@@ -51,22 +51,23 @@ import {
   DragHandle as DragHandleIcon,
   Palette as PaletteIcon,
 } from '@mui/icons-material';
-import { useTaxonomyOptions } from '../../../hooks/useTaxonomyOptions';
-import { taxonomyApi } from '../../../api/taxonomyClient';
-import type { TaxonomyGroupKey, TaxonomyOption } from '@gravyty/domain';
+import { useMetadataOptions } from '../../../hooks/useMetadataOptions';
+import { metadataApi } from '../../../api/metadataClient';
+import type { MetadataGroupKey, MetadataOption } from '@gravyty/domain';
 import { track } from '../../../lib/telemetry';
 
-const TAXONOMY_KEY_LABELS: Record<TaxonomyGroupKey, string> = {
+const METADATA_KEY_LABELS: Record<MetadataGroupKey, string> = {
   product: 'Product',
   product_suite: 'Product Suite',
   topic_tag: 'Topic Tags',
   badge: 'Badges',
+  audience: 'Audience',
 };
 
 type SortOption = 'default' | 'alphabetical';
 
-export function AdminTaxonomyDetailPage() {
-  const { key } = useParams<{ key: TaxonomyGroupKey }>();
+export function AdminMetadataDetailPage() {
+  const { key } = useParams<{ key: MetadataGroupKey }>();
   const navigate = useNavigate();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -124,26 +125,26 @@ export function AdminTaxonomyDetailPage() {
     return /^#[0-9A-F]{6}$/i.test(hex);
   };
 
-  if (!key || !['product', 'product_suite', 'topic_tag', 'badge'].includes(key)) {
+  if (!key || !['product', 'product_suite', 'topic_tag', 'badge', 'audience'].includes(key)) {
     return (
       <Box sx={{ p: 3 }}>
-        <Alert severity="error">Invalid taxonomy key</Alert>
+        <Alert severity="error">Invalid metadata key</Alert>
       </Box>
     );
   }
 
-  const { options, loading, error, refetch, setOptions } = useTaxonomyOptions(key, {
+  const { options, loading, error, refetch, setOptions } = useMetadataOptions(key, {
     include_archived: true,
   });
 
   // Fetch Product Suites when viewing Products
-  const { options: productSuites } = useTaxonomyOptions('product_suite', {
+  const { options: productSuites } = useMetadataOptions('product_suite', {
     include_archived: false,
   });
 
   // Track page view
   useEffect(() => {
-    track('lms_taxonomy_options_viewed', { key });
+    track('lms_metadata_options_viewed', { key });
   }, [key]);
 
   // Filter and sort options
@@ -194,7 +195,7 @@ export function AdminTaxonomyDetailPage() {
 
     setCreating(true);
     try {
-      const response = await taxonomyApi.createOption(key, {
+      const response = await metadataApi.createOption(key, {
         label: newLabel.trim(),
         parent_id: key === 'product' ? (newParentId || undefined) : undefined,
         color: newColor,
@@ -205,7 +206,7 @@ export function AdminTaxonomyDetailPage() {
         return;
       }
 
-      track('lms_taxonomy_option_created', { key, option_id: response.data.option.option_id });
+      track('lms_metadata_option_created', { key, option_id: response.data.option.option_id });
       setNewLabel('');
       setNewParentId(null);
       setNewColor(undefined);
@@ -221,7 +222,7 @@ export function AdminTaxonomyDetailPage() {
     }
   };
 
-  const handleStartEdit = (option: TaxonomyOption) => {
+  const handleStartEdit = (option: MetadataOption) => {
     setEditingId(option.option_id);
     setEditingLabel(option.label);
     setEditingParentId(option.parent_id || null);
@@ -255,14 +256,14 @@ export function AdminTaxonomyDetailPage() {
       if (key === 'product') {
         updates.parent_id = editingParentId || null;
       }
-      const response = await taxonomyApi.updateOption(optionId, updates);
+      const response = await metadataApi.updateOption(optionId, updates);
 
       if ('error' in response) {
         alert(`Failed to update option: ${response.error.message}`);
         return;
       }
 
-      track('lms_taxonomy_option_renamed', { key, option_id: optionId });
+      track('lms_metadata_option_renamed', { key, option_id: optionId });
       setEditingId(null);
       setEditingLabel('');
       setEditingParentId(null);
@@ -288,7 +289,7 @@ export function AdminTaxonomyDetailPage() {
   const handleArchive = async (optionId: string) => {
     setSaving(optionId);
     try {
-      const response = await taxonomyApi.updateOption(optionId, {
+      const response = await metadataApi.updateOption(optionId, {
         archived_at: new Date().toISOString(),
       });
 
@@ -297,7 +298,7 @@ export function AdminTaxonomyDetailPage() {
         return;
       }
 
-      track('lms_taxonomy_option_archived', { key, option_id: optionId });
+      track('lms_metadata_option_archived', { key, option_id: optionId });
       refetch();
     } catch (err) {
       console.error('Error archiving option:', err);
@@ -311,7 +312,7 @@ export function AdminTaxonomyDetailPage() {
     setSaving(optionId);
     try {
       // Send empty string to unarchive - backend converts falsy values to null
-      const response = await taxonomyApi.updateOption(optionId, {
+      const response = await metadataApi.updateOption(optionId, {
         archived_at: '' as any,
       });
 
@@ -320,7 +321,7 @@ export function AdminTaxonomyDetailPage() {
         return;
       }
 
-      track('lms_taxonomy_option_restored', { key, option_id: optionId });
+      track('lms_metadata_option_restored', { key, option_id: optionId });
       refetch();
     } catch (err) {
       console.error('Error restoring option:', err);
@@ -348,11 +349,11 @@ export function AdminTaxonomyDetailPage() {
     try {
       // Update both options
       await Promise.all([
-        taxonomyApi.updateOption(optionId, { sort_order: newOrder }),
-        taxonomyApi.updateOption(targetOption.option_id, { sort_order: tempOrder }),
+        metadataApi.updateOption(optionId, { sort_order: newOrder }),
+        metadataApi.updateOption(targetOption.option_id, { sort_order: tempOrder }),
       ]);
 
-      track('lms_taxonomy_option_reordered', { key });
+      track('lms_metadata_option_reordered', { key });
       refetch();
     } catch (err) {
       console.error('Error reordering option:', err);
@@ -366,14 +367,14 @@ export function AdminTaxonomyDetailPage() {
     setSaving(optionId);
     setColorMenuAnchor(null);
     try {
-      const response = await taxonomyApi.updateOption(optionId, { color });
+      const response = await metadataApi.updateOption(optionId, { color });
 
       if ('error' in response) {
         alert(`Failed to update color: ${response.error.message}`);
         return;
       }
 
-      track('lms_taxonomy_option_color_changed', { key, option_id: optionId });
+      track('lms_metadata_option_color_changed', { key, option_id: optionId });
       refetch();
     } catch (err) {
       console.error('Error updating color:', err);
@@ -399,7 +400,7 @@ export function AdminTaxonomyDetailPage() {
     );
   }
 
-  const displayLabel = TAXONOMY_KEY_LABELS[key];
+  const displayLabel = METADATA_KEY_LABELS[key];
 
   return (
     <Box sx={{ p: 3 }}>
@@ -416,10 +417,10 @@ export function AdminTaxonomyDetailPage() {
         <Link
           component="button"
           variant="body1"
-          onClick={() => navigate('/enablement/admin/taxonomy')}
+          onClick={() => navigate('/enablement/admin/metadata')}
           sx={{ textDecoration: 'none', cursor: 'pointer' }}
         >
-          Taxonomy
+          Metadata
         </Link>
         <Typography color="text.primary">{displayLabel}</Typography>
       </Breadcrumbs>
@@ -859,7 +860,7 @@ export function AdminTaxonomyDetailPage() {
                   onClick={async () => {
                     setCheckingUsage(true);
                     try {
-                      const response = await taxonomyApi.getUsage(key, menuAnchor.optionId);
+                      const response = await metadataApi.getUsage(key, menuAnchor.optionId);
                       if ('error' in response) {
                         alert(`Failed to check usage: ${response.error.message}`);
                         return;
@@ -943,12 +944,12 @@ export function AdminTaxonomyDetailPage() {
                 if (!deleteDialogOpen) return;
                 setDeleting(true);
                 try {
-                  const response = await taxonomyApi.deleteOption(key, deleteDialogOpen);
+                  const response = await metadataApi.deleteOption(key, deleteDialogOpen);
                   if ('error' in response) {
                     alert(`Failed to delete option: ${response.error.message}`);
                     return;
                   }
-                  track('lms_taxonomy_option_deleted', { key, option_id: deleteDialogOpen });
+                  track('lms_metadata_option_deleted', { key, option_id: deleteDialogOpen });
                   setDeleteDialogOpen(null);
                   setDeleteUsage(null);
                   refetch();

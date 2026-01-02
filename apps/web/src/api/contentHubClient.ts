@@ -13,13 +13,13 @@ export interface CreateAssetRequest {
   cover_image?: MediaRef;
   asset_type: 'deck' | 'doc' | 'image' | 'video' | 'logo' | 'worksheet' | 'link';
   owner_id?: string;
-  taxonomy_node_ids?: string[];
+  metadata_node_ids?: string[];
   source_type: 'UPLOAD' | 'LINK' | 'GOOGLE_DRIVE';
   source_ref?: Record<string, unknown>;
 }
 
 export interface ListAssetsParams {
-  taxonomy_node_id?: string;
+  metadata_node_id?: string;
   asset_type?: string;
   status?: string;
   pinned?: boolean;
@@ -87,7 +87,7 @@ export async function createAsset(data: CreateAssetRequest): Promise<ApiResponse
  */
 export async function listAssets(params?: ListAssetsParams): Promise<ApiResponse<ListAssetsResponse>> {
   const queryParams = new URLSearchParams();
-  if (params?.taxonomy_node_id) queryParams.append('taxonomy_node_id', params.taxonomy_node_id);
+  if (params?.metadata_node_id) queryParams.append('metadata_node_id', params.metadata_node_id);
   if (params?.asset_type) queryParams.append('asset_type', params.asset_type);
   if (params?.status) queryParams.append('status', params.status);
   if (params?.pinned !== undefined) queryParams.append('pinned', params.pinned.toString());
@@ -396,7 +396,7 @@ export async function resolveRequest(requestId: string): Promise<ApiResponse<Upd
 // ============================================================================
 
 export interface CreateSubscriptionRequest {
-  target_type: 'asset' | 'taxonomy' | 'collection' | 'savedSearch';
+  target_type: 'asset' | 'metadata' | 'collection' | 'savedSearch';
   target_id: string;
   triggers?: {
     newVersion?: boolean;

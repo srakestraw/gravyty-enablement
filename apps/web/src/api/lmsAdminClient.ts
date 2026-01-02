@@ -453,6 +453,24 @@ export const lmsAdminApi = {
     });
   },
 
+  async chatCompletion(params: {
+    prompt: string;
+    context?: string;
+    existing_content?: string;
+  }) {
+    return apiFetch<{ 
+      content: string; 
+      usage: {
+        promptTokens: number;
+        completionTokens: number;
+        totalTokens: number;
+      };
+    }>(`${BASE_URL}/ai/chat-completion`, {
+      method: 'POST',
+      body: JSON.stringify(params),
+    });
+  },
+
   async getMediaUrl(mediaId: string): Promise<ApiResponse<{ url: string; expires_in_seconds: number }>> {
     const url = `${BASE_URL}/media/${mediaId}/url`;
     return apiFetch<{ url: string; expires_in_seconds: number }>(url);

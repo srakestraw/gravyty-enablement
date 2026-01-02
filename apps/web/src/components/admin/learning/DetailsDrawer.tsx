@@ -31,7 +31,7 @@ import {
   ExpandLess as ExpandLessIcon,
 } from '@mui/icons-material';
 import { MediaSelectModal } from './MediaSelectModal';
-import { TaxonomySelect, TaxonomyMultiSelect } from '../../taxonomy';
+import { MetadataSelect, MetadataMultiSelect } from '../../metadata';
 import { focusRegistry } from '../../../utils/focusRegistry';
 import type { Course, MediaRef } from '@gravyty/domain';
 
@@ -211,7 +211,7 @@ export function DetailsDrawer({
               {/* Product Suite */}
               <Grid item xs={12} sm={6}>
                 <Box ref={productSuiteRef}>
-                  <TaxonomyMultiSelect
+                  <MetadataMultiSelect
                     groupKey="product_suite"
                     values={productSuiteIds}
                     onChange={(optionIds) => {
@@ -232,7 +232,7 @@ export function DetailsDrawer({
               {/* Product */}
               <Grid item xs={12} sm={6}>
                 <Box ref={productRef}>
-                  <TaxonomyMultiSelect
+                  <MetadataMultiSelect
                     groupKey="product"
                     values={productIds}
                     onChange={(optionIds) => {
@@ -253,7 +253,7 @@ export function DetailsDrawer({
               {/* Topic Tags */}
               <Grid item xs={12}>
                 <Box ref={topicTagsRef}>
-                  <TaxonomyMultiSelect
+                  <MetadataMultiSelect
                     groupKey="topic_tag"
                     values={topicTagIds}
                     onChange={(optionIds) => {
@@ -342,7 +342,7 @@ export function DetailsDrawer({
               {/* Badges */}
               <Grid item xs={12}>
                 <Paper ref={badgesRef} sx={{ p: 2 }}>
-                  <TaxonomyMultiSelect
+                  <MetadataMultiSelect
                     groupKey="badge"
                     values={badgeIds}
                     onChange={(optionIds) => {

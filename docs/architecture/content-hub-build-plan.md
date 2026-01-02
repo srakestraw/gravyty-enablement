@@ -12,7 +12,7 @@ Implement **Content Hub** as a DAM capability that:
 - Stores assets once and reuses them across Courses (no duplicate uploads)
 - Supports versioning, scheduled publishing, and expiration
 - Notifies users when content is published, updated, expiring, or expired
-- Supports pinning, taxonomy-driven discovery, and comments
+- Supports pinning, metadata-driven discovery, and comments
 - Supports external sharing via unique links with tracking and revocation
 - Supports link assets (URL) and Google Drive import + sync
 
@@ -34,7 +34,7 @@ From the architecture overview:
 ## 3) Dependencies and prerequisites
 
 ### Required (blocking)
-1. **Taxonomy foundation** exists and is accessible via API and UI (Admin-managed).
+1. **Metadata foundation** exists and is accessible via API and UI (Admin-managed).
 2. **Users & Roles** exist, including groups for: Admin, Approver, Contributor, Viewer.
 3. **S3 presigned URL pattern** exists for upload and download (or will be implemented in Phase 2).
 
@@ -105,7 +105,7 @@ Build plan assumes **Option A** unless the codebase strongly favors separate tab
 
 - Domain
   - Define domain models and Zod validators:
-    - Asset, AssetVersion, TaxonomyRef, PinnedState
+    - Asset, AssetVersion, MetadataRef, PinnedState
   - Define enums:
     - `sourceType`: UPLOAD | LINK | GOOGLE_DRIVE
     - `status`: draft | scheduled | published | deprecated | expired | archived
@@ -114,7 +114,7 @@ Build plan assumes **Option A** unless the codebase strongly favors separate tab
 - Infra/CDK
   - Confirm `DDB_TABLE_CONTENT=content_registry` exists
   - Add new GSIs needed for discovery without Scan (examples):
-    - ByTaxonomy + Status + UpdatedAt
+    - ByMetadata + Status + UpdatedAt
     - ByPinned + UpdatedAt
     - ByOwner + UpdatedAt
     - ByShareToken (token -> ShareLink)
@@ -140,10 +140,10 @@ Build plan assumes **Option A** unless the codebase strongly favors separate tab
 
 - API
   - Assets
-    - POST /assets (create metadata + taxonomy)
-    - GET /assets (list with filters: taxonomy, type, status, pinned)
+    - POST /assets (create metadata fields)
+    - GET /assets (list with filters: metadata, type, status, pinned)
     - GET /assets/:id (detail)
-    - PATCH /assets/:id (metadata, owner, taxonomy)
+    - PATCH /assets/:id (metadata fields, owner, metadata nodes)
   - Versions
     - POST /assets/:id/versions/init-upload (create draft version + presigned PUT)
     - POST /assets/:id/versions/complete-upload (finalize metadata, checksum, size)
@@ -156,7 +156,7 @@ Build plan assumes **Option A** unless the codebase strongly favors separate tab
 
 - Web
   - Content Hub Library
-    - Search + taxonomy filters (basic)
+    - Search + metadata filters (basic)
     - Default view: Published and non-expired
   - Asset detail
     - Metadata section
@@ -219,14 +219,14 @@ Build plan assumes **Option A** unless the codebase strongly favors separate tab
 
 ---
 
-### Phase 4 - Discovery and governance: pinning + taxonomy enforcement
-**Outcome**: Users reliably discover the right content; publishing requires taxonomy and required metadata.
+### Phase 4 - Discovery and governance: pinning + metadata enforcement
+**Outcome**: Users reliably discover the right content; publishing requires metadata and required metadata fields.
 
 - API
   - POST /assets/:id/pin (Approver+)
   - DELETE /assets/:id/pin (Approver+)
   - Enforce publish requirements:
-    - Taxonomy required
+    - Metadata required
     - Required metadata required (title, type, owner)
   - Add list variants:
     - Pinned first
@@ -239,14 +239,14 @@ Build plan assumes **Option A** unless the codebase strongly favors separate tab
     - Recently updated
     - Expiring soon
   - Pin/unpin controls (Approver+)
-  - Taxonomy filter UX (multi-select if supported by taxonomy model)
+  - Metadata filter UX (multi-select if supported by metadata model)
 
 - Jobs
   - If pinned asset expires:
     - Auto-unpin (recommended) and notify owner/approver
 
 **Acceptance**
-- Published assets always have taxonomy.
+- Published assets always have metadata.
 - Pinned content is prominently discoverable; expired pinned content is removed or clearly flagged.
 
 ---
@@ -288,7 +288,7 @@ Build plan assumes **Option A** unless the codebase strongly favors separate tab
 **Outcome**: Users can subscribe and stay current without manual checking.
 
 - API
-  - POST /subscriptions (targets: asset, taxonomy)
+  - POST /subscriptions (targets: asset, metadata)
   - DELETE /subscriptions/:id
   - Optional auto-subscribe:
     - on download
@@ -379,7 +379,7 @@ Build plan assumes **Option A** unless the codebase strongly favors separate tab
 - Web
   - Course editor:
     - “Add from Content Hub” picker component
-    - search + taxonomy filter
+    - search + metadata filter
     - choose canonical vs version pinned
     - optional display label
   - Course learner view:
@@ -458,7 +458,7 @@ A phase is considered done when:
 - Phase 1: Domain models, infra GSIs, S3 layout conventions
 - Phase 2: Asset CRUD + upload/download
 - Phase 3: Publish/schedule/expire + scheduler job
-- Phase 4: Pinning + taxonomy enforcement + discovery sections
+- Phase 4: Pinning + metadata enforcement + discovery sections
 - Phase 5: Comments + mentions + outdated flags
 - Phase 6: Subscriptions + in-app notifications
 - Phase 7: External share links + tracking + revocation/expiry

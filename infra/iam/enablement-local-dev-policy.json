@@ -23,7 +23,23 @@
         "arn:aws:dynamodb:*:*:table/subscriptions",
         "arn:aws:dynamodb:*:*:table/subscriptions/index/*",
         "arn:aws:dynamodb:*:*:table/events",
-        "arn:aws:dynamodb:*:*:table/events/index/*"
+        "arn:aws:dynamodb:*:*:table/events/index/*",
+        "arn:aws:dynamodb:*:*:table/lms_courses",
+        "arn:aws:dynamodb:*:*:table/lms_courses/index/*",
+        "arn:aws:dynamodb:*:*:table/lms_lessons",
+        "arn:aws:dynamodb:*:*:table/lms_lessons/index/*",
+        "arn:aws:dynamodb:*:*:table/lms_paths",
+        "arn:aws:dynamodb:*:*:table/lms_paths/index/*",
+        "arn:aws:dynamodb:*:*:table/lms_progress",
+        "arn:aws:dynamodb:*:*:table/lms_progress/index/*",
+        "arn:aws:dynamodb:*:*:table/lms_assignments",
+        "arn:aws:dynamodb:*:*:table/lms_assignments/index/*",
+        "arn:aws:dynamodb:*:*:table/lms_certificates",
+        "arn:aws:dynamodb:*:*:table/lms_certificates/index/*",
+        "arn:aws:dynamodb:*:*:table/lms_transcripts",
+        "arn:aws:dynamodb:*:*:table/lms_transcripts/index/*",
+        "arn:aws:dynamodb:*:*:table/metadata",
+        "arn:aws:dynamodb:*:*:table/metadata/index/*"
       ]
     },
     {
@@ -31,18 +47,36 @@
       "Effect": "Allow",
       "Action": [
         "s3:GetObject",
-        "s3:PutObject"
+        "s3:PutObject",
+        "s3:DeleteObject"
       ],
-      "Resource": "arn:aws:s3:::${BUCKET}/content/*"
+      "Resource": [
+        "arn:aws:s3:::${BUCKET}/content/*",
+        "arn:aws:s3:::lms-media-*/covers/*",
+        "arn:aws:s3:::lms-media-*/videos/*",
+        "arn:aws:s3:::lms-media-*/posters/*",
+        "arn:aws:s3:::lms-media-*/attachments/*",
+        "arn:aws:s3:::lms-media-*/temp/*"
+      ]
     },
     {
       "Sid": "S3ListContentPrefix",
       "Effect": "Allow",
       "Action": "s3:ListBucket",
-      "Resource": "arn:aws:s3:::${BUCKET}",
+      "Resource": [
+        "arn:aws:s3:::${BUCKET}",
+        "arn:aws:s3:::lms-media-*"
+      ],
       "Condition": {
         "StringLike": {
-          "s3:prefix": "content/*"
+          "s3:prefix": [
+            "content/*",
+            "covers/*",
+            "videos/*",
+            "posters/*",
+            "attachments/*",
+            "temp/*"
+          ]
         }
       }
     }

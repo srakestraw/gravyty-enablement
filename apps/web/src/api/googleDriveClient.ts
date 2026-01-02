@@ -32,7 +32,7 @@ export interface ImportFromDriveRequest {
   title?: string;
   description?: string;
   asset_type?: string;
-  taxonomy_ids?: string[];
+  metadata_node_ids?: string[];
 }
 
 export interface AssetSyncStatus {

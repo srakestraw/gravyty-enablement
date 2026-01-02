@@ -25,9 +25,9 @@ export {
 // LMS Domain Module
 export * from './lms/index.js';
 
-// Taxonomy Domain Module
-export * from './taxonomy.js';
-export * from './taxonomy-normalization.js';
+// Metadata Domain Module
+export * from './metadata.js';
+export * from './metadata-normalization.js';
 
 // Content Hub Domain Module (includes Subscription)
 export * from './content-hub/index.js';
