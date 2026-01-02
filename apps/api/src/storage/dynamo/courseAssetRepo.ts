@@ -56,47 +56,64 @@ export class DynamoCourseAssetRepo implements CourseAssetRepository {
   }): Promise<{ items: CourseAsset[]; next_cursor?: string }> {
     const { moduleId, lessonId, limit = 50, cursor } = options || {};
     
-    // Scan with filter (can be optimized with GSI)
-    const filterExpressions: string[] = ['#entity_type = :entity_type', '#course_id = :course_id'];
-    const expressionAttributeValues: Record<string, any> = {
-      ':entity_type': 'COURSE_ASSET',
-      ':course_id': courseId,
-    };
-    
-    if (moduleId) {
-      filterExpressions.push('#module_id = :module_id');
-      expressionAttributeValues[':module_id'] = moduleId;
+    try {
+      // Scan with filter (can be optimized with GSI)
+      const filterExpressions: string[] = ['#entity_type = :entity_type', '#course_id = :course_id'];
+      const expressionAttributeValues: Record<string, any> = {
+        ':entity_type': 'COURSE_ASSET',
+        ':course_id': courseId,
+      };
+      
+      if (moduleId) {
+        filterExpressions.push('#module_id = :module_id');
+        expressionAttributeValues[':module_id'] = moduleId;
+      }
+      
+      if (lessonId) {
+        filterExpressions.push('#lesson_id = :lesson_id');
+        expressionAttributeValues[':lesson_id'] = lessonId;
+      }
+      
+      let exclusiveStartKey;
+      if (cursor) {
+        try {
+          exclusiveStartKey = JSON.parse(Buffer.from(cursor, 'base64').toString());
+        } catch (err) {
+          // Invalid cursor - ignore and start from beginning
+          console.warn(`Invalid cursor provided to listByCourse: ${cursor}`, err);
+        }
+      }
+      
+      const command = new ScanCommand({
+        TableName: TABLE_NAME,
+        FilterExpression: filterExpressions.join(' AND '),
+        ExpressionAttributeNames: {
+          '#entity_type': 'entity_type',
+          '#course_id': 'course_id',
+          ...(moduleId && { '#module_id': 'module_id' }),
+          ...(lessonId && { '#lesson_id': 'lesson_id' }),
+        },
+        ExpressionAttributeValues: expressionAttributeValues,
+        Limit: limit,
+        ExclusiveStartKey: exclusiveStartKey,
+      });
+      
+      const { Items = [], LastEvaluatedKey } = await dynamoDocClient.send(command);
+      const courseAssets = Items.filter((item: any) => item.entity_type === 'COURSE_ASSET') as CourseAsset[];
+      
+      // Sort by sort_order
+      courseAssets.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      
+      return {
+        items: courseAssets,
+        next_cursor: LastEvaluatedKey ? Buffer.from(JSON.stringify(LastEvaluatedKey)).toString('base64') : undefined,
+      };
+    } catch (error) {
+      // If DynamoDB operation fails (table doesn't exist, connection issue, etc.), return empty list
+      console.error(`Error listing course assets for course ${courseId}:`, error);
+      // Re-throw to let the handler decide how to handle it
+      throw error;
     }
-    
-    if (lessonId) {
-      filterExpressions.push('#lesson_id = :lesson_id');
-      expressionAttributeValues[':lesson_id'] = lessonId;
-    }
-    
-    const command = new ScanCommand({
-      TableName: TABLE_NAME,
-      FilterExpression: filterExpressions.join(' AND '),
-      ExpressionAttributeNames: {
-        '#entity_type': 'entity_type',
-        '#course_id': 'course_id',
-        ...(moduleId && { '#module_id': 'module_id' }),
-        ...(lessonId && { '#lesson_id': 'lesson_id' }),
-      },
-      ExpressionAttributeValues: expressionAttributeValues,
-      Limit: limit,
-      ExclusiveStartKey: cursor ? JSON.parse(Buffer.from(cursor, 'base64').toString()) : undefined,
-    });
-    
-    const { Items = [], LastEvaluatedKey } = await dynamoDocClient.send(command);
-    const courseAssets = Items.filter((item: any) => item.entity_type === 'COURSE_ASSET') as CourseAsset[];
-    
-    // Sort by sort_order
-    courseAssets.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
-    
-    return {
-      items: courseAssets,
-      next_cursor: LastEvaluatedKey ? Buffer.from(JSON.stringify(LastEvaluatedKey)).toString('base64') : undefined,
-    };
   }
 
   async listByAsset(assetId: string, options?: {

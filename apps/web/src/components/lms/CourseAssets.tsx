@@ -16,6 +16,7 @@ import {
   Chip,
   Button,
   Grid,
+  IconButton,
 } from '@mui/material';
 import { Download, GetApp, Block, Delete } from '@mui/icons-material';
 import { lmsAdminApi } from '../../api/lmsAdminClient';
@@ -57,6 +58,33 @@ export function CourseAssets({ courseId, readOnly = false, onAssetDetached }: Co
         : await lmsAdminApi.listCourseAssets(courseId);
       
       if (isErrorResponse(response)) {
+        // Handle 404/not found errors gracefully - course might not exist yet
+        // This is common when creating a new course that hasn't been saved
+        const isNotFound = response.error.code === 'NOT_FOUND' || 
+                          response.error.message.toLowerCase().includes('not found') ||
+                          response.error.message.toLowerCase().includes('requested resource not found');
+        
+        // Handle 500 errors gracefully - might be due to course not existing or server issues
+        // For new/unsaved courses, server might return 500 instead of 404
+        const isServerError = response.error.code === 'INTERNAL_ERROR' || 
+                             response.error.code === 'HTTP_ERROR';
+        
+        if (isNotFound || isServerError) {
+          // Course doesn't exist yet, has no assets, or server error - treat as empty list
+          // This allows users to continue working with unsaved courses
+          if (isServerError) {
+            // Log server errors for debugging but don't block the user
+            console.warn('[CourseAssets] Server error loading assets, treating as empty list:', {
+              courseId,
+              error: response.error,
+            });
+          }
+          setAssets([]);
+          setError(null);
+          return;
+        }
+        
+        // For other errors (auth, validation, etc.), show the error message
         setError(response.error.message);
         return;
       }

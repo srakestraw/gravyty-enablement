@@ -41,6 +41,7 @@ export async function attachAssetToCourse(req: AuthenticatedRequest, res: Respon
           message: 'Invalid request body',
           details: parsed.error.errors,
         },
+        request_id: requestId,
       };
       return res.status(400).json(response);
     }
@@ -58,6 +59,7 @@ export async function attachAssetToCourse(req: AuthenticatedRequest, res: Respon
           code: 'NOT_FOUND',
           message: `Asset ${asset_id} not found`,
         },
+        request_id: requestId,
       };
       return res.status(404).json(response);
     }
@@ -71,6 +73,7 @@ export async function attachAssetToCourse(req: AuthenticatedRequest, res: Respon
             code: 'NOT_FOUND',
             message: `Version ${version_id} not found for asset ${asset_id}`,
           },
+          request_id: requestId,
         };
         return res.status(404).json(response);
       }
@@ -82,6 +85,7 @@ export async function attachAssetToCourse(req: AuthenticatedRequest, res: Respon
             code: 'BAD_REQUEST',
             message: 'Only published versions can be attached to courses',
           },
+          request_id: requestId,
         };
         return res.status(400).json(response);
       }
@@ -93,6 +97,7 @@ export async function attachAssetToCourse(req: AuthenticatedRequest, res: Respon
             code: 'BAD_REQUEST',
             message: 'Asset has no published version. Please publish a version first or attach a specific version.',
           },
+          request_id: requestId,
         };
         return res.status(400).json(response);
       }
@@ -131,6 +136,7 @@ export async function attachAssetToCourse(req: AuthenticatedRequest, res: Respon
         code: 'INTERNAL_ERROR',
         message: error instanceof Error ? error.message : 'Failed to attach asset to course',
       },
+      request_id: requestId,
     };
     return res.status(500).json(response);
   }
@@ -150,32 +156,81 @@ export async function listCourseAssets(req: AuthenticatedRequest, res: Response)
     const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : undefined;
     const cursor = req.query.cursor as string | undefined;
     
-    const result = await courseAssetRepo.listByCourse(courseId, {
-      moduleId,
-      lessonId,
-      limit,
-      cursor,
-    });
+    let result;
+    try {
+      result = await courseAssetRepo.listByCourse(courseId, {
+        moduleId,
+        lessonId,
+        limit,
+        cursor,
+      });
+    } catch (repoError) {
+      // If repository call fails (e.g., table doesn't exist, connection issue), return empty list
+      console.warn(`[${requestId}] Failed to list course assets from repository for course ${courseId}:`, repoError);
+      const response: ApiSuccessResponse<{
+        items: Array<CourseAsset & { asset: Asset | null; version: AssetVersion | null }>;
+        next_cursor?: string;
+      }> = {
+        data: {
+          items: [],
+        },
+        request_id: requestId,
+      };
+      return res.status(200).json(response);
+    }
+    
+    // Ensure result.items exists
+    if (!result || !result.items) {
+      const response: ApiSuccessResponse<{
+        items: Array<CourseAsset & { asset: Asset | null; version: AssetVersion | null }>;
+        next_cursor?: string;
+      }> = {
+        data: {
+          items: [],
+          next_cursor: result?.next_cursor,
+        },
+        request_id: requestId,
+      };
+      return res.status(200).json(response);
+    }
     
     // Enrich with asset and version data
     const enrichedItems = await Promise.all(
       result.items.map(async (courseAsset) => {
-        const asset = await assetRepo.get(courseAsset.asset_id);
-        let version: AssetVersion | null = null;
-        
-        if (courseAsset.version_id) {
-          // Version-pinned
-          version = await assetVersionRepo.get(courseAsset.version_id);
-        } else if (asset?.current_published_version_id) {
-          // Canonical - resolve to latest published
-          version = await assetVersionRepo.get(asset.current_published_version_id);
+        try {
+          const asset = await assetRepo.get(courseAsset.asset_id);
+          let version: AssetVersion | null = null;
+          
+          if (courseAsset.version_id) {
+            // Version-pinned
+            try {
+              version = await assetVersionRepo.get(courseAsset.version_id);
+            } catch (err) {
+              console.warn(`[${requestId}] Failed to fetch version ${courseAsset.version_id} for course asset ${courseAsset.course_asset_id}:`, err);
+            }
+          } else if (asset?.current_published_version_id) {
+            // Canonical - resolve to latest published
+            try {
+              version = await assetVersionRepo.get(asset.current_published_version_id);
+            } catch (err) {
+              console.warn(`[${requestId}] Failed to fetch published version ${asset.current_published_version_id} for asset ${courseAsset.asset_id}:`, err);
+            }
+          }
+          
+          return {
+            ...courseAsset,
+            asset: asset || null,
+            version: version || null,
+          };
+        } catch (err) {
+          console.warn(`[${requestId}] Failed to enrich course asset ${courseAsset.course_asset_id}:`, err);
+          // Return course asset with null asset/version if enrichment fails
+          return {
+            ...courseAsset,
+            asset: null,
+            version: null,
+          };
         }
-        
-        return {
-          ...courseAsset,
-          asset: asset || null,
-          version: version || null,
-        };
       })
     );
     
@@ -196,6 +251,7 @@ export async function listCourseAssets(req: AuthenticatedRequest, res: Response)
         code: 'INTERNAL_ERROR',
         message: error instanceof Error ? error.message : 'Failed to list course assets',
       },
+      request_id: requestId,
     };
     return res.status(500).json(response);
   }
@@ -225,6 +281,7 @@ export async function updateCourseAsset(req: AuthenticatedRequest, res: Response
           message: 'Invalid request body',
           details: parsed.error.errors,
         },
+        request_id: requestId,
       };
       return res.status(400).json(response);
     }
@@ -237,6 +294,7 @@ export async function updateCourseAsset(req: AuthenticatedRequest, res: Response
           code: 'NOT_FOUND',
           message: `Course asset ${courseAssetId} not found for course ${courseId}`,
         },
+        request_id: requestId,
       };
       return res.status(404).json(response);
     }
@@ -250,6 +308,7 @@ export async function updateCourseAsset(req: AuthenticatedRequest, res: Response
             code: 'NOT_FOUND',
             message: `Version ${parsed.data.version_id} not found for asset ${courseAsset.asset_id}`,
           },
+          request_id: requestId,
         };
         return res.status(404).json(response);
       }
@@ -261,6 +320,7 @@ export async function updateCourseAsset(req: AuthenticatedRequest, res: Response
             code: 'BAD_REQUEST',
             message: 'Only published versions can be attached to courses',
           },
+          request_id: requestId,
         };
         return res.status(400).json(response);
       }
@@ -292,6 +352,7 @@ export async function updateCourseAsset(req: AuthenticatedRequest, res: Response
         code: 'INTERNAL_ERROR',
         message: error instanceof Error ? error.message : 'Failed to update course asset',
       },
+      request_id: requestId,
     };
     return res.status(500).json(response);
   }
@@ -315,6 +376,7 @@ export async function detachAssetFromCourse(req: AuthenticatedRequest, res: Resp
           code: 'NOT_FOUND',
           message: `Course asset ${courseAssetId} not found for course ${courseId}`,
         },
+        request_id: requestId,
       };
       return res.status(404).json(response);
     }
@@ -323,6 +385,7 @@ export async function detachAssetFromCourse(req: AuthenticatedRequest, res: Resp
     
     const response: ApiSuccessResponse<void> = {
       data: undefined,
+      request_id: requestId,
     };
     return res.status(200).json(response);
   } catch (error) {
@@ -332,6 +395,7 @@ export async function detachAssetFromCourse(req: AuthenticatedRequest, res: Resp
         code: 'INTERNAL_ERROR',
         message: error instanceof Error ? error.message : 'Failed to detach asset from course',
       },
+      request_id: requestId,
     };
     return res.status(500).json(response);
   }
