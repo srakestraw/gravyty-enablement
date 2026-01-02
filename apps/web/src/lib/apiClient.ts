@@ -39,11 +39,32 @@ async function getAuthHeaders(): Promise<HeadersInit> {
 
   // Try to get JWT token from Amplify
   try {
-    const { getIdToken } = await import('./auth');
+    const { getIdToken, decodeJwtPayload } = await import('./auth');
     // Force refresh token to ensure we have latest groups/claims
     // This is important when user's group membership changes
     const token = await getIdToken(true); // Force refresh
     if (token) {
+      // Debug: Decode and log token claims in dev mode
+      if (import.meta.env.DEV) {
+        try {
+          const payload = decodeJwtPayload(token);
+          if (payload) {
+            const groups = payload['cognito:groups'] || payload.groups || [];
+            const groupsArray = Array.isArray(groups) ? groups : (groups ? [groups] : []);
+            
+            if (!groups.includes('Admin') && groups.length > 0) {
+              console.warn('[API Client] ⚠️ Token does NOT contain Admin group!', {
+                groups,
+                groupsArray: Array.isArray(groups) ? groups : [groups],
+                message: 'You may need to sign out and sign back in to get a fresh token.',
+              });
+            }
+          }
+        } catch (decodeError) {
+          console.warn('[API Client] Failed to decode token for debugging:', decodeError);
+        }
+      }
+      
       headers['Authorization'] = `Bearer ${token}`;
       return headers;
     }
@@ -102,10 +123,23 @@ export async function apiFetch<T>(
     const data = await response.json();
 
     if (!response.ok) {
+      // Log full error response for debugging (especially 403 errors)
+      if (response.status === 403 || response.status === 401) {
+        console.error('[API Client] ❌ Auth error response:', {
+          status: response.status,
+          statusText: response.statusText,
+          endpoint: url,
+          error: data.error,
+          fullResponse: data,
+        });
+      }
+      
       return {
         error: {
           code: data.error?.code || 'HTTP_ERROR',
           message: data.error?.message || `HTTP ${response.status}`,
+          // Include debug info if available
+          debug: data.error?.debug,
         },
         request_id: data.request_id || 'unknown',
       };
@@ -133,6 +167,10 @@ export async function apiFetch<T>(
 
 /**
  * Events API
+ * 
+ * Note: Browser console may show network errors (ERR_CONNECTION_REFUSED) when
+ * the API server isn't running. These errors are handled gracefully and don't
+ * affect app functionality. Telemetry failures are non-critical and silently ignored.
  */
 export const eventsApi = {
   track: async (event: {
@@ -143,19 +181,36 @@ export const eventsApi = {
   }) => {
     // Non-blocking - fire and forget
     // Silently fail - telemetry should never break the app
-    apiFetch<{ received: boolean }>('/v1/events', {
-      method: 'POST',
-      body: JSON.stringify({
-        ...event,
-        timestamp: new Date().toISOString(),
-      }),
-    }).catch(() => {
-      // Silently ignore telemetry failures
-      // Only log in development mode for debugging
-      if (import.meta.env.DEV) {
-        console.debug('[Telemetry] Failed to track event (non-critical)', event.event_name);
+    try {
+      const result = await apiFetch<{ received: boolean }>('/v1/events', {
+        method: 'POST',
+        body: JSON.stringify({
+          ...event,
+          timestamp: new Date().toISOString(),
+        }),
+      });
+      
+      // Check if it's an error response (network error or API error)
+      if (isErrorResponse(result)) {
+        // Silently ignore telemetry failures
+        // Network errors (API not running) are expected in development
+        if (result.error.code === 'NETWORK_ERROR') {
+          // Only log if explicitly enabled via env var
+          if (import.meta.env.DEV && import.meta.env.VITE_LOG_TELEMETRY_ERRORS === 'true') {
+            console.debug('[Telemetry] API not available (non-critical)', event.event_name);
+          }
+        } else if (import.meta.env.DEV) {
+          // Other API errors - log in development for debugging
+          console.debug('[Telemetry] Failed to track event (non-critical)', event.event_name, result.error);
+        }
       }
-    });
+    } catch (error) {
+      // Catch any unexpected errors (shouldn't happen since apiFetch handles errors)
+      // But just in case, silently ignore
+      if (import.meta.env.DEV && import.meta.env.VITE_LOG_TELEMETRY_ERRORS === 'true') {
+        console.debug('[Telemetry] Unexpected error (non-critical)', event.event_name, error);
+      }
+    }
   },
 };
 
@@ -211,7 +266,7 @@ export const notificationsApi = {
 export interface AdminUser {
   username: string;
   email: string;
-  name?: string;
+  name: string;
   role: 'Viewer' | 'Contributor' | 'Approver' | 'Admin';
   enabled: boolean;
   user_status: 'UNCONFIRMED' | 'CONFIRMED' | 'ARCHIVED' | 'COMPROMISED' | 'UNKNOWN' | 'RESET_REQUIRED' | 'FORCE_CHANGE_PASSWORD';
@@ -233,7 +288,7 @@ export interface ListUsersResponse {
 
 export interface InviteUserPayload {
   email: string;
-  name?: string;
+  name: string;
   role?: 'Viewer' | 'Contributor' | 'Approver' | 'Admin';
 }
 

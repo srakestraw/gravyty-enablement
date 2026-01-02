@@ -50,10 +50,11 @@ type Role = 'Viewer' | 'Contributor' | 'Approver' | 'Admin';
 type EnabledFilter = 'all' | 'enabled' | 'disabled';
 
 export function AdminUsersRolesPage() {
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, checkAuth } = useAuth();
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<Role | 'all'>('all');
   const [enabledFilter, setEnabledFilter] = useState<EnabledFilter>('all');
@@ -94,7 +95,48 @@ export function AdminUsersRolesPage() {
       });
 
       if (isErrorResponse(response)) {
-        setError(response.error.message);
+        // Check if it's a permission error
+        if (response.error.code === 'FORBIDDEN' || response.error.message.includes('Requires Admin role')) {
+          const apiRole = response.error.message.match(/Current role: (\w+)/)?.[1] || 'Unknown';
+          const frontendRole = currentUser?.role || 'Unknown';
+          
+          // Log full error details including debug info
+          console.error('[AdminUsersRolesPage] ❌ 403 Forbidden error:', {
+            apiRole,
+            frontendRole,
+            error: response.error,
+            debug: response.error.debug,
+            fullResponse: response,
+          });
+          
+          if (frontendRole === 'Admin' && apiRole !== 'Admin') {
+            // Token mismatch - frontend thinks Admin but API sees different role
+            const debugInfo = response.error.debug;
+            const debugMessage = debugInfo 
+              ? `\n\nAPI Debug Info:\n- Groups from token: ${JSON.stringify(debugInfo.groupsFromToken)}\n- Groups from payload: ${JSON.stringify(debugInfo.groupsFromPayload)}\n- User object: ${JSON.stringify(debugInfo.reqUserObject)}`
+              : '';
+            
+            setError(
+              `Token mismatch detected! Frontend shows "${frontendRole}" but API received "${apiRole}". ` +
+              `This means your JWT token doesn't include the Admin group. ` +
+              `Please sign out completely and sign back in to get a fresh token with updated permissions. ` +
+              `Check browser console and API server logs for detailed debugging info.${debugMessage}`
+            );
+          } else {
+            const debugInfo = response.error.debug;
+            const debugMessage = debugInfo 
+              ? `\n\nAPI Debug Info:\n- Groups from token: ${JSON.stringify(debugInfo.groupsFromToken)}\n- Groups from payload: ${JSON.stringify(debugInfo.groupsFromPayload)}\n- User object: ${JSON.stringify(debugInfo.reqUserObject)}`
+              : '';
+            
+            setError(
+              `Permission denied: ${response.error.message}. ` +
+              `Your current role is "${frontendRole}". ` +
+              `If you were recently added to the Admin group, please sign out and sign back in to refresh your token.${debugMessage}`
+            );
+          }
+        } else {
+          setError(response.error.message);
+        }
         setUsers([]);
       } else {
         setUsers(response.data.items);
@@ -153,7 +195,7 @@ export function AdminUsersRolesPage() {
     try {
       const response = await usersApi.inviteUser({
         email: inviteEmail,
-        name: inviteName || undefined,
+        name: inviteName,
         role: inviteRole,
       });
 
@@ -417,8 +459,50 @@ export function AdminUsersRolesPage() {
       </Box>
 
       {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
+        <Alert 
+          severity="error" 
+          sx={{ mb: 2 }}
+          action={
+            (error.includes('Requires Admin role') || error.includes('Permission denied')) ? (
+              <Button
+                color="inherit"
+                size="small"
+                onClick={async () => {
+                  setRefreshing(true);
+                  try {
+                    await checkAuth(true); // Force refresh token
+                    // Wait a moment for auth to refresh, then retry
+                    setTimeout(() => {
+                      fetchUsers();
+                      setRefreshing(false);
+                    }, 1000);
+                  } catch (err) {
+                    setRefreshing(false);
+                    setError('Failed to refresh authentication. Please sign out and sign back in to get a fresh token.');
+                  }
+                }}
+                disabled={refreshing}
+              >
+                {refreshing ? 'Refreshing...' : 'Refresh Auth'}
+              </Button>
+            ) : null
+          }
+        >
+          <Box>
+            <Typography variant="body2">{error}</Typography>
+            {(error.includes('Requires Admin role') || error.includes('Permission denied')) && (
+              <Box sx={{ mt: 1 }}>
+                <Typography variant="caption" color="text.secondary">
+                  Current user: {currentUser?.email || currentUser?.userId || 'Unknown'} | 
+                  Role: {currentUser?.role || 'Unknown'}
+                </Typography>
+                <Typography variant="caption" display="block" sx={{ mt: 0.5 }}>
+                  If you were recently added to the Admin group, you need to sign out and sign back in 
+                  to get a fresh token with updated permissions.
+                </Typography>
+              </Box>
+            )}
+          </Box>
         </Alert>
       )}
 
@@ -553,10 +637,11 @@ export function AdminUsersRolesPage() {
           />
           <TextField
             fullWidth
-            label="Name (optional)"
+            label="Name"
             value={inviteName}
             onChange={(e) => setInviteName(e.target.value)}
             margin="normal"
+            required
           />
           <FormControl fullWidth margin="normal">
             <InputLabel>Role</InputLabel>
@@ -579,7 +664,7 @@ export function AdminUsersRolesPage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setInviteDialogOpen(false)}>Cancel</Button>
-          <Button onClick={handleInvite} variant="contained" disabled={!inviteEmail}>
+          <Button onClick={handleInvite} variant="contained" disabled={!inviteEmail || !inviteName}>
             Invite
           </Button>
         </DialogActions>
@@ -643,7 +728,7 @@ export function AdminUsersRolesPage() {
             </>
           ) : (
             <Typography>
-              Are you sure you want to disable <strong>{selectedUser?.email}</strong>? They will not be able to access the system.
+              Are you sure you want to disable <strong>{selectedUser?.name || selectedUser?.email}</strong>? They will not be able to access the system.
             </Typography>
           )}
         </DialogContent>
@@ -668,7 +753,7 @@ export function AdminUsersRolesPage() {
         <DialogTitle>Enable User</DialogTitle>
         <DialogContent>
           <Typography>
-            Are you sure you want to enable <strong>{selectedUser?.email}</strong>? They will be able to access the system.
+            Are you sure you want to enable <strong>{selectedUser?.name || selectedUser?.email}</strong>? They will be able to access the system.
           </Typography>
         </DialogContent>
         <DialogActions>
@@ -719,7 +804,7 @@ export function AdminUsersRolesPage() {
                 <strong>Warning:</strong> This action cannot be undone. The user will be permanently deleted from the system.
               </Alert>
               <Typography>
-                Are you sure you want to delete <strong>{selectedUser?.email}</strong>? This will permanently remove their account and all associated data.
+                Are you sure you want to delete <strong>{selectedUser?.name || selectedUser?.email}</strong>? This will permanently remove their account and all associated data.
               </Typography>
             </>
           )}

@@ -28,7 +28,7 @@ export type CognitoUserStatus = z.infer<typeof CognitoUserStatusSchema>;
 export const AdminUserSchema = z.object({
   username: z.string(),
   email: z.string().email(),
-  name: z.string().optional(),
+  name: z.string(),
   role: UserRoleSchema,
   enabled: z.boolean(),
   user_status: CognitoUserStatusSchema,

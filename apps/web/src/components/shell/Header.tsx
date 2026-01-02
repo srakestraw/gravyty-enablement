@@ -46,15 +46,16 @@ import { notificationsApi, type Notification } from '../../lib/apiClient';
 import { track, TELEMETRY_EVENTS } from '../../lib/telemetry';
 
 /**
- * Get user initials from email or userId
+ * Get user initials from name, email, or userId
  */
-function getUserInitials(user: { email?: string; userId?: string }): string {
-  const name = user.email?.split('@')[0] || user.userId || 'U';
-  const parts = name.split(/[._-]/);
+function getUserInitials(user: { name?: string; email?: string; userId?: string }): string {
+  // Prefer name if available
+  const displayName = user.name || user.email?.split('@')[0] || user.userId || 'U';
+  const parts = displayName.split(/[._-]/);
   if (parts.length >= 2) {
     return (parts[0][0] + parts[1][0]).toUpperCase();
   }
-  return name.substring(0, 2).toUpperCase();
+  return displayName.substring(0, 2).toUpperCase();
 }
 
 /**
@@ -581,7 +582,7 @@ export function Header() {
               >
                 <Box sx={{ px: 2, py: 1.5 }}>
                   <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                    {user.email || user.userId}
+                    {user.name || user.email || user.userId}
                   </Typography>
                   {user.role && (
                     <Typography variant="caption" color="text.secondary">

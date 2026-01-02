@@ -45,6 +45,8 @@ function cognitoUserToAdminUser(user: UserType, groups: string[] = []): AdminUse
   const emailAttr = attributes.find(attr => attr.Name === 'email');
   const nameAttr = attributes.find(attr => attr.Name === 'name');
   const email = emailAttr?.Value || '';
+  // Use name if available, otherwise fall back to email for backward compatibility
+  const name = nameAttr?.Value || email;
   
   // Determine role from groups (highest precedence)
   let role: UserRole = 'Viewer';
@@ -56,7 +58,7 @@ function cognitoUserToAdminUser(user: UserType, groups: string[] = []): AdminUse
   return {
     username: user.Username || '',
     email,
-    name: nameAttr?.Value,
+    name,
     role,
     enabled: user.Enabled !== false,
     user_status: (user.UserStatus as CognitoUserStatus) || 'UNCONFIRMED',
@@ -125,7 +127,7 @@ export async function listUsers(options: {
  */
 export async function adminCreateUserInvite(
   email: string,
-  name?: string
+  name: string
 ): Promise<AdminUser> {
   if (!isCognitoConfigured()) {
     throw new Error('Cognito is not configured. COGNITO_USER_POOL_ID must be set.');
@@ -134,10 +136,8 @@ export async function adminCreateUserInvite(
   try {
     const attributes: { Name: string; Value: string }[] = [
       { Name: 'email', Value: email },
+      { Name: 'name', Value: name },
     ];
-    if (name) {
-      attributes.push({ Name: 'name', Value: name });
-    }
 
     const command = new AdminCreateUserCommand({
       UserPoolId: USER_POOL_ID,

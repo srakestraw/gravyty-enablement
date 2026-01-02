@@ -46,17 +46,7 @@ if (userPoolDomainInput) {
 // Debug logging for domain construction (dev mode only)
 if (import.meta.env.DEV && typeof window !== 'undefined' && typeof document !== 'undefined') {
   try {
-    console.log('[Auth] Domain configuration:', {
-      userPoolDomainInput,
-      cognitoRegion,
-      constructedDomain: userPoolDomain,
-      hasDomain: !!userPoolDomain,
-      envVars: {
-        VITE_COGNITO_DOMAIN: import.meta.env.VITE_COGNITO_DOMAIN,
-        VITE_COGNITO_REGION: import.meta.env.VITE_COGNITO_REGION,
-        VITE_COGNITO_USER_POOL_ID: import.meta.env.VITE_COGNITO_USER_POOL_ID ? '***' : undefined,
-      },
-    });
+    // Debug logging removed
   } catch (e) {
     // Silently fail if logging causes issues
   }
@@ -151,19 +141,7 @@ if (userPoolId && userPoolClientId && userPoolDomain) {
     });
     isConfigured = true;
     
-    // Log configuration in dev mode only
-    if (import.meta.env.DEV) {
-        console.log('[Auth] Amplify configured successfully', {
-          environment: isProduction ? 'production' : 'development',
-          userPoolId,
-          userPoolClientId,
-          domain: validatedDomain,
-          domainInput: userPoolDomainInput,
-          cognitoRegion,
-          currentOrigin,
-          redirectSignIn: redirectSignIn.slice(0, 2), // Log first 2 URLs only
-        });
-      }
+    // Configuration successful
   } catch (error) {
     console.error('[Auth] Failed to configure Amplify:', error, {
       userPoolId,
@@ -205,6 +183,7 @@ if (userPoolId && userPoolClientId && userPoolDomain) {
 export interface AuthUser {
   userId: string;
   email?: string;
+  name?: string;
   role?: string;
   authMode?: 'cognito' | 'dev';
 }
@@ -223,33 +202,11 @@ export async function signInWithGoogle(): Promise<void> {
   }
 
   try {
-    console.log('[Auth] Initiating Google sign-in redirect...', {
-      domain: userPoolDomain,
-      redirectSignIn,
-      currentOrigin,
-      userPoolId,
-      userPoolClientId,
-    });
-    
-    // Log the exact redirect URI that will be used
+    // Initiating Google sign-in redirect
     // Amplify uses the first redirectSignIn URL as the redirect_uri parameter
-    const primaryRedirectUri = redirectSignIn[0];
-    console.log('[Auth] Primary redirect URI:', primaryRedirectUri);
-    console.log('[Auth] All configured redirect URIs:', redirectSignIn);
-    
-    // Construct the expected Cognito OAuth URL to verify what will be sent
-    const expectedCognitoUrl = `https://${userPoolDomain}/oauth2/authorize?redirect_uri=${encodeURIComponent(primaryRedirectUri)}&response_type=code&client_id=${userPoolClientId}&identity_provider=Google&scope=openid+email+profile`;
-    console.log('[Auth] Expected Cognito OAuth URL (first 200 chars):', expectedCognitoUrl.substring(0, 200) + '...');
-    console.log('[Auth] Full redirect_uri parameter:', encodeURIComponent(primaryRedirectUri));
-    
-    // signInWithRedirect will immediately redirect the browser to Cognito hosted UI
-    // The browser will then redirect to Google, then back to Cognito, then back to our app
     await signInWithRedirect({
       provider: 'Google',
     });
-    
-    // This code will not execute because the browser redirects immediately
-    console.log('[Auth] This should not appear - redirect happened');
   } catch (error) {
     console.error('[Auth] Sign in redirect failed:', error);
     // Re-throw to let the UI handle the error
@@ -267,7 +224,7 @@ export async function signOutUser(): Promise<void> {
 /**
  * Decode JWT token payload (without verification - token is already verified by Amplify)
  */
-function decodeJwtPayload(token: string): any {
+export function decodeJwtPayload(token: string): any {
   try {
     const base64Url = token.split('.')[1];
     const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
@@ -292,8 +249,9 @@ export async function getCurrentAuthUser(): Promise<AuthUser | null> {
     const user = await getCurrentUser();
     const session = await fetchAuthSession();
     
-    // Try to get email from ID token claims
+    // Try to get email and name from ID token claims
     let email: string | undefined;
+    let name: string | undefined;
     let groups: string[] | undefined;
     
     if (session.tokens?.idToken) {
@@ -302,19 +260,12 @@ export async function getCurrentAuthUser(): Promise<AuthUser | null> {
       if (payload) {
         // Email can be in 'email' claim or 'email_verified' claim
         email = payload.email || payload['cognito:username'] || user.signInDetails?.loginId;
+        // Extract name from token claims (may be in 'name' or 'cognito:name')
+        name = payload.name || payload['cognito:name'];
         // Extract Cognito groups from token claims
         groups = payload['cognito:groups'] || payload.groups;
         
-        // Debug logging in dev mode
-        if (import.meta.env.DEV) {
-          console.log('[Auth] ID Token claims:', {
-            email,
-            groups,
-            hasCognitoGroups: !!payload['cognito:groups'],
-            allClaims: Object.keys(payload),
-            cognitoGroupsValue: payload['cognito:groups'],
-          });
-        }
+        // ID Token claims extracted
       }
     }
     
@@ -323,12 +274,18 @@ export async function getCurrentAuthUser(): Promise<AuthUser | null> {
       email = user.signInDetails?.loginId;
     }
     
+    // Fallback name to email if name not available
+    if (!name && email) {
+      name = email;
+    }
+    
     // Store groups as comma-separated string for easier parsing
     const groupsString = groups && groups.length > 0 ? groups.join(',') : undefined;
     
     return {
       userId: user.userId,
       email,
+      name,
       // Role will be extracted from JWT token groups claim in AuthContext
       // Store raw groups string for role extraction
       role: groupsString,
@@ -404,17 +361,7 @@ export async function handleOAuthRedirect(): Promise<boolean> {
   const hasError = urlParams.has('error') || hashParams.has('error');
 
   // Only log if there's an actual OAuth redirect (code, state, or error)
-  // This prevents console spam on normal page loads
-  if (isDevelopment && (hasCode || hasState || hasError)) {
-    console.log('[Auth] Checking OAuth redirect:', {
-      url: window.location.href,
-      search: window.location.search,
-      hash: window.location.hash,
-      hasCode,
-      hasState,
-      hasError,
-    });
-  }
+  // Checking OAuth redirect parameters
 
   // Handle OAuth errors
   if (hasError) {
@@ -461,17 +408,13 @@ export async function handleOAuthRedirect(): Promise<boolean> {
 
   if (hasCode || hasState) {
     try {
-      console.log('[Auth] Processing OAuth redirect callback...');
-      
+      // Processing OAuth redirect callback
       // Fetch auth session with forceRefresh to process the OAuth callback
       // This will exchange the authorization code for tokens
       const session = await fetchAuthSession({ forceRefresh: true });
       
       if (session.tokens?.idToken) {
-        console.log('[Auth] OAuth redirect processed successfully - user authenticated', {
-          hasIdToken: !!session.tokens.idToken,
-          hasAccessToken: !!session.tokens.accessToken,
-        });
+        // OAuth redirect processed successfully
         
         // Clean up URL parameters and hash
         const cleanUrl = window.location.pathname;

@@ -26,6 +26,20 @@ import {
 export async function listAdminUsers(req: AuthenticatedRequest, res: Response) {
   const requestId = req.headers['x-request-id'] as string;
 
+  // Debug logging for admin users endpoint
+  console.log('[AdminUsers] 📋 GET /v1/admin/users - Request received:', {
+    requestId,
+    user: req.user,
+    userRole: req.user?.role,
+    userId: req.user?.user_id,
+    email: req.user?.email,
+    tokenGroups: (req as any).tokenGroups || 'not available',
+    tokenGroupsStringified: JSON.stringify((req as any).tokenGroups || 'not available'),
+    tokenPayloadGroups: (req as any).tokenPayloadGroups || 'not available',
+    tokenPayloadGroupsStringified: JSON.stringify((req as any).tokenPayloadGroups || 'not available'),
+    query: req.query,
+  });
+
   try {
     const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 50;
     const query = req.query.query as string | undefined;
@@ -87,6 +101,17 @@ export async function inviteUser(req: AuthenticatedRequest, res: Response) {
         error: {
           code: 'VALIDATION_ERROR',
           message: 'email is required',
+        },
+        request_id: requestId,
+      });
+      return;
+    }
+
+    if (!name || typeof name !== 'string') {
+      res.status(400).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'name is required',
         },
         request_id: requestId,
       });
