@@ -21,12 +21,19 @@ const BASE_URL = '/v1/lms/admin';
 export interface AdminCourseSummary {
   course_id: string;
   title: string;
+  short_description?: string;
+  cover_image_url?: string;
+  product?: string; // Was "product_suite"
+  product_suite?: string; // Was "product_concept"
+  topic_tags?: string[];
+  estimated_duration_minutes?: number;
+  estimated_minutes?: number;
+  difficulty_level?: 'beginner' | 'intermediate' | 'advanced';
   status: string;
+  published_at?: string;
   version: number;
   updated_at: string;
   created_at: string;
-  product?: string; // Was "product_suite"
-  product_suite?: string; // Was "product_concept"
 }
 
 export interface AdminPathSummary {
@@ -215,9 +222,23 @@ export const lmsAdminApi = {
   },
 
   async deleteCourse(courseId: string) {
-    return apiFetch<{ course: Course }>(
+    return apiFetch<{ deleted: true }>(
       `${BASE_URL}/courses/${courseId}`,
       { method: 'DELETE' }
+    );
+  },
+
+  async archiveCourse(courseId: string) {
+    return apiFetch<{ course: Course }>(
+      `${BASE_URL}/courses/${courseId}/archive`,
+      { method: 'POST' }
+    );
+  },
+
+  async restoreCourse(courseId: string) {
+    return apiFetch<{ course: Course }>(
+      `${BASE_URL}/courses/${courseId}/restore`,
+      { method: 'POST' }
     );
   },
 
@@ -430,6 +451,11 @@ export const lmsAdminApi = {
       method: 'POST',
       body: JSON.stringify(params),
     });
+  },
+
+  async getMediaUrl(mediaId: string): Promise<ApiResponse<{ url: string; expires_in_seconds: number }>> {
+    const url = `${BASE_URL}/media/${mediaId}/url`;
+    return apiFetch<{ url: string; expires_in_seconds: number }>(url);
   },
 
   async uploadMedia(mediaId: string, file: File): Promise<ApiResponse<{ media_ref: MediaRef }>> {

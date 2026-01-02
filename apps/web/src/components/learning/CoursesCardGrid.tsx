@@ -4,8 +4,8 @@
  * Displays courses in a card grid layout with role-based actions
  */
 
-import { Grid, Box, Button, IconButton, Menu, MenuItem, Chip } from '@mui/material';
-import { MoreVert as MoreVertIcon, Edit as EditIcon, Publish as PublishIcon, Archive as ArchiveIcon } from '@mui/icons-material';
+import { Grid, Box, Button, IconButton, Menu, MenuItem, Chip, Tooltip } from '@mui/material';
+import { MoreVert as MoreVertIcon, Edit as EditIcon, Publish as PublishIcon, Archive as ArchiveIcon, Visibility as VisibilityIcon } from '@mui/icons-material';
 import { useState } from 'react';
 import { CourseCard } from '../lms/CourseCard';
 import type { CourseSummary } from '@gravyty/domain';
@@ -25,6 +25,7 @@ interface CoursesCardGridProps {
   onArchive?: (courseId: string) => void;
   showStatus?: boolean; // Show status pills for drafts/archived
   showActions?: boolean; // Show action menus
+  isAllView?: boolean; // Whether currently viewing "All" courses (show status pills for all)
 }
 
 export function CoursesCardGrid({
@@ -37,10 +38,12 @@ export function CoursesCardGrid({
   onArchive,
   showStatus = false,
   showActions = false,
+  isAllView = false,
 }: CoursesCardGridProps) {
   const [anchorEl, setAnchorEl] = useState<{ [key: string]: HTMLElement | null }>({});
 
   const handleMenuOpen = (courseId: string, event: React.MouseEvent<HTMLElement>) => {
+    event.stopPropagation(); // Prevent card click
     setAnchorEl({ ...anchorEl, [courseId]: event.currentTarget });
   };
 
@@ -63,43 +66,80 @@ export function CoursesCardGrid({
     return hasLearningPermission(userRole, 'learning.course.archive') && course.status !== 'archived';
   };
 
+  // Map status to display label
+  const getStatusLabel = (status?: string): string => {
+    switch (status) {
+      case 'draft':
+        return 'Draft';
+      case 'published':
+        return 'Published';
+      case 'archived':
+        return 'Archived';
+      default:
+        return status || '';
+    }
+  };
+
+  // Get status chip color
+  const getStatusColor = (status?: string): 'default' | 'success' | 'warning' => {
+    switch (status) {
+      case 'published':
+        return 'success';
+      case 'archived':
+        return 'default';
+      case 'draft':
+      default:
+        return 'warning';
+    }
+  };
+
   return (
     <Grid container spacing={3}>
       {courses.map((course) => {
         const menuOpen = Boolean(anchorEl[course.course_id]);
-        const hasActions = showActions && (canEdit(course) || canPublish(course) || canArchive(course));
+        // Always show actions menu when showActions is true
+        const shouldShowActions = showActions;
+        const statusLabel = getStatusLabel(course.status);
+        const statusColor = getStatusColor(course.status);
+        // Show status pill only when in All view
+        const shouldShowStatus = isAllView && course.status && statusLabel;
 
         return (
           <Grid item xs={12} sm={6} md={4} lg={3} key={course.course_id}>
-            <Box sx={{ position: 'relative', height: '100%' }}>
-              {/* Status pill for non-published courses */}
-              {showStatus && course.status !== 'published' && (
+            <Box sx={{ position: 'relative', height: '100%', overflow: 'visible' }}>
+              {/* Status pill - only show in All view, overlaying the card */}
+              {shouldShowStatus && (
                 <Chip
-                  label={course.status}
-                  color={course.status === 'archived' ? 'default' : 'warning'}
+                  label={statusLabel}
+                  color={statusColor}
                   size="small"
                   sx={{
                     position: 'absolute',
                     top: 8,
-                    right: 8,
-                    zIndex: 1,
+                    left: 8,
+                    zIndex: 10,
+                    pointerEvents: 'auto',
                   }}
                 />
               )}
 
-              {/* Action menu button */}
-              {hasActions && (
+              {/* Action menu button - overlaying the card */}
+              {shouldShowActions && (
                 <IconButton
                   size="small"
                   onClick={(e) => handleMenuOpen(course.course_id, e)}
+                  onMouseDown={(e) => e.stopPropagation()} // Prevent card click
+                  aria-label="Course actions"
                   sx={{
                     position: 'absolute',
                     top: 8,
-                    right: showStatus && course.status !== 'published' ? 60 : 8,
-                    zIndex: 1,
+                    right: 8,
+                    zIndex: 10,
                     bgcolor: 'background.paper',
+                    boxShadow: 2,
                     '&:hover': {
                       bgcolor: 'action.hover',
+                      boxShadow: 3,
                     },
                   }}
                 >
@@ -110,51 +150,85 @@ export function CoursesCardGrid({
               <CourseCard
                 course={course}
                 onClick={() => {
-                  // If user can edit and has edit permission, go to edit; otherwise view
-                  if (canEdit(course) && onEdit) {
-                    onEdit(course.course_id);
-                  } else {
-                    onView(course.course_id);
-                  }
+                  // Always navigate to view (not edit) when clicking card
+                  onView(course.course_id);
                 }}
               />
 
               {/* Action menu */}
-              {hasActions && (
+              {shouldShowActions && (
                 <Menu
                   anchorEl={anchorEl[course.course_id] || null}
                   open={menuOpen}
                   onClose={() => handleMenuClose(course.course_id)}
+                  onClick={(e) => e.stopPropagation()} // Prevent card click
+                  onMouseDown={(e) => e.stopPropagation()} // Prevent card click
                 >
-                  <MenuItem onClick={() => {
-                    onView(course.course_id);
-                    handleMenuClose(course.course_id);
-                  }}>
+                  {/* View - always available */}
+                  <MenuItem 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onView(course.course_id);
+                      handleMenuClose(course.course_id);
+                    }}
+                  >
+                    <VisibilityIcon sx={{ mr: 1, fontSize: 18 }} />
                     View
                   </MenuItem>
-                  {canEdit(course) && onEdit && (
-                    <MenuItem onClick={() => {
-                      onEdit(course.course_id);
-                      handleMenuClose(course.course_id);
-                    }}>
+                  
+                  {/* Edit - show if onEdit provided and user can edit */}
+                  {onEdit && (
+                    <MenuItem 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (canEdit(course)) {
+                          onEdit(course.course_id);
+                        }
+                        handleMenuClose(course.course_id);
+                      }}
+                      disabled={!canEdit(course)}
+                    >
                       <EditIcon sx={{ mr: 1, fontSize: 18 }} />
                       Edit
                     </MenuItem>
                   )}
-                  {canPublish(course) && onPublish && (
-                    <MenuItem onClick={() => {
-                      onPublish(course.course_id);
-                      handleMenuClose(course.course_id);
-                    }}>
-                      <PublishIcon sx={{ mr: 1, fontSize: 18 }} />
-                      Publish
-                    </MenuItem>
+                  
+                  {/* Publish - show if onPublish provided, disable if not publishable */}
+                  {onPublish && (
+                    <Tooltip 
+                      title={canPublish(course) ? '' : 'Only draft courses can be published'}
+                      placement="left"
+                    >
+                      <span>
+                        <MenuItem 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (canPublish(course)) {
+                              onPublish(course.course_id);
+                            }
+                            handleMenuClose(course.course_id);
+                          }}
+                          disabled={!canPublish(course)}
+                        >
+                          <PublishIcon sx={{ mr: 1, fontSize: 18 }} />
+                          Publish
+                        </MenuItem>
+                      </span>
+                    </Tooltip>
                   )}
-                  {canArchive(course) && onArchive && (
-                    <MenuItem onClick={() => {
-                      onArchive(course.course_id);
-                      handleMenuClose(course.course_id);
-                    }}>
+                  
+                  {/* Archive - show if onArchive provided and user can archive */}
+                  {onArchive && (
+                    <MenuItem 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (canArchive(course)) {
+                          onArchive(course.course_id);
+                        }
+                        handleMenuClose(course.course_id);
+                      }}
+                      disabled={!canArchive(course)}
+                    >
                       <ArchiveIcon sx={{ mr: 1, fontSize: 18 }} />
                       Archive
                     </MenuItem>

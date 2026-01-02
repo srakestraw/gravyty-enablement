@@ -53,6 +53,7 @@ export function CoursesPage() {
   const [statusFilter, setStatusFilter] = useState<string>('published');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [publishing, setPublishing] = useState<string | null>(null);
+  const [archiving, setArchiving] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>(() => getDefaultViewMode(user?.role));
   const [sortBy, setSortBy] = useState<'title' | 'updated' | 'status'>('updated');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
@@ -111,15 +112,16 @@ export function CoursesPage() {
     ? (adminCourses || []).map(c => ({
         course_id: c.course_id,
         title: c.title,
-        short_description: undefined,
-        cover_image_url: undefined,
+        short_description: c.short_description,
+        cover_image_url: c.cover_image_url,
         product: c.product,
         product_suite: c.product_suite,
-        topic_tags: [],
-        estimated_duration_minutes: undefined,
-        difficulty_level: undefined,
+        topic_tags: c.topic_tags || [],
+        estimated_duration_minutes: c.estimated_duration_minutes,
+        estimated_minutes: c.estimated_minutes,
+        difficulty_level: c.difficulty_level,
         status: c.status as 'draft' | 'published' | 'archived',
-        published_at: undefined,
+        published_at: c.published_at,
         updated_at: c.updated_at, // Add updated_at for sorting
       } as CourseSummary & { updated_at?: string }))
     : publishedCourses;
@@ -219,9 +221,19 @@ export function CoursesPage() {
   };
 
   const handleArchive = async (courseId: string) => {
-    // TODO: Implement archive functionality when API supports it
-    console.log('Archive course:', courseId);
-    alert('Archive functionality coming soon');
+    if (!confirm('Are you sure you want to archive this course? It will be hidden from the course list.')) {
+      return;
+    }
+    setArchiving(courseId);
+    try {
+      await lmsAdminApi.archiveCourse(courseId);
+      refetch();
+    } catch (err) {
+      console.error('Failed to archive course:', err);
+      alert('Failed to archive course');
+    } finally {
+      setArchiving(null);
+    }
   };
 
   const handleSortChange = (field: 'title' | 'updated' | 'status') => {
@@ -372,6 +384,7 @@ export function CoursesPage() {
             onArchive={canArchive ? handleArchive : undefined}
             showStatus={useAdminView}
             showActions={useAdminView}
+            isAllView={useAdminView && statusFilter === 'all'}
           />
           {nextCursor && (
             <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
@@ -394,6 +407,7 @@ export function CoursesPage() {
             onPublish={canPublish ? handlePublish : undefined}
             onArchive={canArchive ? handleArchive : undefined}
             publishing={publishing}
+            archiving={archiving}
             sortBy={sortBy}
             sortOrder={sortOrder}
             onSortChange={handleSortChange}

@@ -17,7 +17,7 @@ import {
 } from '../storage/dynamo/lmsRepo';
 import { emitLmsEvent, LMS_EVENTS } from '../telemetry/lmsTelemetry';
 import { dynamoDocClient } from '../aws/dynamoClient';
-import { PutCommand } from '@aws-sdk/lib-dynamodb';
+import { PutCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb';
 import type {
   Course,
   CourseSummary,
@@ -68,15 +68,120 @@ export async function listAdminCourses(req: AuthenticatedRequest, res: Response)
     });
     
     const { Items = [] } = await dynamoDocClient.send(command);
-    let courses = (Items as Course[]).map((c) => ({
-      course_id: c.course_id,
-      title: c.title,
-      status: c.status,
-      version: c.version || 0,
-      updated_at: c.updated_at,
-      created_at: c.created_at,
-      product: c.product,
-      product_suite: c.product_suite,
+    const { GetObjectCommand } = await import('@aws-sdk/client-s3');
+    
+    // Convert Course to CourseSummary with all fields for card display
+    // Generate presigned URLs for cover images since bucket is private
+    let courses = await Promise.all((Items as Course[]).map(async (c) => {
+      let coverImageUrl = c.cover_image?.url;
+      
+      // Determine bucket and key
+      let bucket: string | undefined;
+      let key: string | undefined;
+      
+      // First try to get from cover_image object
+      if (c.cover_image?.s3_bucket && c.cover_image?.s3_key) {
+        bucket = c.cover_image.s3_bucket;
+        key = c.cover_image.s3_key;
+      } else if (c.cover_image?.url && c.cover_image.url.includes('s3.amazonaws.com')) {
+        // Extract bucket and key from S3 URL
+        // Format: https://bucket-name.s3.region.amazonaws.com/key/path
+        // or: https://s3.region.amazonaws.com/bucket-name/key/path
+        try {
+          const url = new URL(c.cover_image.url);
+          const hostname = url.hostname;
+          const pathname = url.pathname;
+          
+          // Pattern: bucket-name.s3.region.amazonaws.com
+          // Example: lms-media-758742552610-us-east-1.s3.amazonaws.com
+          // Group 1: bucket-name (everything before .s3)
+          // Group 2: region (everything between s3. and .amazonaws, but actually the region is in the bucket name for some formats)
+          // Actually, for s3.amazonaws.com format, the region might be in the bucket name or path
+          // Let's try: bucket-name.s3.amazonaws.com (no region in hostname)
+          const s3Pattern = /^(.+)\.s3\.amazonaws\.com$/;
+          let match = hostname.match(s3Pattern);
+          
+          if (match) {
+            // For s3.amazonaws.com format, bucket is in hostname, key is in pathname
+            bucket = match[1];
+            key = pathname.startsWith('/') ? pathname.substring(1) : pathname;
+            console.log(`[${requestId}] Extracted from s3.amazonaws.com format - bucket: ${bucket}, key: ${key}`);
+          } else {
+            // Try pattern: bucket-name.s3.region.amazonaws.com
+            const s3RegionPattern = /^(.+)\.s3\.([^.]+)\.amazonaws\.com$/;
+            match = hostname.match(s3RegionPattern);
+            if (match) {
+              bucket = match[1];
+              key = pathname.startsWith('/') ? pathname.substring(1) : pathname;
+              console.log(`[${requestId}] Extracted from s3.region.amazonaws.com format - bucket: ${bucket}, key: ${key}`);
+            } else {
+              // Try pattern: bucket-name.s3-region.amazonaws.com
+              const s3DashPattern = /^(.+)\.s3-([^.]+)\.amazonaws\.com$/;
+              match = hostname.match(s3DashPattern);
+              if (match) {
+                bucket = match[1];
+                key = pathname.startsWith('/') ? pathname.substring(1) : pathname;
+                console.log(`[${requestId}] Extracted from s3-region.amazonaws.com format - bucket: ${bucket}, key: ${key}`);
+              }
+            }
+          }
+          
+          if (bucket && key) {
+            bucket = match[1]; // Full bucket name (can contain dots/dashes)
+            key = pathname.startsWith('/') ? pathname.substring(1) : pathname;
+            console.log(`[${requestId}] Extracted from hostname - bucket: ${bucket}, key: ${key}, original URL: ${c.cover_image.url}`);
+          } else {
+            // Pattern: s3.region.amazonaws.com/bucket-name/key
+            const pathParts = pathname.split('/').filter(p => p);
+            if (pathParts.length >= 2) {
+              bucket = pathParts[0];
+              key = pathParts.slice(1).join('/');
+              console.log(`[${requestId}] Extracted from pathname pattern - bucket: ${bucket}, key: ${key}`);
+            } else {
+              console.warn(`[${requestId}] Could not parse S3 URL: ${c.cover_image.url}`);
+            }
+          }
+        } catch (error) {
+          console.error(`[${requestId}] Error parsing S3 URL for course ${c.course_id}:`, error, c.cover_image.url);
+        }
+      }
+      
+      // Generate presigned URL if we have bucket and key
+      if (bucket && key) {
+        try {
+          const getCommand = new GetObjectCommand({
+            Bucket: bucket,
+            Key: key,
+          });
+          coverImageUrl = await getSignedUrl(s3Client, getCommand, { expiresIn: 3600 });
+          console.log(`[${requestId}] Generated presigned URL for course ${c.course_id}`);
+        } catch (error) {
+          console.error(`[${requestId}] Error generating presigned URL for course ${c.course_id}:`, error);
+          console.error(`[${requestId}] Bucket: ${bucket}, Key: ${key}`);
+          // Fallback to original URL if presigning fails
+        }
+      } else if (c.cover_image?.url && c.cover_image.url.includes('s3.amazonaws.com')) {
+        console.warn(`[${requestId}] Course ${c.course_id} has S3 URL but could not extract bucket/key:`, c.cover_image.url);
+      }
+      
+      return {
+        course_id: c.course_id,
+        title: c.title,
+        short_description: c.short_description,
+        cover_image_url: coverImageUrl,
+        product: c.product,
+        product_suite: c.product_suite,
+        topic_tags: c.topic_tags || [],
+        estimated_duration_minutes: c.estimated_duration_minutes,
+        estimated_minutes: c.estimated_minutes,
+        difficulty_level: c.difficulty_level,
+        status: c.status,
+        published_at: c.published_at,
+        // Include admin-specific fields
+        version: c.version || 0,
+        updated_at: c.updated_at,
+        created_at: c.created_at,
+      };
     }));
     
     // Apply filters
@@ -615,7 +720,6 @@ export async function publishCourse(req: AuthenticatedRequest, res: Response) {
         error: {
           code: 'VALIDATION_FAILED',
           message: 'Course validation failed',
-          details: validation.errors,
         },
         request_id: requestId,
       });
@@ -649,7 +753,7 @@ export async function publishCourse(req: AuthenticatedRequest, res: Response) {
 
 /**
  * DELETE /v1/lms/admin/courses/:courseId
- * Delete (archive) a course
+ * Delete a course
  */
 export async function deleteCourse(req: AuthenticatedRequest, res: Response) {
   const requestId = req.headers['x-request-id'] as string;
@@ -665,7 +769,7 @@ export async function deleteCourse(req: AuthenticatedRequest, res: Response) {
   }
   
   try {
-    // Get course to verify it exists
+    // Get course to verify it exists and capture title for telemetry
     const course = await lmsRepo.getCourseDraftOrPublished(courseId);
     if (!course) {
       res.status(404).json({
@@ -675,20 +779,12 @@ export async function deleteCourse(req: AuthenticatedRequest, res: Response) {
       return;
     }
     
-    // Archive the course (set status to 'archived')
-    // This is safer than hard deletion - preserves data for audit/recovery
-    const now = new Date().toISOString();
-    const archivedCourse: Course = {
-      ...course,
-      status: 'archived',
-      updated_at: now,
-      updated_by: userId,
-    };
-    
-    // Use PutCommand to update the course (allows status change to archived)
-    const command = new PutCommand({
+    // Delete the course from DynamoDB
+    const command = new DeleteCommand({
       TableName: LMS_COURSES_TABLE,
-      Item: archivedCourse,
+      Key: {
+        course_id: courseId,
+      },
     });
     await dynamoDocClient.send(command);
     
@@ -698,8 +794,8 @@ export async function deleteCourse(req: AuthenticatedRequest, res: Response) {
       course_title: course.title,
     });
     
-    const response: ApiSuccessResponse<{ course: Course }> = {
-      data: { course: archivedCourse },
+    const response: ApiSuccessResponse<{ deleted: true }> = {
+      data: { deleted: true },
       request_id: requestId,
     };
     res.json(response);
@@ -709,6 +805,94 @@ export async function deleteCourse(req: AuthenticatedRequest, res: Response) {
       error: {
         code: 'INTERNAL_ERROR',
         message: error instanceof Error ? error.message : 'Failed to delete course',
+      },
+      request_id: requestId,
+    });
+  }
+}
+
+/**
+ * POST /v1/lms/admin/courses/:courseId/archive
+ * Archive a course
+ */
+export async function archiveCourse(req: AuthenticatedRequest, res: Response) {
+  const requestId = req.headers['x-request-id'] as string;
+  const userId = req.user?.user_id;
+  const courseId = req.params.courseId as string;
+  
+  if (!userId) {
+    res.status(401).json({
+      error: { code: 'UNAUTHORIZED', message: 'User ID required' },
+      request_id: requestId,
+    });
+    return;
+  }
+  
+  try {
+    const course = await lmsRepo.archiveCourse(courseId, userId);
+    
+    // Emit telemetry
+    await emitLmsEvent(req, 'lms_admin_course_archived' as any, {
+      course_id: courseId,
+      course_title: course.title,
+    });
+    
+    const response: ApiSuccessResponse<{ course: Course }> = {
+      data: { course },
+      request_id: requestId,
+    };
+    res.json(response);
+  } catch (error) {
+    console.error(`[${requestId}] Error archiving course:`, error);
+    const statusCode = error instanceof Error && error.message.includes('not found') ? 404 : 500;
+    res.status(statusCode).json({
+      error: {
+        code: statusCode === 404 ? 'NOT_FOUND' : 'INTERNAL_ERROR',
+        message: error instanceof Error ? error.message : 'Failed to archive course',
+      },
+      request_id: requestId,
+    });
+  }
+}
+
+/**
+ * POST /v1/lms/admin/courses/:courseId/restore
+ * Restore an archived course
+ */
+export async function restoreCourse(req: AuthenticatedRequest, res: Response) {
+  const requestId = req.headers['x-request-id'] as string;
+  const userId = req.user?.user_id;
+  const courseId = req.params.courseId as string;
+  
+  if (!userId) {
+    res.status(401).json({
+      error: { code: 'UNAUTHORIZED', message: 'User ID required' },
+      request_id: requestId,
+    });
+    return;
+  }
+  
+  try {
+    const course = await lmsRepo.restoreCourse(courseId, userId);
+    
+    // Emit telemetry
+    await emitLmsEvent(req, 'lms_admin_course_restored' as any, {
+      course_id: courseId,
+      course_title: course.title,
+    });
+    
+    const response: ApiSuccessResponse<{ course: Course }> = {
+      data: { course },
+      request_id: requestId,
+    };
+    res.json(response);
+  } catch (error) {
+    console.error(`[${requestId}] Error restoring course:`, error);
+    const statusCode = error instanceof Error && error.message.includes('not found') ? 404 : 500;
+    res.status(statusCode).json({
+      error: {
+        code: statusCode === 404 ? 'NOT_FOUND' : 'INTERNAL_ERROR',
+        message: error instanceof Error ? error.message : 'Failed to restore course',
       },
       request_id: requestId,
     });
@@ -1057,7 +1241,6 @@ export async function publishPath(req: AuthenticatedRequest, res: Response) {
         error: {
           code: 'VALIDATION_FAILED',
           message: 'Path validation failed',
-          details: validation.errors,
         },
         request_id: requestId,
       });
@@ -1616,7 +1799,16 @@ export async function listMedia(req: AuthenticatedRequest, res: Response) {
     
     // Apply filters
     if (mediaType) {
-      media = media.filter((m) => m.type === mediaType);
+      // Map media_type parameter to stored type value
+      // 'cover' and 'poster' are stored as 'image', 'video' as 'video', 'attachment' as 'document'
+      const typeMap: Record<string, string> = {
+        'cover': 'image',
+        'poster': 'image',
+        'video': 'video',
+        'attachment': 'document',
+      };
+      const storedType = typeMap[mediaType] || mediaType;
+      media = media.filter((m) => m.type === storedType);
     }
     if (courseId) {
       media = media.filter((m) => m.course_id === courseId);
@@ -1821,18 +2013,38 @@ export async function uploadMedia(req: AuthenticatedRequest, res: Response) {
 
   try {
     // Get file data from request body (raw buffer)
-    const fileBuffer = Buffer.isBuffer(req.body) ? req.body : null;
+    // Express raw() middleware should provide Buffer, but handle other cases
+    let fileBuffer: Buffer | null = null;
+    
+    if (Buffer.isBuffer(req.body)) {
+      fileBuffer = req.body;
+    } else if (typeof req.body === 'string') {
+      // If body is a string, convert to buffer
+      fileBuffer = Buffer.from(req.body, 'binary');
+    } else if (req.body instanceof Uint8Array) {
+      fileBuffer = Buffer.from(req.body);
+    } else if (req.body && typeof req.body === 'object' && 'data' in req.body) {
+      // Handle base64 encoded data
+      fileBuffer = Buffer.from(req.body.data, 'base64');
+    }
     
     if (!fileBuffer || fileBuffer.length === 0) {
+      console.error(`[${requestId}] Invalid request body type:`, typeof req.body, 'isBuffer:', Buffer.isBuffer(req.body));
       res.status(400).json({
         error: {
           code: 'VALIDATION_ERROR',
-          message: 'File data not found in request body',
+          message: 'File data not found in request body. Expected raw binary data.',
         },
         request_id: requestId,
       });
       return;
     }
+    
+    console.log(`[${requestId}] Received file upload:`, {
+      mediaId,
+      fileSize: fileBuffer.length,
+      contentType: req.query.content_type,
+    });
 
     // Get media metadata from query params
     const PresignSchema = z.object({
@@ -1863,6 +2075,7 @@ export async function uploadMedia(req: AuthenticatedRequest, res: Response) {
 
     const { Item: mediaItem } = await dynamoDocClient.send(mediaCommand);
     if (!mediaItem || mediaItem.entity_type !== 'MEDIA') {
+      console.error(`[${requestId}] Media not found:`, { mediaId, mediaItem: mediaItem ? 'exists but wrong type' : 'not found' });
       res.status(404).json({
         error: { code: 'NOT_FOUND', message: 'Media not found. Call presignMediaUpload first.' },
         request_id: requestId,
@@ -1871,6 +2084,13 @@ export async function uploadMedia(req: AuthenticatedRequest, res: Response) {
     }
 
     const mediaRef = mediaItem as any as MediaRef;
+    
+    console.log(`[${requestId}] Uploading to S3:`, {
+      bucket: mediaRef.s3_bucket,
+      key: mediaRef.s3_key,
+      contentType: parsed.data.content_type,
+      fileSize: fileBuffer.length,
+    });
 
     // Upload to S3
     const putCommand = new PutObjectCommand({
@@ -1880,7 +2100,31 @@ export async function uploadMedia(req: AuthenticatedRequest, res: Response) {
       ContentType: parsed.data.content_type,
     });
     
-    await s3Client.send(putCommand);
+    try {
+      // Log AWS credentials info for debugging (without exposing secrets)
+      const credentials = await s3Client.config.credentials?.();
+      console.log(`[${requestId}] S3 client credentials:`, {
+        hasCredentials: !!credentials,
+        accessKeyId: credentials?.accessKeyId ? `${credentials.accessKeyId.substring(0, 8)}...` : 'none',
+        region: s3Client.config.region,
+      });
+      
+      await s3Client.send(putCommand);
+      console.log(`[${requestId}] Successfully uploaded to S3`);
+    } catch (s3Error: any) {
+      console.error(`[${requestId}] S3 upload error:`, {
+        error: s3Error,
+        message: s3Error?.message,
+        code: s3Error?.Code || s3Error?.code,
+        name: s3Error?.name,
+        bucket: mediaRef.s3_bucket,
+        key: mediaRef.s3_key,
+        requestId: s3Error?.$metadata?.requestId,
+        httpStatusCode: s3Error?.$metadata?.httpStatusCode,
+      });
+      // Re-throw to be caught by outer catch block
+      throw new Error(`S3 upload failed: ${s3Error instanceof Error ? s3Error.message : String(s3Error)}`);
+    }
     
     // Emit telemetry
     await emitLmsEvent(req, 'lms_admin_media_uploaded' as any, {
@@ -1899,10 +2143,88 @@ export async function uploadMedia(req: AuthenticatedRequest, res: Response) {
     res.json(response);
   } catch (error) {
     console.error(`[${requestId}] Error uploading media:`, error);
+    const errorMessage = error instanceof Error ? error.message : 'Failed to upload media';
+    const errorCode = error instanceof Error && error.message.includes('Access Denied') 
+      ? 'ACCESS_DENIED' 
+      : error instanceof Error && error.message.includes('S3')
+      ? 'S3_ERROR'
+      : 'INTERNAL_ERROR';
+    
+    res.status(500).json({
+      error: {
+        code: errorCode,
+        message: errorMessage,
+      },
+      request_id: requestId,
+    });
+  }
+}
+
+/**
+ * GET /v1/lms/admin/media/:media_id/url
+ * Get presigned URL for viewing/downloading media
+ */
+export async function getMediaUrl(req: AuthenticatedRequest, res: Response) {
+  const requestId = req.headers['x-request-id'] as string;
+  const mediaId = req.params.media_id;
+  
+  try {
+    // Look up media metadata
+    const { GetCommand } = await import('@aws-sdk/lib-dynamodb');
+    const mediaCommand = new GetCommand({
+      TableName: LMS_CERTIFICATES_TABLE,
+      Key: {
+        entity_type: 'MEDIA',
+        SK: mediaId,
+      },
+    });
+
+    const { Item: mediaItem } = await dynamoDocClient.send(mediaCommand);
+    if (!mediaItem || mediaItem.entity_type !== 'MEDIA') {
+      res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Media not found' },
+        request_id: requestId,
+      });
+      return;
+    }
+
+    const mediaRef = mediaItem as any as MediaRef;
+    
+    if (!mediaRef.s3_bucket || !mediaRef.s3_key) {
+      res.status(400).json({
+        error: { code: 'BAD_REQUEST', message: 'Media does not have S3 storage information' },
+        request_id: requestId,
+      });
+      return;
+    }
+
+    // Generate presigned GET URL (1 hour expiry)
+    const { getSignedUrl } = await import('@aws-sdk/s3-request-presigner');
+    const { GetObjectCommand } = await import('@aws-sdk/client-s3');
+    const getCommand = new GetObjectCommand({
+      Bucket: mediaRef.s3_bucket,
+      Key: mediaRef.s3_key,
+    });
+
+    const presignedUrl = await getSignedUrl(s3Client, getCommand, { expiresIn: 3600 });
+
+    const response: ApiSuccessResponse<{
+      url: string;
+      expires_in_seconds: number;
+    }> = {
+      data: {
+        url: presignedUrl,
+        expires_in_seconds: 3600,
+      },
+      request_id: requestId,
+    };
+    res.json(response);
+  } catch (error) {
+    console.error(`[${requestId}] Error getting media URL:`, error);
     res.status(500).json({
       error: {
         code: 'INTERNAL_ERROR',
-        message: error instanceof Error ? error.message : 'Failed to upload media',
+        message: error instanceof Error ? error.message : 'Failed to get media URL',
       },
       request_id: requestId,
     });
