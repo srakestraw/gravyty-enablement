@@ -2,8 +2,8 @@
  * Details Drawer Component
  * 
  * Collapsible drawer containing course metadata fields:
- * - Product (single select)
- * - Product Suite (single select, dependent on Product)
+ * - Product Suite (single select, independent)
+ * - Product (single select, independent)
  * - Topic Tags (multi-select)
  * - Cover Image (upload/select)
  * - Badges (multi-select)
@@ -53,8 +53,8 @@ export function DetailsDrawer({
   markFieldTouched,
 }: DetailsDrawerProps) {
   const [coverModalOpen, setCoverModalOpen] = useState(false);
-  const [productId, setProductId] = useState<string | undefined>(undefined);
-  const [productSuiteId, setProductSuiteId] = useState<string | undefined>(undefined);
+  const [productIds, setProductIds] = useState<string[]>([]);
+  const [productSuiteIds, setProductSuiteIds] = useState<string[]>([]);
   const [topicTagIds, setTopicTagIds] = useState<string[]>([]);
   const [badgeIds, setBadgeIds] = useState<string[]>([]);
 
@@ -71,8 +71,15 @@ export function DetailsDrawer({
   // Sync state with course (only when course ID changes)
   useEffect(() => {
     if (course && course.course_id !== lastSyncedCourseIdRef.current) {
-      setProductId(course.product_id || course.product_suite_id || undefined);
-      setProductSuiteId(course.product_suite_id || course.product_concept_id || undefined);
+      // Support both new array fields and legacy single values for backward compatibility
+      const courseProductIds = course.product_ids && course.product_ids.length > 0 
+        ? course.product_ids 
+        : (course.product_id ? [course.product_id] : []);
+      const courseProductSuiteIds = course.product_suite_ids && course.product_suite_ids.length > 0
+        ? course.product_suite_ids
+        : (course.product_suite_id ? [course.product_suite_id] : []);
+      setProductIds(courseProductIds);
+      setProductSuiteIds(courseProductSuiteIds);
       setTopicTagIds(course.topic_tag_ids && course.topic_tag_ids.length > 0 ? course.topic_tag_ids : []);
       setBadgeIds(course.badge_ids && course.badge_ids.length > 0 ? course.badge_ids : []);
       lastSyncedCourseIdRef.current = course.course_id;
@@ -169,15 +176,6 @@ export function DetailsDrawer({
     handleCourseFieldChange('cover_image', mediaRef);
   };
 
-
-  // Clear Product Suite when Product is cleared
-  useEffect(() => {
-    if (!productId && productSuiteId) {
-      setProductSuiteId(undefined);
-      handleCourseFieldChange('product_suite_id', undefined);
-    }
-  }, [productId]);
-
   if (!course) return null;
 
   return (
@@ -210,47 +208,44 @@ export function DetailsDrawer({
         <Collapse in={open}>
           <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
             <Grid container spacing={2}>
-              {/* Product */}
+              {/* Product Suite */}
               <Grid item xs={12} sm={6}>
-                <Box ref={productRef}>
-                  <TaxonomySelect
-                    groupKey="product"
-                    value={productId}
-                    onChange={(optionId) => {
-                      setProductId(optionId);
-                      handleCourseFieldChange('product_id', optionId);
+                <Box ref={productSuiteRef}>
+                  <TaxonomyMultiSelect
+                    groupKey="product_suite"
+                    values={productSuiteIds}
+                    onChange={(optionIds) => {
+                      setProductSuiteIds(optionIds);
+                      handleCourseFieldChange('product_suite_ids', optionIds);
                       if (markFieldTouched) {
-                        markFieldTouched('course', course.course_id, 'product_id');
+                        markFieldTouched('course', course.course_id, 'product_suite_ids');
                       }
                     }}
-                    label="Product"
-                    placeholder="Select product"
+                    label="Product Suite"
+                    placeholder="Select product suites"
                     fullWidth
-                    error={shouldShowError && shouldShowError('course', course.course_id, 'product_id')}
+                    error={shouldShowError && shouldShowError('course', course.course_id, 'product_suite_ids')}
                   />
                 </Box>
               </Grid>
 
-              {/* Product Suite */}
+              {/* Product */}
               <Grid item xs={12} sm={6}>
-                <Box ref={productSuiteRef}>
-                  <TaxonomySelect
-                    groupKey="product_suite"
-                    value={productSuiteId}
-                    parentId={productId}
-                    onChange={(optionId) => {
-                      setProductSuiteId(optionId);
-                      handleCourseFieldChange('product_suite_id', optionId);
+                <Box ref={productRef}>
+                  <TaxonomyMultiSelect
+                    groupKey="product"
+                    values={productIds}
+                    onChange={(optionIds) => {
+                      setProductIds(optionIds);
+                      handleCourseFieldChange('product_ids', optionIds);
                       if (markFieldTouched) {
-                        markFieldTouched('course', course.course_id, 'product_suite_id');
+                        markFieldTouched('course', course.course_id, 'product_ids');
                       }
                     }}
-                    label="Product Suite"
-                    placeholder={productId ? 'Select product suite' : 'Select a Product first'}
-                    disabled={!productId}
+                    label="Product"
+                    placeholder="Select products"
                     fullWidth
-                    error={shouldShowError && shouldShowError('course', course.course_id, 'product_suite_id')}
-                    helperText={!productId ? 'Select a Product first' : undefined}
+                    error={shouldShowError && shouldShowError('course', course.course_id, 'product_ids')}
                   />
                 </Box>
               </Grid>

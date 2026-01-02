@@ -58,11 +58,13 @@ export const CourseSchema = z.object({
   
   // Categorization
   // New field names (preferred)
-  product: z.string().optional(), // Was "product_suite"
-  product_suite: z.string().optional(), // Was "product_concept"
+  product: z.string().optional(), // Was "product_suite" (legacy, use product_ids)
+  product_suite: z.string().optional(), // Was "product_concept" (legacy, use product_suite_ids)
   topic_tags: z.array(z.string()).default([]),
-  product_id: z.string().optional(), // Was "product_suite_id"
-  product_suite_id: z.string().optional(), // Was "product_concept_id"
+  product_id: z.string().optional(), // Legacy single value (use product_ids)
+  product_ids: z.array(z.string()).default([]), // Multi-select product IDs
+  product_suite_id: z.string().optional(), // Legacy single value (use product_suite_ids)
+  product_suite_ids: z.array(z.string()).default([]), // Multi-select product suite IDs
   topic_tag_ids: z.array(z.string()).default([]),
   // Legacy fields (for backward compatibility - will be normalized on read)
   // These are kept in schema but should not be written going forward

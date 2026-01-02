@@ -262,37 +262,42 @@ export function CourseDetailsEditor({
             Metadata
           </Typography>
           <Grid container spacing={2}>
-            {/* Product */}
+            {/* Product Suite */}
             <Grid item xs={12} sm={6}>
-              <Box ref={productRef}>
-                <TaxonomySelect
-                  groupKey="product"
-                  value={course.product_id || course.product_suite_id || undefined}
-                  onChange={(optionId) => {
-                    handleFieldChange('product_id', optionId);
+              <Box ref={productSuiteRef}>
+                <TaxonomyMultiSelect
+                  groupKey="product_suite"
+                  values={
+                    (course.product_suite_ids && course.product_suite_ids.length > 0)
+                      ? course.product_suite_ids
+                      : (course.product_suite_id ? [course.product_suite_id] : [])
+                  }
+                  onChange={(optionIds) => {
+                    handleFieldChange('product_suite_ids', optionIds);
                   }}
-                  label="Product"
-                  placeholder="Select product"
+                  label="Product Suite"
+                  placeholder="Select product suites"
                   fullWidth
                 />
               </Box>
             </Grid>
 
-            {/* Product Suite */}
+            {/* Product */}
             <Grid item xs={12} sm={6}>
-              <Box ref={productSuiteRef}>
-                <TaxonomySelect
-                  groupKey="product_suite"
-                  value={course.product_suite_id || course.product_concept_id || undefined}
-                  parentId={course.product_id || course.product_suite_id || undefined}
-                  onChange={(optionId) => {
-                    handleFieldChange('product_suite_id', optionId);
+              <Box ref={productRef}>
+                <TaxonomyMultiSelect
+                  groupKey="product"
+                  values={
+                    (course.product_ids && course.product_ids.length > 0)
+                      ? course.product_ids
+                      : (course.product_id ? [course.product_id] : [])
+                  }
+                  onChange={(optionIds) => {
+                    handleFieldChange('product_ids', optionIds);
                   }}
-                  label="Product Suite"
-                  placeholder={course.product_id ? 'Select product suite' : 'Select a Product first'}
-                  disabled={!course.product_id}
+                  label="Product"
+                  placeholder="Select products"
                   fullWidth
-                  helperText={!course.product_id ? 'Select a Product first' : undefined}
                 />
               </Box>
             </Grid>

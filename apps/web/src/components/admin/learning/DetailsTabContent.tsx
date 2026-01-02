@@ -58,8 +58,29 @@ export function DetailsTabContent({
   descriptionRef,
   onTemporaryMediaCreated,
 }: DetailsTabContentProps) {
-  const [productId, setProductId] = useState<string | undefined>(undefined);
-  const [productSuiteId, setProductSuiteId] = useState<string | undefined>(undefined);
+  const [productIds, setProductIds] = useState<string[]>([]);
+  const [productSuiteIds, setProductSuiteIds] = useState<string[]>([]);
+
+  // Debug: Track Product Suite state changes
+  useEffect(() => {
+    console.log('[DetailsTabContent] Product Suite state changed:', {
+      productSuiteIds,
+      courseProductSuiteIds: course?.product_suite_ids,
+      courseProductSuiteId: course?.product_suite_id, // legacy
+      timestamp: new Date().toISOString(),
+    });
+  }, [productSuiteIds, course?.product_suite_ids, course?.product_suite_id]);
+
+  // Debug: Track Product state changes
+  useEffect(() => {
+    console.log('[DetailsTabContent] Product state changed:', {
+      productIds,
+      productSuiteIds,
+      courseProductIds: course?.product_ids,
+      courseProductId: course?.product_id, // legacy
+      timestamp: new Date().toISOString(),
+    });
+  }, [productIds, productSuiteIds, course?.product_ids, course?.product_id]);
   const [topicTagIds, setTopicTagIds] = useState<string[]>([]);
   const [badgeIds, setBadgeIds] = useState<string[]>([]);
   const [title, setTitle] = useState('');
@@ -80,15 +101,56 @@ export function DetailsTabContent({
   const lastSyncedCourseIdRef = useRef<string | null>(null);
 
   // Sync state with course (only when course ID changes)
+  // Only sync if course_id actually changed to avoid overwriting user input
   useEffect(() => {
-    if (course && course.course_id !== lastSyncedCourseIdRef.current) {
+    const courseIdChanged = course && course.course_id !== lastSyncedCourseIdRef.current;
+    console.log('[DetailsTabContent] Sync useEffect triggered:', {
+      courseId: course?.course_id,
+      lastSyncedCourseId: lastSyncedCourseIdRef.current,
+      courseIdChanged,
+      courseProductIds: course?.product_ids,
+      courseProductSuiteIds: course?.product_suite_ids,
+      courseProductId: course?.product_id, // legacy
+      courseProductSuiteId: course?.product_suite_id, // legacy
+      localProductIds: productIds,
+      localProductSuiteIds: productSuiteIds,
+      willSync: courseIdChanged,
+      timestamp: new Date().toISOString(),
+      stackTrace: new Error().stack,
+    });
+    
+    // IMPORTANT: Only sync when course_id actually changes, not when course object reference changes
+    // This prevents overwriting user input when course updates come back from the server
+    if (courseIdChanged) {
       console.log('[DetailsTabContent] Syncing local state with course (course_id changed):', {
         courseId: course.course_id,
         courseTitle: course.title,
+        courseProductIds: course.product_ids,
+        courseProductSuiteIds: course.product_suite_ids,
+        courseProductId: course.product_id, // legacy
+        courseProductSuiteId: course.product_suite_id, // legacy
         currentLocalTitle: title,
+        currentLocalProductIds: productIds,
+        currentLocalProductSuiteIds: productSuiteIds,
       });
-      setProductId(course.product_id || course.product_suite_id || undefined);
-      setProductSuiteId(course.product_suite_id || course.product_concept_id || undefined);
+      // Only sync if course_id changed - this is a new course being loaded
+      // Support both new array fields and legacy single values for backward compatibility
+      const courseProductIds = course.product_ids && course.product_ids.length > 0 
+        ? course.product_ids 
+        : (course.product_id ? [course.product_id] : []);
+      const courseProductSuiteIds = course.product_suite_ids && course.product_suite_ids.length > 0
+        ? course.product_suite_ids
+        : (course.product_suite_id ? [course.product_suite_id] : []);
+      
+      console.log('[DetailsTabContent] Syncing product fields:', {
+        courseProductIds,
+        courseProductSuiteIds,
+        courseProductId: course.product_id, // legacy
+        courseProductSuiteId: course.product_suite_id, // legacy
+      });
+      
+      setProductIds(courseProductIds);
+      setProductSuiteIds(courseProductSuiteIds);
       setTopicTagIds(course.topic_tag_ids && course.topic_tag_ids.length > 0 ? course.topic_tag_ids : []);
       setBadgeIds(course.badge_ids && course.badge_ids.length > 0 ? course.badge_ids : []);
       setTitle(course.title || '');
@@ -96,19 +158,57 @@ export function DetailsTabContent({
       setDescription(course.description || '');
       setEstimatedMinutes(course.estimated_minutes?.toString() || '');
       lastSyncedCourseIdRef.current = course.course_id;
+    } else if (course) {
+      console.log('[DetailsTabContent] Course ID unchanged, NOT syncing to preserve user input:', {
+        courseId: course.course_id,
+        courseProductIds: course.product_ids,
+        courseProductSuiteIds: course.product_suite_ids,
+        courseProductId: course.product_id, // legacy
+        courseProductSuiteId: course.product_suite_id, // legacy
+        localProductIds: productIds,
+        localProductSuiteIds: productSuiteIds,
+        note: 'This prevents overwriting user input when course updates come back from server',
+      });
     }
-  }, [course?.course_id]);
+    // Don't sync individual fields when course object changes but course_id stays the same
+    // This prevents overwriting user input during updates
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [course?.course_id]); // Only depend on course_id, not the entire course object or other fields
 
   // Debug: Track when course prop changes (any field, not just course_id)
   useEffect(() => {
     console.log('[DetailsTabContent] course prop changed:', {
       courseId: course?.course_id,
       courseTitle: course?.title,
+      courseProductIds: course?.product_ids,
+      courseProductSuiteIds: course?.product_suite_ids,
+      courseProductId: course?.product_id, // legacy
+      courseProductSuiteId: course?.product_suite_id, // legacy
+      localProductIds: productIds,
+      localProductSuiteIds: productSuiteIds,
       localTitle: title,
       titleMismatch: course?.title !== title,
       timestamp: new Date().toISOString(),
+      stackTrace: new Error().stack,
     });
-  }, [course]);
+    
+    // WARNING: If course prop has undefined values but local state has values, this might clear them
+    if (course && course.course_id === lastSyncedCourseIdRef.current) {
+      const courseHasProductIds = (course.product_ids && course.product_ids.length > 0) || course.product_id;
+      const courseHasProductSuiteIds = (course.product_suite_ids && course.product_suite_ids.length > 0) || course.product_suite_id;
+      if ((productSuiteIds.length > 0 && !courseHasProductSuiteIds) || (productIds.length > 0 && !courseHasProductIds)) {
+        console.warn('[DetailsTabContent] ⚠️ Course prop update might clear local state!', {
+          courseProductIds: course.product_ids,
+          courseProductSuiteIds: course.product_suite_ids,
+          courseProductId: course.product_id, // legacy
+          courseProductSuiteId: course.product_suite_id, // legacy
+          localProductIds: productIds,
+          localProductSuiteIds: productSuiteIds,
+          note: 'Course prop has undefined values but local state has values - sync useEffect should NOT run',
+        });
+      }
+    }
+  }, [course, productIds, productSuiteIds, title]);
 
   // Register fields with focus registry
   useEffect(() => {
@@ -120,7 +220,7 @@ export function DetailsTabContent({
       unregisters.push(focusRegistry.register({
         entityType: 'course',
         entityId: course.course_id,
-        fieldKey: 'product_id',
+        fieldKey: 'product_ids',
         ref: productRef,
       }));
     }
@@ -129,7 +229,7 @@ export function DetailsTabContent({
       unregisters.push(focusRegistry.register({
         entityType: 'course',
         entityId: course.course_id,
-        fieldKey: 'product_suite_id',
+        fieldKey: 'product_suite_ids',
         ref: productSuiteRef,
       }));
     }
@@ -193,8 +293,14 @@ export function DetailsTabContent({
       case 'product_id':
         updates = { product_id: value };
         break;
+      case 'product_ids':
+        updates = { product_ids: Array.isArray(value) ? value : [] };
+        break;
       case 'product_suite_id':
         updates = { product_suite_id: value };
+        break;
+      case 'product_suite_ids':
+        updates = { product_suite_ids: Array.isArray(value) ? value : [] };
         break;
       case 'topic_tag_ids':
         updates = { topic_tag_ids: value };
@@ -306,13 +412,7 @@ export function DetailsTabContent({
 
 
 
-  // Clear Product Suite when Product is cleared
-  useEffect(() => {
-    if (!productId && productSuiteId) {
-      setProductSuiteId(undefined);
-      handleCourseFieldChange('product_suite_id', undefined);
-    }
-  }, [productId]);
+  // Product Suite and Product are now independent - no dependency logic needed
 
   return (
     <>
@@ -414,47 +514,55 @@ export function DetailsTabContent({
             Metadata
           </Typography>
           <Grid container spacing={2}>
-            {/* Product */}
+            {/* Product Suite */}
             <Grid item xs={12} sm={6}>
-              <Box ref={productRef}>
-                <TaxonomySelect
-                  groupKey="product"
-                  value={productId}
-                  onChange={(optionId) => {
-                    setProductId(optionId);
-                    handleCourseFieldChange('product_id', optionId);
+              <Box ref={productSuiteRef}>
+                <TaxonomyMultiSelect
+                  groupKey="product_suite"
+                  values={productSuiteIds}
+                  onChange={(optionIds) => {
+                    console.log('[DetailsTabContent] Product Suite onChange called:', {
+                      newOptionIds: optionIds,
+                      currentProductSuiteIds: productSuiteIds,
+                      timestamp: new Date().toISOString(),
+                    });
+                    setProductSuiteIds(optionIds);
+                    handleCourseFieldChange('product_suite_ids', optionIds);
                     if (markFieldTouched) {
-                      markFieldTouched('course', course.course_id, 'product_id');
+                      markFieldTouched('course', course.course_id, 'product_suite_ids');
                     }
                   }}
-                  label="Product"
-                  placeholder="Select product"
+                  label="Product Suite"
+                  placeholder="Select product suites"
                   fullWidth
-                  error={shouldShowError && shouldShowError('course', course.course_id, 'product_id')}
+                  error={shouldShowError && shouldShowError('course', course.course_id, 'product_suite_ids')}
                 />
               </Box>
             </Grid>
 
-            {/* Product Suite */}
+            {/* Product */}
             <Grid item xs={12} sm={6}>
-              <Box ref={productSuiteRef}>
-                <TaxonomySelect
-                  groupKey="product_suite"
-                  value={productSuiteId}
-                  parentId={productId}
-                  onChange={(optionId) => {
-                    setProductSuiteId(optionId);
-                    handleCourseFieldChange('product_suite_id', optionId);
+              <Box ref={productRef}>
+                <TaxonomyMultiSelect
+                  groupKey="product"
+                  values={productIds}
+                  onChange={(optionIds) => {
+                    console.log('[DetailsTabContent] Product onChange called:', {
+                      newOptionIds: optionIds,
+                      currentProductIds: productIds,
+                      courseId: course?.course_id,
+                      timestamp: new Date().toISOString(),
+                    });
+                    setProductIds(optionIds);
+                    handleCourseFieldChange('product_ids', optionIds);
                     if (markFieldTouched) {
-                      markFieldTouched('course', course.course_id, 'product_suite_id');
+                      markFieldTouched('course', course.course_id, 'product_ids');
                     }
                   }}
-                  label="Product Suite"
-                  placeholder={productId ? 'Select product suite' : 'Select a Product first'}
-                  disabled={!productId}
+                  label="Product"
+                  placeholder="Select products"
                   fullWidth
-                  error={shouldShowError && shouldShowError('course', course.course_id, 'product_suite_id')}
-                  helperText={!productId ? 'Select a Product first' : undefined}
+                  error={shouldShowError && shouldShowError('course', course.course_id, 'product_ids')}
                 />
               </Box>
             </Grid>

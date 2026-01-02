@@ -87,8 +87,8 @@ export function CreateAssetPage() {
   const [description, setDescription] = useState('');
   const [coverImage, setCoverImage] = useState<MediaRef | null>(null);
   const [assetType, setAssetType] = useState<AssetType>('doc');
-  const [productSuiteId, setProductSuiteId] = useState<string | undefined>(undefined);
-  const [productId, setProductId] = useState<string | undefined>(undefined);
+  const [productSuiteIds, setProductSuiteIds] = useState<string[]>([]);
+  const [productIds, setProductIds] = useState<string[]>([]);
   const [tagIds, setTagIds] = useState<string[]>([]);
   const [ownerId, setOwnerId] = useState<string | undefined>(undefined);
   const [ownerUser, setOwnerUser] = useState<AdminUser | null>(null);
@@ -116,22 +116,26 @@ export function CreateAssetPage() {
   
   // Update taxonomy labels for summary
   useEffect(() => {
-    if (productSuiteId) {
-      const option = productSuiteOptions.find(opt => opt.option_id === productSuiteId);
-      setProductSuiteLabel(option?.label || 'Selected');
+    if (productSuiteIds.length > 0) {
+      const labels = productSuiteIds
+        .map(id => productSuiteOptions.find(opt => opt.option_id === id)?.label)
+        .filter((label): label is string => !!label);
+      setProductSuiteLabel(labels.length > 0 ? labels.join(', ') : 'Selected');
     } else {
       setProductSuiteLabel('');
     }
-  }, [productSuiteId, productSuiteOptions]);
+  }, [productSuiteIds, productSuiteOptions]);
   
   useEffect(() => {
-    if (productId) {
-      const option = productOptions.find(opt => opt.option_id === productId);
-      setProductLabel(option?.label || 'Selected');
+    if (productIds.length > 0) {
+      const labels = productIds
+        .map(id => productOptions.find(opt => opt.option_id === id)?.label)
+        .filter((label): label is string => !!label);
+      setProductLabel(labels.length > 0 ? labels.join(', ') : 'Selected');
     } else {
       setProductLabel('');
     }
-  }, [productId, productOptions]);
+  }, [productIds, productOptions]);
   
   // Role-based permissions
   const canPublish = isApproverOrHigher(user?.role);
@@ -199,12 +203,12 @@ export function CreateAssetPage() {
         if (!assetType) return 'Content type is required';
         return undefined;
       case 'productSuite':
-        if ((publishAction === 'publish-now' || publishAction === 'schedule') && !productSuiteId) {
+        if ((publishAction === 'publish-now' || publishAction === 'schedule') && productSuiteIds.length === 0) {
           return 'Product Suite is required to publish';
         }
         return undefined;
       case 'product':
-        if ((publishAction === 'publish-now' || publishAction === 'schedule') && !productId) {
+        if ((publishAction === 'publish-now' || publishAction === 'schedule') && productIds.length === 0) {
           return 'Product is required to publish';
         }
         return undefined;
@@ -270,7 +274,7 @@ export function CreateAssetPage() {
     
     // Publish/schedule validation
     if (publishAction === 'publish-now' || publishAction === 'schedule') {
-      if (!productSuiteId || !productId) return false;
+      if (productSuiteIds.length === 0 || productIds.length === 0) return false;
       if (!changeLog.trim()) return false;
       if (publishAction === 'schedule' && (!publishAt || new Date(publishAt) <= new Date())) return false;
     }
@@ -359,8 +363,8 @@ export function CreateAssetPage() {
       
       // Collect taxonomy node IDs
       const taxonomyNodeIds: string[] = [];
-      if (productSuiteId) taxonomyNodeIds.push(productSuiteId);
-      if (productId) taxonomyNodeIds.push(productId);
+      taxonomyNodeIds.push(...productSuiteIds);
+      taxonomyNodeIds.push(...productIds);
       taxonomyNodeIds.push(...tagIds);
       
       // Prepare source_ref based on source type
@@ -493,8 +497,8 @@ export function CreateAssetPage() {
       source: sourceType === 'UPLOAD' ? (file ? file.name : 'No file selected') : sourceType === 'LINK' ? (linkUrl ? getDomainFromUrl(linkUrl) : 'No URL') : 'Google Drive',
       visibility: publishAction === 'draft' ? 'Draft' : publishAction === 'schedule' ? (publishAt ? `Scheduled: ${new Date(publishAt).toLocaleString()}` : 'Scheduled: Not set') : 'Publish now',
       expiration: expireAt ? new Date(expireAt).toLocaleString() : 'None',
-      productSuite: productSuiteLabel || (productSuiteId ? 'Selected' : 'Not set'),
-      product: productLabel || (productId ? 'Selected' : 'Not set'),
+      productSuite: productSuiteLabel || (productSuiteIds.length > 0 ? 'Selected' : 'Not set'),
+      product: productLabel || (productIds.length > 0 ? 'Selected' : 'Not set'),
     };
   };
   
@@ -508,7 +512,7 @@ export function CreateAssetPage() {
     if (sourceType === 'UPLOAD' && !file) return 'Select a file to upload';
     if (sourceType === 'LINK' && (!linkUrl.trim() || !linkUrl.startsWith('https://'))) return 'Enter a valid https URL';
     if ((publishAction === 'publish-now' || publishAction === 'schedule')) {
-      if (!productSuiteId || !productId) return 'Select Product suite and Product to publish';
+      if (productSuiteIds.length === 0 || productIds.length === 0) return 'Select Product suite(s) and Product(s) to publish';
       if (!changeLog.trim()) return 'Describe what changed';
       if (publishAction === 'schedule' && (!publishAt || new Date(publishAt) <= new Date())) return 'Set a future publish date/time';
     }
@@ -603,31 +607,27 @@ export function CreateAssetPage() {
                 Classification
               </Typography>
               <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2, mb: 1.5 }}>
-                <TaxonomySelect
+                <TaxonomyMultiSelect
                   groupKey="product_suite"
-                  value={productSuiteId}
-                  onChange={(id) => {
-                    setProductSuiteId(id);
-                    // Clear product when product suite changes
-                    if (id !== productSuiteId) {
-                      setProductId(undefined);
-                    }
+                  values={productSuiteIds}
+                  onChange={(ids) => {
+                    setProductSuiteIds(ids);
                     handleFieldChange('productSuite');
                   }}
                   label="Product Suite"
-                  placeholder="Select product suite"
+                  placeholder="Select product suites"
                   error={!!fieldErrors.productSuite}
                   required={publishAction === 'publish-now' || publishAction === 'schedule'}
                 />
-                <TaxonomySelect
+                <TaxonomyMultiSelect
                   groupKey="product"
-                  value={productId}
-                  onChange={(id) => {
-                    setProductId(id);
+                  values={productIds}
+                  onChange={(ids) => {
+                    setProductIds(ids);
                     handleFieldChange('product');
                   }}
                   label="Product"
-                  placeholder="Select product"
+                  placeholder="Select products"
                   error={!!fieldErrors.product}
                   required={publishAction === 'publish-now' || publishAction === 'schedule'}
                 />

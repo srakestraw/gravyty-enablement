@@ -1,7 +1,7 @@
 /**
  * Gravyty Enablement Portal - Domain Types and Helpers
  */
-export * from './types.js';
+export { UserRoleSchema, type UserRole, CognitoUserStatusSchema, type CognitoUserStatus, AdminUserSchema, type AdminUser, ContentStatusSchema, type ContentStatus, ContentItemSchema, type ContentItem, NotificationSchema, type Notification, ActivityEventSchema, type ActivityEvent, } from './types.js';
 export * from './lms/index.js';
 export * from './taxonomy.js';
 export * from './taxonomy-normalization.js';

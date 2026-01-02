@@ -57,6 +57,8 @@ export const sampleCourseDetail: CourseDetail = {
   short_description: 'Learn the fundamentals of sales enablement and customer success.',
   product: 'Sales',
   product_suite: 'Enablement',
+  product_ids: [],
+  product_suite_ids: [],
   topic_tags: ['sales', 'onboarding', 'fundamentals'],
   topic_tag_ids: [],
   related_course_ids: ['course-2'],

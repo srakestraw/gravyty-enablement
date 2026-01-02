@@ -73,7 +73,9 @@ export declare const CourseSchema: z.ZodObject<{
     product_suite: z.ZodOptional<z.ZodString>;
     topic_tags: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
     product_id: z.ZodOptional<z.ZodString>;
+    product_ids: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
     product_suite_id: z.ZodOptional<z.ZodString>;
+    product_suite_ids: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
     topic_tag_ids: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
     legacy_product_suite: z.ZodOptional<z.ZodString>;
     legacy_product_concept: z.ZodOptional<z.ZodString>;
@@ -190,6 +192,8 @@ export declare const CourseSchema: z.ZodObject<{
     status: "draft" | "published" | "archived";
     created_at: string;
     title: string;
+    product_ids: string[];
+    product_suite_ids: string[];
     topic_tag_ids: string[];
     version: number;
     created_by: string;
@@ -259,7 +263,9 @@ export declare const CourseSchema: z.ZodObject<{
     product?: string | undefined;
     product_suite?: string | undefined;
     product_id?: string | undefined;
+    product_ids?: string[] | undefined;
     product_suite_id?: string | undefined;
+    product_suite_ids?: string[] | undefined;
     topic_tag_ids?: string[] | undefined;
     legacy_product_suite?: string | undefined;
     legacy_product_concept?: string | undefined;

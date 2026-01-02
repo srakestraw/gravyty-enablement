@@ -4,6 +4,7 @@
  * Represents a logical asset (e.g., "Q1 Sales Deck") that can have multiple versions.
  */
 import { z } from 'zod';
+import { MediaRefSchema } from '../lms/media.js';
 /**
  * Asset Type
  */
@@ -55,6 +56,8 @@ export const AssetSchema = z.object({
     current_published_version_id: z.string().optional(),
     // Pinning
     pinned: z.boolean().default(false),
+    // Cover image
+    cover_image: MediaRefSchema.optional(),
     // Timestamps
     created_at: z.string(), // ISO datetime
     created_by: z.string(), // User ID
