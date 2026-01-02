@@ -14,11 +14,6 @@ import {
   Box,
   Tabs,
   Tab,
-  List,
-  ListItem,
-  ListItemButton,
-  ListItemText,
-  ListItemIcon,
   CircularProgress,
   Alert,
   Typography,
@@ -28,17 +23,12 @@ import {
 } from '@mui/material';
 import {
   Upload as UploadIcon,
-  VideoFile as VideoIcon,
-  Image as ImageIcon,
-  AttachFile as AttachmentIcon,
   Close as CloseIcon,
-  Collections as CollectionsIcon,
   AutoAwesome as AutoAwesomeIcon,
   PhotoLibrary as PhotoLibraryIcon,
   CloudUpload as CloudUploadIcon,
   Delete as DeleteIcon,
 } from '@mui/icons-material';
-import { useAdminMedia } from '../../../hooks/useAdminMedia';
 import { lmsAdminApi } from '../../../api/lmsAdminClient';
 import type { MediaRef } from '@gravyty/domain';
 import { AIGenerationTab } from './AIGenerationTab';
@@ -74,10 +64,9 @@ export function MediaSelectModal({
   entityShortDescription,
   entityDescription,
 }: MediaSelectModalProps) {
-  // For cover images, show 4 tabs; for others, show 2 tabs
+  // For cover images, show 3 tabs; for others, show 1 tab
   const isCoverImage = mediaType === 'cover';
-  const [tab, setTab] = useState<'gallery' | 'upload' | 'ai' | 'unsplash'>('gallery');
-  const [selectedMediaId, setSelectedMediaId] = useState<string | null>(null);
+  const [tab, setTab] = useState<'upload' | 'ai' | 'unsplash'>('upload');
   
   // Upload tab state
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -252,8 +241,7 @@ export function MediaSelectModal({
   // Reset tab when modal opens and ensure valid tab state
   useEffect(() => {
     if (open) {
-      setTab('gallery');
-      setSelectedMediaId(null);
+      setTab('upload');
       setFile(null);
       setUploadError(null);
       // Reset upload tab state
@@ -265,24 +253,9 @@ export function MediaSelectModal({
   // Ensure tab is valid for current media type
   useEffect(() => {
     if (!isCoverImage && (tab === 'ai' || tab === 'unsplash')) {
-      setTab('gallery');
+      setTab('upload');
     }
   }, [isCoverImage, tab]);
-
-  const { data: media, loading, error, refetch } = useAdminMedia({
-    media_type: mediaType,
-    course_id: courseId,
-    lesson_id: lessonId,
-  });
-
-  // Filter media by type
-  const filteredMedia = media?.filter((m: any) => {
-    if (mediaType === 'cover') return m.type === 'cover';
-    if (mediaType === 'video') return m.type === 'video';
-    if (mediaType === 'poster') return m.type === 'poster';
-    if (mediaType === 'attachment') return m.type === 'attachment';
-    return true;
-  }) || [];
 
   // Drag and drop handlers
   const handleDrag = useCallback((e: React.DragEvent) => {
@@ -369,38 +342,9 @@ export function MediaSelectModal({
         onTemporaryMediaCreated(presignResponse.data.media_ref.media_id);
       }
 
-      // Refresh media list and select the newly uploaded media
-      await refetch();
-      // Use same params as the hook to ensure consistent filtering
-      const newMedia = await lmsAdminApi.listMedia({ 
-        media_type: mediaType,
-        course_id: courseId,
-        lesson_id: lessonId,
-      });
-      if ('error' in newMedia) {
-        console.warn('Failed to refresh media list, but upload succeeded:', newMedia.error);
-        // Still select the media even if list refresh fails
-        onSelect(presignResponse.data.media_ref);
-        onClose();
-        return;
-      }
-
-      if (newMedia.data) {
-        const uploaded = newMedia.data.media.find((m: any) => m.media_id === presignResponse.data.media_ref.media_id);
-        if (uploaded) {
-          onSelect(presignResponse.data.media_ref);
-          onClose();
-        } else {
-          // Media uploaded but not found in list - still select it
-          console.warn('Media uploaded but not found in refreshed list, selecting anyway');
-          onSelect(presignResponse.data.media_ref);
-          onClose();
-        }
-      } else {
-        // No data in response but no error - still select the media
-        onSelect(presignResponse.data.media_ref);
-        onClose();
-      }
+      // Select the newly uploaded media
+      onSelect(presignResponse.data.media_ref);
+      onClose();
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Failed to upload media';
       setUploadStatus('error');
@@ -409,35 +353,6 @@ export function MediaSelectModal({
     } finally {
       setUploading(false);
     }
-  };
-
-  const handleSelect = () => {
-    if (!selectedMediaId) return;
-
-    const selected = filteredMedia.find((m: any) => m.media_id === selectedMediaId);
-    if (selected) {
-      // Convert media item to MediaRef
-      const mediaRef: MediaRef = {
-        media_id: selected.media_id,
-        type: selected.type === 'cover' ? 'image' : selected.type === 'video' ? 'video' : 'document',
-        url: selected.url || '',
-        created_at: selected.created_at || new Date().toISOString(),
-        created_by: selected.created_by || '',
-        filename: selected.filename,
-        content_type: selected.content_type,
-        size_bytes: selected.size_bytes,
-        s3_bucket: selected.s3_bucket,
-        s3_key: selected.s3_key,
-      };
-      onSelect(mediaRef);
-      onClose();
-    }
-  };
-
-  const getMediaIcon = (type: string) => {
-    if (type === 'cover' || type === 'poster') return <ImageIcon />;
-    if (type === 'video') return <VideoIcon />;
-    return <AttachmentIcon />;
   };
 
   return (
@@ -454,7 +369,7 @@ export function MediaSelectModal({
         <Tabs 
           value={tab} 
           onChange={(_, newValue) => {
-            const newTab = newValue as 'gallery' | 'upload' | 'ai' | 'unsplash';
+            const newTab = newValue as 'upload' | 'ai' | 'unsplash';
             // Only allow switching to AI/Unsplash tabs if it's a cover image
             if ((newTab === 'ai' || newTab === 'unsplash') && !isCoverImage) {
               return;
@@ -467,7 +382,6 @@ export function MediaSelectModal({
           }} 
           sx={{ mb: 2 }}
         >
-          <Tab label="Gallery" value="gallery" icon={<CollectionsIcon />} iconPosition="start" />
           <Tab label="Upload" value="upload" icon={<UploadIcon />} iconPosition="start" />
           <Tab 
             label="Use AI Generation" 
@@ -484,49 +398,6 @@ export function MediaSelectModal({
             sx={{ display: isCoverImage ? 'flex' : 'none' }}
           />
         </Tabs>
-
-        {tab === 'gallery' && (
-          <Box>
-            {loading && (
-              <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
-                <CircularProgress />
-              </Box>
-            )}
-
-            {error && (
-              <Alert severity="error" sx={{ mb: 2 }}>
-                {error.message}
-              </Alert>
-            )}
-
-            {!loading && !error && (
-              <>
-                {filteredMedia.length === 0 ? (
-                  <Typography color="text.secondary" sx={{ p: 3, textAlign: 'center' }}>
-                    No {mediaType} media found. Upload your first file to get started.
-                  </Typography>
-                ) : (
-                  <List>
-                    {filteredMedia.map((item: any) => (
-                      <ListItem key={item.media_id} disablePadding>
-                        <ListItemButton
-                          selected={selectedMediaId === item.media_id}
-                          onClick={() => setSelectedMediaId(item.media_id)}
-                        >
-                          <ListItemIcon>{getMediaIcon(item.type)}</ListItemIcon>
-                          <ListItemText
-                            primary={item.filename || item.media_id}
-                            secondary={item.created_at ? new Date(item.created_at).toLocaleDateString() : ''}
-                          />
-                        </ListItemButton>
-                      </ListItem>
-                    ))}
-                  </List>
-                )}
-              </>
-            )}
-          </Box>
-        )}
 
         {tab === 'upload' && (
           <Box>
@@ -724,15 +595,6 @@ export function MediaSelectModal({
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Cancel</Button>
-        {tab === 'gallery' && (
-          <Button
-            variant="contained"
-            onClick={handleSelect}
-            disabled={!selectedMediaId}
-          >
-            Select
-          </Button>
-        )}
         {tab === 'upload' && (
           <Button
             variant="contained"
