@@ -18,15 +18,12 @@ import {
   List,
   ListItem,
   ListItemText,
-  Stack,
 } from '@mui/material';
 import { PlaceholderPage } from '../../components/shared/PlaceholderPage';
 import {
   getAsset, 
   listVersions, 
   getDownloadUrl,
-  downloadAttachment,
-  downloadAllAttachments,
   publishVersion,
   scheduleVersion,
   expireVersion,
@@ -37,8 +34,6 @@ import {
   createSubscription,
   deleteSubscription,
   checkSubscription,
-  pinAsset,
-  unpinAsset,
 } from '../../api/contentHubClient';
 import {
   syncAssetFromDrive,
@@ -57,13 +52,7 @@ import {
   DialogActions,
   TextField,
   MenuItem,
-  Menu,
-  IconButton,
-  Tooltip,
 } from '@mui/material';
-import {
-  Download as DownloadIcon,
-} from '@mui/icons-material';
 
 export function AssetDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -88,7 +77,6 @@ export function AssetDetailPage() {
   const [checkingSubscription, setCheckingSubscription] = useState(false);
   const [syncStatus, setSyncStatus] = useState<AssetSyncStatus | null>(null);
   const [syncing, setSyncing] = useState(false);
-  const [downloadMenuAnchor, setDownloadMenuAnchor] = useState<null | HTMLElement>(null);
   
   const isApprover = isApproverOrHigher(user?.role);
   const isDriveAsset = asset?.source_type === 'GOOGLE_DRIVE';
@@ -240,7 +228,7 @@ export function AssetDetailPage() {
     }
   };
   
-  const handleDownload = async (versionId: string, storageKey?: string) => {
+  const handleDownload = async (versionId: string) => {
     try {
       const response = await getDownloadUrl(versionId);
       
@@ -249,50 +237,11 @@ export function AssetDetailPage() {
         return;
       }
       
-      // Handle multiple files
-      if ('files' in response.data && Array.isArray(response.data.files)) {
-        const filesToDownload = storageKey 
-          ? response.data.files.filter(f => f.storage_key === storageKey)
-          : response.data.files;
-        
-        filesToDownload.forEach(file => {
-          window.open(file.download_url, '_blank');
-        });
-      } else if ('download_url' in response.data) {
-        // Single file (backward compatible)
-        window.open(response.data.download_url, '_blank');
-      }
+      // Open download URL in new window
+      window.open(response.data.download_url, '_blank');
     } catch (err) {
       alert('Failed to generate download URL');
     }
-  };
-  
-  const handleDownloadAttachment = async (attachmentId: string) => {
-    if (!asset) return;
-    try {
-      await downloadAttachment(asset.asset_id, attachmentId);
-      setDownloadMenuAnchor(null);
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to download attachment');
-    }
-  };
-  
-  const handleDownloadAll = async () => {
-    if (!asset) return;
-    try {
-      await downloadAllAttachments(asset.asset_id);
-      setDownloadMenuAnchor(null);
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to download attachments');
-    }
-  };
-  
-  const handleDownloadMenuClick = (event: React.MouseEvent<HTMLElement>) => {
-    setDownloadMenuAnchor(event.currentTarget);
-  };
-  
-  const handleDownloadMenuClose = () => {
-    setDownloadMenuAnchor(null);
   };
   
   const handlePublish = async () => {
@@ -400,11 +349,7 @@ export function AssetDetailPage() {
     );
   }
   
-  // Get file attachments from latest published version
   const latestPublishedVersion = versions.find(v => v.status === 'published' && v.version_id === asset.current_published_version_id);
-  const fileAttachments = latestPublishedVersion?.file_metadata || [];
-  const hasMultipleAttachments = fileAttachments.length > 1;
-  const primaryAttachment = fileAttachments.find((fm: any) => fm.is_primary) || fileAttachments[0];
   
   return (
     <PlaceholderPage title={asset.title} description={asset.description}>
@@ -453,98 +398,16 @@ export function AssetDetailPage() {
               {isSubscribed ? 'Unsubscribe' : 'Subscribe'}
             </Button>
           )}
-          {latestPublishedVersion && fileAttachments.length > 0 && (
-            <>
-              {hasMultipleAttachments ? (
-                <>
-                  <Button
-                    size="small"
-                    variant="contained"
-                    startIcon={<DownloadIcon />}
-                    onClick={handleDownloadMenuClick}
-                  >
-                    Download
-                  </Button>
-                  <Menu
-                    anchorEl={downloadMenuAnchor}
-                    open={Boolean(downloadMenuAnchor)}
-                    onClose={handleDownloadMenuClose}
-                  >
-                    {primaryAttachment && (
-                      <MenuItem onClick={() => handleDownloadAttachment(primaryAttachment.storage_key)}>
-                        Download primary
-                      </MenuItem>
-                    )}
-                    <MenuItem onClick={handleDownloadAll}>
-                      Download all (ZIP)
-                    </MenuItem>
-                    <MenuItem onClick={handleDownloadMenuClose} disabled>
-                      <Typography variant="caption" color="text.secondary">
-                        Individual files available below
-                      </Typography>
-                    </MenuItem>
-                  </Menu>
-                </>
-              ) : (
-                <Button
-                  size="small"
-                  variant="contained"
-                  startIcon={<DownloadIcon />}
-                  onClick={() => primaryAttachment && handleDownloadAttachment(primaryAttachment.storage_key)}
-                >
-                  Download
-                </Button>
-              )}
-            </>
-          )}
         </Box>
         
-        {latestPublishedVersion && fileAttachments.length > 0 && (
-          <Box sx={{ mb: 2 }}>
-            <Typography variant="body2" gutterBottom>
-              Attachments:
-            </Typography>
-            <Stack spacing={1}>
-              {fileAttachments.map((file: any, index: number) => (
-                <Box
-                  key={file.storage_key || index}
-                  sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    p: 1,
-                    border: 1,
-                    borderColor: 'divider',
-                    borderRadius: 1,
-                  }}
-                >
-                  <Box sx={{ flex: 1 }}>
-                    <Typography variant="body2">
-                      {file.filename || `File ${index + 1}`}
-                    </Typography>
-                    {file.size_bytes && (
-                      <Typography variant="caption" color="text.secondary">
-                        {(file.size_bytes / 1024).toFixed(1)} KB
-                      </Typography>
-                    )}
-                  </Box>
-                  <Tooltip title="Download">
-                    <IconButton
-                      size="small"
-                      onClick={() => handleDownloadAttachment(file.storage_key)}
-                    >
-                      <DownloadIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                </Box>
-              ))}
-            </Stack>
-            {fileAttachments.length > 1 && (
-              <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
-                Download all includes files only. Links are not bundled.
-              </Typography>
-            )}
-          </Box>
+        {latestPublishedVersion && (
+          <Button
+            variant="contained"
+            onClick={() => handleDownload(latestPublishedVersion.version_id)}
+            sx={{ mb: 2 }}
+          >
+            Download Latest Version
+          </Button>
         )}
       </Box>
       
@@ -560,28 +423,6 @@ export function AssetDetailPage() {
             <Typography variant="h6" gutterBottom>Metadata</Typography>
             <Typography variant="body2"><strong>Owner:</strong> {asset.owner_id}</Typography>
             <Typography variant="body2"><strong>Source:</strong> {asset.source_type}</Typography>
-            {asset.source_type === 'LINK' && asset.source_ref && (
-              <Box sx={{ mt: 1 }}>
-                <Typography variant="body2" gutterBottom><strong>Links:</strong></Typography>
-                {'urls' in asset.source_ref && Array.isArray(asset.source_ref.urls) ? (
-                  <Stack spacing={0.5}>
-                    {asset.source_ref.urls.map((url: string, index: number) => (
-                      <Typography key={index} variant="body2">
-                        <a href={url} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit' }}>
-                          {url}
-                        </a>
-                      </Typography>
-                    ))}
-                  </Stack>
-                ) : 'url' in asset.source_ref && typeof asset.source_ref.url === 'string' ? (
-                  <Typography variant="body2">
-                    <a href={asset.source_ref.url} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit' }}>
-                      {asset.source_ref.url}
-                    </a>
-                  </Typography>
-                ) : null}
-              </Box>
-            )}
             {isDriveAsset && syncStatus && (
               <Box sx={{ mt: 2 }}>
                 <Typography variant="body2" gutterBottom>
@@ -670,30 +511,12 @@ export function AssetDetailPage() {
                     />
                     <Box sx={{ display: 'flex', gap: 1 }}>
                       {version.status === 'published' && (
-                        <>
-                          {(version.storage_keys && version.storage_keys.length > 1) ||
-                           (version.file_metadata && version.file_metadata.length > 1) ? (
-                            <Box>
-                              {(version.file_metadata || []).map((file, index) => (
-                                <Button
-                                  key={file.storage_key || index}
-                                  size="small"
-                                  onClick={() => handleDownload(version.version_id, file.storage_key)}
-                                  sx={{ mr: 1, mb: 1 }}
-                                >
-                                  {file.filename || `File ${index + 1}`}
-                                </Button>
-                              ))}
-                            </Box>
-                          ) : (
-                            <Button
-                              size="small"
-                              onClick={() => handleDownload(version.version_id)}
-                            >
-                              Download
-                            </Button>
-                          )}
-                        </>
+                        <Button
+                          size="small"
+                          onClick={() => handleDownload(version.version_id)}
+                        >
+                          Download
+                        </Button>
                       )}
                       {isApprover && version.status === 'draft' && (
                         <>
