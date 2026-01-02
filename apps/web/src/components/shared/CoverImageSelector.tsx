@@ -12,7 +12,6 @@ import {
   Typography,
   IconButton,
   Stack,
-  Chip,
 } from '@mui/material';
 import {
   Edit as EditIcon,
@@ -87,17 +86,6 @@ export function CoverImageSelector({
       <Stack spacing={2}>
         {/* Label */}
         <Typography variant="subtitle2">{label}</Typography>
-
-        {/* Image Requirements Guidance */}
-        {showGuidance && (
-          <Chip
-            label="Recommended: 16:9 aspect ratio (1600 x 900). Keep subject centered, avoid text near edges."
-            size="small"
-            color="info"
-            variant="outlined"
-            sx={{ alignSelf: 'flex-start' }}
-          />
-        )}
 
         {/* Current Cover Image Display */}
         {coverImage && imageUrl ? (
