@@ -280,19 +280,8 @@ export async function getMetadataOptionUsage(req: AuthenticatedRequest, res: Res
       return;
     }
 
-    // Verify option exists
-    const option = await metadataRepo.getOptionById(optionId);
-    if (!option) {
-      res.status(404).json({
-        error: {
-          code: 'NOT_FOUND',
-          message: `Metadata option ${optionId} not found`,
-        },
-        request_id: requestId,
-      });
-      return;
-    }
-
+    // Check usage - we allow checking usage even if the option is soft-deleted or doesn't exist
+    // This is useful for seeing what references an option before permanent deletion
     const usage = await metadataRepo.getUsageCount(optionId, groupKey);
 
     const response: ApiSuccessResponse<typeof usage> = {

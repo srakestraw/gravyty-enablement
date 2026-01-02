@@ -11,6 +11,18 @@ import * as migrationHandlers from '../handlers/metadataMigration';
 
 const router = express.Router();
 
+// IMPORTANT: More specific routes must come BEFORE less specific routes
+// Express matches routes in order, so /:groupKey/options/:optionId/usage must come before /:groupKey/options
+
+// Get usage count - Admin only (must come before /:groupKey/options)
+router.get('/:groupKey/options/:optionId/usage', requireRole('Admin'), metadataHandlers.getMetadataOptionUsage);
+
+// Merge option - Admin only (must come before /:groupKey/options)
+router.post('/:groupKey/options/:optionId/merge', requireRole('Admin'), metadataHandlers.mergeMetadataOption);
+
+// Delete option - Admin only (must come before /:groupKey/options)
+router.delete('/:groupKey/options/:optionId', requireRole('Admin'), metadataHandlers.deleteMetadataOption);
+
 // List options - public (Viewer+)
 router.get('/:groupKey/options', requireRole('Viewer'), metadataHandlers.listMetadataOptions);
 
@@ -22,15 +34,6 @@ router.post('/:groupKey/options', requireRole('Admin'), metadataHandlers.createM
 
 // Update option - Admin only
 router.patch('/options/:optionId', requireRole('Admin'), metadataHandlers.updateMetadataOption);
-
-// Get usage count - Admin only
-router.get('/:groupKey/options/:optionId/usage', requireRole('Admin'), metadataHandlers.getMetadataOptionUsage);
-
-// Delete option - Admin only
-router.delete('/:groupKey/options/:optionId', requireRole('Admin'), metadataHandlers.deleteMetadataOption);
-
-// Merge option - Admin only
-router.post('/:groupKey/options/:optionId/merge', requireRole('Admin'), metadataHandlers.mergeMetadataOption);
 
 // Migration routes - Admin only
 router.get('/migration/scan', requireRole('Admin'), migrationHandlers.scanLegacyMetadataValues);

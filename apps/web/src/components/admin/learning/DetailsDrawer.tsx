@@ -32,6 +32,7 @@ import {
 } from '@mui/icons-material';
 import { MediaSelectModal } from './MediaSelectModal';
 import { MetadataSelect, MetadataMultiSelect } from '../../metadata';
+import { useMetadataOptions } from '../../../hooks/useMetadataOptions';
 import { focusRegistry } from '../../../utils/focusRegistry';
 import type { Course, MediaRef } from '@gravyty/domain';
 
@@ -68,6 +69,11 @@ export function DetailsDrawer({
   // Track the last synced course ID to avoid overwriting user input
   const lastSyncedCourseIdRef = useRef<string | null>(null);
 
+  // Fetch all products to validate against Product Suite selection
+  const { options: allProducts } = useMetadataOptions('product', {
+    include_archived: true, // Include archived to check all products
+  });
+
   // Sync state with course (only when course ID changes)
   useEffect(() => {
     if (course && course.course_id !== lastSyncedCourseIdRef.current) {
@@ -85,6 +91,59 @@ export function DetailsDrawer({
       lastSyncedCourseIdRef.current = course.course_id;
     }
   }, [course?.course_id, course?.badge_ids]);
+
+  // Validate and remove invalid products when Product Suite selection changes
+  useEffect(() => {
+    // Only validate if we have products loaded
+    if (allProducts.length === 0) {
+      // Products not loaded yet, skip validation
+      return;
+    }
+    
+    // Only validate if we have Product Suites selected and products selected
+    if (productSuiteIds.length === 0 || productIds.length === 0) {
+      // If no Product Suites selected, keep all products (backward compatibility)
+      // If no products selected, nothing to validate
+      return;
+    }
+    
+    // Create set of valid Product Suite IDs for quick lookup
+    const validProductSuiteIds = new Set(productSuiteIds);
+    
+    // Filter products to only keep those that:
+    // 1. Belong to at least one selected Product Suite (parent_id matches), OR
+    // 2. Have no parent_id (backward compatibility)
+    const validProductIds = productIds.filter((productId) => {
+      const product = allProducts.find((p) => p.option_id === productId);
+      if (!product) {
+        // Product not found, remove it
+        return false;
+      }
+      // Keep if no parent_id (backward compatibility) or parent_id matches selected Product Suite
+      return (
+        product.parent_id === null ||
+        product.parent_id === undefined ||
+        (product.parent_id && validProductSuiteIds.has(product.parent_id))
+      );
+    });
+    
+    // If any products were removed, update the selection
+    // Use JSON.stringify to compare arrays to avoid unnecessary updates
+    const currentIdsStr = JSON.stringify([...productIds].sort());
+    const validIdsStr = JSON.stringify([...validProductIds].sort());
+    if (currentIdsStr !== validIdsStr) {
+      console.log('[DetailsDrawer] Removing invalid products:', {
+        removed: productIds.filter((id) => !validProductIds.includes(id)),
+        validProductIds,
+        productSuiteIds,
+      });
+      setProductIds(validProductIds);
+      if (course) {
+        handleCourseFieldChange('product_ids', validProductIds);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productSuiteIds, productIds, allProducts]);
 
   // Register fields with focus registry
   useEffect(() => {
@@ -242,6 +301,7 @@ export function DetailsDrawer({
                         markFieldTouched('course', course.course_id, 'product_ids');
                       }
                     }}
+                    parentIds={productSuiteIds.length > 0 ? productSuiteIds : undefined}
                     label="Product"
                     placeholder="Select products"
                     fullWidth

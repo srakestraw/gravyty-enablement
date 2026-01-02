@@ -425,10 +425,6 @@ export function DetailsTabContent({
     });
   }, [course?.title, course?.course_id, title, shouldShowError]);
 
-
-
-  // Product Suite and Product are now independent - no dependency logic needed
-
   return (
     <>
       <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 3 }}>

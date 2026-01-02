@@ -82,19 +82,31 @@ export class MetadataRepo {
     // For hierarchical metadata (e.g., product filtered by product_suite), show options that:
     // 1. Match the parent_id exactly, OR
     // 2. Have no parent_id set (null/undefined) - for backward compatibility with existing data
-    // Note: If no products match the parent_id, we show all products to allow selection until data is properly configured
+    // Note: If no products match the parent_id AND no products have null/undefined parent_id,
+    // we show all products to allow selection until data is properly configured
     if (params.parent_id !== undefined && params.parent_id !== null) {
-      const matchingOptions = options.filter((opt) => 
-        opt.parent_id === params.parent_id || 
-        opt.parent_id === null || 
-        opt.parent_id === undefined
-      );
-      // If we have matching options, use them; otherwise show all (for backward compatibility during migration)
+      // Separate products into: matching parent_id, no parent_id, and others
+      const matchingParentId = options.filter((opt) => opt.parent_id === params.parent_id);
+      const noParentId = options.filter((opt) => opt.parent_id === null || opt.parent_id === undefined);
+      const matchingOptions = [...matchingParentId, ...noParentId];
+      
+      // Always include products with no parent_id (backward compatibility)
+      // If we have products matching the parent_id OR products with no parent_id, use them
+      // Otherwise, if there are NO products with null/undefined parent_id AND no products match,
+      // show all products (for backward compatibility during migration)
       if (matchingOptions.length > 0) {
         options = matchingOptions;
+      } else {
+        // No products match AND no products have null/undefined parent_id
+        // This means all products have parent_id set but none match the selected Product Suite
+        // Show all products to allow selection (data migration scenario)
+        console.log(`[MetadataRepo] No products match parent_id ${params.parent_id} and no products have null parent_id. Showing all ${options.length} products for backward compatibility.`);
+        // options already contains all products, so no change needed
       }
-      // If no matching options, keep all options (allows selection until parent_id is set on products)
     }
+
+    // Filter out soft-deleted items (deleted_at is set)
+    options = options.filter((opt) => !opt.deleted_at);
 
     // Filter archived unless explicitly included
     if (!params.include_archived) {
@@ -383,36 +395,40 @@ export class MetadataRepo {
       courseLastKey = courseResult.LastEvaluatedKey;
     } while (courseLastKey);
 
-    // Build filter expression for resources
-    const resourceFilter = this.buildUsageFilterExpression(groupKey, optionId, 'resource');
+    // Skip resource scanning for badges - badges only apply to courses, learning paths, and role playing
+    // Not to content items/resources
+    if (groupKey !== 'badge') {
+      // Build filter expression for resources
+      const resourceFilter = this.buildUsageFilterExpression(groupKey, optionId, 'resource');
 
-    // Check Resources/Content table
-    let resourceLastKey;
-    do {
-      const resourceCommand = new ScanCommand({
-        TableName: CONTENT_TABLE,
-        ...(resourceFilter.filterExpression && {
-          FilterExpression: resourceFilter.filterExpression,
-          ExpressionAttributeNames: resourceFilter.attributeNames,
-          ExpressionAttributeValues: resourceFilter.attributeValues,
-        }),
-        ...(resourceLastKey && { ExclusiveStartKey: resourceLastKey }),
-      });
+      // Check Resources/Content table
+      let resourceLastKey;
+      do {
+        const resourceCommand = new ScanCommand({
+          TableName: CONTENT_TABLE,
+          ...(resourceFilter.filterExpression && {
+            FilterExpression: resourceFilter.filterExpression,
+            ExpressionAttributeNames: resourceFilter.attributeNames,
+            ExpressionAttributeValues: resourceFilter.attributeValues,
+          }),
+          ...(resourceLastKey && { ExclusiveStartKey: resourceLastKey }),
+        });
 
-      const resourceResult = await dynamoDocClient.send(resourceCommand);
-      const resources = (resourceResult.Items || []) as ContentItem[];
+        const resourceResult = await dynamoDocClient.send(resourceCommand);
+        const resources = (resourceResult.Items || []) as ContentItem[];
 
-      resourceCount += resources.length;
+        resourceCount += resources.length;
 
-      // Collect sample resource IDs
-      resources.forEach((resource) => {
-        if (sampleResourceIds.length < 10) {
-          sampleResourceIds.push(resource.content_id);
-        }
-      });
+        // Collect sample resource IDs
+        resources.forEach((resource) => {
+          if (sampleResourceIds.length < 10) {
+            sampleResourceIds.push(resource.content_id);
+          }
+        });
 
-      resourceLastKey = resourceResult.LastEvaluatedKey;
-    } while (resourceLastKey);
+        resourceLastKey = resourceResult.LastEvaluatedKey;
+      } while (resourceLastKey);
+    }
 
     return {
       used_by_courses: courseCount,

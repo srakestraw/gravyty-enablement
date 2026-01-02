@@ -30,6 +30,7 @@ export interface MetadataMultiSelectProps {
   groupKey: MetadataGroupKey;
   values: string[]; // Array of metadata option IDs
   onChange: (optionIds: string[]) => void;
+  parentIds?: string[]; // Optional array of parent IDs for hierarchical filtering (e.g., filter products by Product Suite)
   label?: string;
   placeholder?: string;
   disabled?: boolean;
@@ -42,13 +43,14 @@ export function MetadataMultiSelect({
   groupKey,
   values,
   onChange,
+  parentIds,
   label,
   placeholder,
   disabled,
   error,
   helperText,
   fullWidth = true,
-}: TaxonomyMultiSelectProps) {
+}: MetadataMultiSelectProps) {
   const { user } = useAuth();
   const canCreate = isAdmin(user?.role);
   const canManage = isAdmin(user?.role);
@@ -58,9 +60,11 @@ export function MetadataMultiSelect({
   const [managerAnchor, setManagerAnchor] = useState<HTMLElement | null>(null);
 
   // Fetch options with query filter (include archived for manager)
+  // Pass parentIds to filter options hierarchically (e.g., products filtered by Product Suite)
   const { options, loading, setOptions: setOptionsState } = useMetadataOptions(groupKey, {
     query: query || undefined,
     include_archived: managerOpen, // Include archived when manager is open
+    parentIds: parentIds, // Pass parent IDs for hierarchical filtering
   });
 
   // Find selected options
