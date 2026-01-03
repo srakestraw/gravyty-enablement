@@ -21,6 +21,7 @@ import { AdminHubPage } from './pages/AdminHubPage';
 import { CoursesPage } from './pages/learn/CoursesPage';
 import { CourseDetailPage } from './pages/learn/CourseDetailPage';
 import { LessonPlayerPage } from './pages/learn/LessonPlayerPage';
+import { AssessmentPage } from './pages/learn/AssessmentPage';
 import { LearningPathsPage } from './pages/learn/LearningPathsPage';
 import { LearningPathDetailPage } from './pages/learn/LearningPathDetailPage';
 import { CertificationsPage } from './pages/learn/CertificationsPage';
@@ -55,6 +56,12 @@ import { InsightsResourcesPage } from './pages/InsightsResourcesPage';
 import { AdminUsersRolesPage } from './pages/admin/AdminUsersRolesPage';
 import { AdminLearningPage } from './pages/admin/AdminLearningPage';
 import { AdminIntegrationsPage } from './pages/admin/AdminIntegrationsPage';
+import { AdminPromptHelpersPage } from './pages/admin/AdminPromptHelpersPage';
+import { AdminPromptHelperDetailPage } from './pages/admin/AdminPromptHelperDetailPage';
+// Admin Badge pages
+import { AdminBadgesPage } from './pages/admin/badges/AdminBadgesPage';
+import { AdminBadgeDetailPage } from './pages/admin/badges/AdminBadgeDetailPage';
+import { AdminBadgeAwardsPage } from './pages/admin/badges/AdminBadgeAwardsPage';
 // Admin Learning pages
 import { AdminLearningCoursesPage } from './pages/admin/learning/AdminLearningCoursesPage';
 import { AdminCourseEditorPage } from './pages/admin/learning/AdminCourseEditorPage';
@@ -275,6 +282,16 @@ function App() {
           <RequireAuth>
             <AppShell>
               <LessonPlayerPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/enablement/learn/courses/:courseId/assessment/:attemptId"
+        element={
+          <RequireAuth>
+            <AppShell>
+              <AssessmentPage />
             </AppShell>
           </RequireAuth>
         }
@@ -710,6 +727,66 @@ function App() {
             <RequireAdmin>
               <AppShell>
                 <AdminIntegrationsPage />
+              </AppShell>
+            </RequireAdmin>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/enablement/admin/prompt-helpers"
+        element={
+          <RequireAuth>
+            <RequireAdmin>
+              <AppShell>
+                <AdminPromptHelpersPage />
+              </AppShell>
+            </RequireAdmin>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/enablement/admin/prompt-helpers/:helperId"
+        element={
+          <RequireAuth>
+            <RequireAdmin>
+              <AppShell>
+                <AdminPromptHelperDetailPage />
+              </AppShell>
+            </RequireAdmin>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/enablement/admin/badges"
+        element={
+          <RequireAuth>
+            <RequireAdmin>
+              <AppShell>
+                <AdminBadgesPage />
+              </AppShell>
+            </RequireAdmin>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/enablement/admin/badges/:badgeId"
+        element={
+          <RequireAuth>
+            <RequireAdmin>
+              <AppShell>
+                <AdminBadgeDetailPage />
+              </AppShell>
+            </RequireAdmin>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/enablement/admin/badges/:badgeId/awards"
+        element={
+          <RequireAuth>
+            <RequireAdmin>
+              <AppShell>
+                <AdminBadgeAwardsPage />
               </AppShell>
             </RequireAdmin>
           </RequireAuth>

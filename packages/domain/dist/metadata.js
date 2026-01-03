@@ -2,7 +2,7 @@
  * Metadata Domain Types
  *
  * Defines metadata groups and options for categorizing content (Courses, Resources).
- * Metadata groups: product, product_suite, topic_tag, badge, audience
+ * Metadata groups: product, product_suite, topic_tag, audience
  *
  * Note: Renamed from legacy naming:
  * - Legacy "product_suite" -> "product"
@@ -19,7 +19,7 @@ import { z } from 'zod';
  * - "product_suite" (was "product_concept")
  * - "topic_tag" (unchanged)
  */
-export const MetadataGroupKeySchema = z.enum(['product', 'product_suite', 'topic_tag', 'badge', 'audience', 'entity_type']);
+export const MetadataGroupKeySchema = z.enum(['product', 'product_suite', 'topic_tag', 'audience', 'entity_type', 'badge']);
 /**
  * Metadata Option
  *

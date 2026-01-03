@@ -4,7 +4,7 @@
  * Tab content for AI-powered image generation
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Box,
   TextField,
@@ -25,8 +25,12 @@ import {
   CheckCircle as CheckCircleIcon,
 } from '@mui/icons-material';
 import { lmsAdminApi } from '../../../api/lmsAdminClient';
+import { promptHelpersApi } from '../../../api/promptHelpersClient';
 import { downloadAndUploadImage } from './utils/imageUpload';
-import type { MediaRef } from '@gravyty/domain';
+import { isErrorResponse } from '../../../lib/apiClient';
+import type { MediaRef, PromptHelper } from '@gravyty/domain';
+import { Collapse, Accordion, AccordionSummary, AccordionDetails } from '@mui/material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 
 export interface AIGenerationTabProps {
   entityTitle?: string;
@@ -61,6 +65,75 @@ export function AIGenerationTab({
   const [revisedPrompt, setRevisedPrompt] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Prompt Helper state
+  const [helpers, setHelpers] = useState<PromptHelper[]>([]);
+  const [selectedHelperId, setSelectedHelperId] = useState<string>('');
+  const [composedPrompt, setComposedPrompt] = useState<string | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
+  const [loadingHelpers, setLoadingHelpers] = useState(false);
+
+  // Load helpers and default on mount
+  useEffect(() => {
+    const loadHelpers = async () => {
+      setLoadingHelpers(true);
+      try {
+        const response = await promptHelpersApi.getForContext('cover_image');
+        if (!isErrorResponse(response)) {
+          setHelpers(response.data.helpers);
+          // Set default helper if available
+          const defaultHelper = response.data.helpers.find(h => h.is_default_for.includes('cover_image'));
+          if (defaultHelper) {
+            setSelectedHelperId(defaultHelper.helper_id);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load prompt helpers:', err);
+      } finally {
+        setLoadingHelpers(false);
+      }
+    };
+    loadHelpers();
+  }, []);
+
+  // Compose prompt preview when helper or prompt changes
+  useEffect(() => {
+    const updatePreview = async () => {
+      if (!selectedHelperId || !prompt.trim()) {
+        setComposedPrompt(null);
+        return;
+      }
+      
+      try {
+        const response = await promptHelpersApi.composePreview({
+          helper_id: selectedHelperId,
+          context: 'cover_image',
+          user_content: prompt,
+          provider,
+          variables: {
+            course: {
+              title: entityTitle,
+            },
+            cover: {
+              subject: prompt,
+            },
+          },
+        });
+        
+        if (!isErrorResponse(response)) {
+          setComposedPrompt(response.data.composed_prompt);
+        }
+      } catch (err) {
+        console.error('Failed to compose preview:', err);
+      }
+    };
+    
+    if (selectedHelperId && prompt.trim()) {
+      updatePreview();
+    } else {
+      setComposedPrompt(null);
+    }
+  }, [selectedHelperId, prompt, provider, entityTitle]);
 
   const handleSuggestPrompt = async () => {
     if (!entityTitle) {
@@ -103,12 +176,16 @@ export function AIGenerationTab({
     setRevisedPrompt(null);
 
     try {
+      // Use composed prompt if helper is selected, otherwise use raw prompt
+      const finalPrompt = composedPrompt || prompt.trim();
+      
       const response = await lmsAdminApi.generateImage({
-        prompt: prompt.trim(),
+        prompt: finalPrompt,
         provider,
         size: '1024x1024',
         quality: 'standard',
         style: 'vivid',
+        helper_id: selectedHelperId || undefined,
       });
 
       if ('data' in response) {
@@ -197,6 +274,43 @@ export function AIGenerationTab({
             <MenuItem value="gemini">Google Gemini</MenuItem>
           </Select>
         </FormControl>
+
+        {/* Prompt Helper Selector */}
+        <FormControl fullWidth>
+          <InputLabel>Prompt Helper</InputLabel>
+          <Select
+            value={selectedHelperId}
+            onChange={(e) => setSelectedHelperId(e.target.value)}
+            label="Prompt Helper"
+            disabled={loadingHelpers}
+          >
+            <MenuItem value="">
+              {helpers.find(h => h.is_default_for.includes('cover_image')) 
+                ? 'Default (recommended)' 
+                : 'None'}
+            </MenuItem>
+            {helpers.map((helper) => (
+              <MenuItem key={helper.helper_id} value={helper.helper_id}>
+                {helper.name}
+                {helper.is_default_for.includes('cover_image') && ' (default)'}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+
+        {/* Composed Prompt Preview */}
+        {composedPrompt && (
+          <Accordion>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <Typography variant="subtitle2">Composed Prompt Preview</Typography>
+            </AccordionSummary>
+            <AccordionDetails>
+              <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>
+                {composedPrompt}
+              </Typography>
+            </AccordionDetails>
+          </Accordion>
+        )}
 
         {/* Prompt Input */}
         <TextField

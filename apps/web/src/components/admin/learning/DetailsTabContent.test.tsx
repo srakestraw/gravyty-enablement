@@ -79,7 +79,6 @@ describe('DetailsTabContent', () => {
     product_id: undefined,
     product_suite_id: undefined,
     topic_tag_ids: [],
-    badge_ids: [],
     sections: [],
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),

@@ -5,7 +5,7 @@
  */
 
 import express from 'express';
-import { requireRole } from '../middleware/jwtAuth';
+import { requireRoleNew as requireRole } from '../middleware/jwtAuth.new';
 import * as searchHandlers from '../handlers/unifiedSearch';
 
 const router = express.Router();
@@ -17,4 +17,5 @@ router.use(requireRole('Viewer'));
 router.get('/', searchHandlers.unifiedSearch);
 
 export default router;
+
 

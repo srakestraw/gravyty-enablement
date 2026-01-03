@@ -41,7 +41,7 @@ export interface MetadataMultiSelectProps {
 
 export function MetadataMultiSelect({
   groupKey,
-  values,
+  values = [],
   onChange,
   parentIds,
   label,
@@ -69,7 +69,8 @@ export function MetadataMultiSelect({
 
   // Find selected options
   const selectedOptions = useMemo(() => {
-    return options.filter((opt) => values.includes(opt.option_id));
+    const safeValues = values || [];
+    return options.filter((opt) => safeValues.includes(opt.option_id));
   }, [values, options]);
 
   // Handle create new option
@@ -88,7 +89,7 @@ export function MetadataMultiSelect({
       }
 
       // Add the newly created option to selection
-      onChange([...values, response.data.option.option_id]);
+      onChange([...(values || []), response.data.option.option_id]);
       setQuery('');
     } catch (err) {
       console.error('Error creating metadata option:', err);
@@ -99,7 +100,8 @@ export function MetadataMultiSelect({
 
   // Filter options: exclude archived unless selected
   const availableOptions = useMemo(() => {
-    const selectedIds = new Set(values);
+    const safeValues = values || [];
+    const selectedIds = new Set(safeValues);
     return options.filter((opt) => !opt.archived_at || selectedIds.has(opt.option_id));
   }, [options, values]);
 

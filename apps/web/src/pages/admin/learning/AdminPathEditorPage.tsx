@@ -36,6 +36,7 @@ import {
   ArrowDownward as ArrowDownIcon,
   Add as AddIcon,
   Refresh as RefreshIcon,
+  Assignment as AssignmentIcon,
 } from '@mui/icons-material';
 import { useAdminPath } from '../../../hooks/useAdminPath';
 import { useAdminCourses } from '../../../hooks/useAdminCourses';
@@ -44,6 +45,7 @@ import { validatePathPublish, getValidationSummary, validatePathDraft } from '..
 import { PublishReadinessPanel } from '../../../components/admin/learning/PublishReadinessPanel';
 import { CoverImageSelector } from '../../../components/shared/CoverImageSelector';
 import { MetadataSection } from '../../../components/metadata';
+import { CreateAssignmentModal } from '../../../components/admin/learning/CreateAssignmentModal';
 import type { LearningPath, LearningPathCourseRef, MediaRef } from '@gravyty/domain';
 
 export function AdminPathEditorPage() {
@@ -70,6 +72,7 @@ export function AdminPathEditorPage() {
   const [addCourseDialogOpen, setAddCourseDialogOpen] = useState(false);
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
   const [discardDialogOpen, setDiscardDialogOpen] = useState(false);
+  const [assignModalOpen, setAssignModalOpen] = useState(false);
 
   // Published courses for selection
   const publishedCourses = useMemo(() => {
@@ -102,7 +105,6 @@ export function AdminPathEditorPage() {
         version: 1,
         courses: [],
         topic_tag_ids: [],
-        badges: [],
         audience_ids: [],
         product_ids: [],
         product_suite_ids: [],
@@ -204,7 +206,6 @@ export function AdminPathEditorPage() {
           description: description.trim() || undefined,
           short_description: shortDescription.trim() || undefined,
           topic_tags: topicTagIds,
-          badges: badgeIds,
           audience_ids: audienceIds,
           courses: path.courses,
           cover_image: coverImage || undefined,
@@ -219,7 +220,6 @@ export function AdminPathEditorPage() {
           description: description.trim() || undefined,
           short_description: shortDescription.trim() || undefined,
           topic_tags: topicTagIds,
-          badges: badgeIds,
           audience_ids: audienceIds,
           courses: path.courses,
           cover_image: coverImage || undefined,
@@ -314,6 +314,17 @@ export function AdminPathEditorPage() {
           {isNew ? 'Create Learning Path' : `Edit Path: ${title || 'Loading...'}`}
         </Typography>
         <Box sx={{ display: 'flex', gap: 1 }}>
+          {!isNew && path && path.status === 'published' && (
+            <Tooltip title="Assign this learning path to learners">
+              <Button
+                variant="outlined"
+                startIcon={<AssignmentIcon />}
+                onClick={() => setAssignModalOpen(true)}
+              >
+                Assign
+              </Button>
+            </Tooltip>
+          )}
           {!isNew && (
             <Tooltip title="Discard unsaved changes and reload from server">
               <Button
@@ -413,8 +424,6 @@ export function AdminPathEditorPage() {
                 onTopicTagIdsChange={setTopicTagIds}
                 audienceIds={audienceIds}
                 onAudienceIdsChange={setAudienceIds}
-                badgeIds={badgeIds}
-                onBadgeIdsChange={setBadgeIds}
               />
             </Box>
 
@@ -567,6 +576,19 @@ export function AdminPathEditorPage() {
           </Button>
         </DialogActions>
       </Dialog>
+      
+      {/* Assignment Modal */}
+      {path && path.status === 'published' && (
+        <CreateAssignmentModal
+          open={assignModalOpen}
+          onClose={() => setAssignModalOpen(false)}
+          contextualTarget={{
+            type: 'path',
+            id: path.path_id,
+            title: path.title,
+          }}
+        />
+      )}
     </Box>
   );
 }

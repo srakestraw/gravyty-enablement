@@ -56,8 +56,8 @@ export interface CreateCourseRequest {
   product_id?: string; // Was "product_suite_id"
   product_suite_id?: string; // Was "product_concept_id"
   topic_tag_ids?: string[];
-  badges?: Array<{ badge_id: string; name: string; description?: string; icon_url?: string }>;
   badge_ids?: string[];
+  badges?: Array<{ badge_id: string; name: string; description?: string; icon_url?: string }>;
 }
 
 export interface UpdateCourseRequest {
@@ -70,8 +70,8 @@ export interface UpdateCourseRequest {
   product_id?: string; // Was "product_suite_id"
   product_suite_id?: string; // Was "product_concept_id"
   topic_tag_ids?: string[];
-  badges?: Array<{ badge_id: string; name: string; description?: string; icon_url?: string }>;
   badge_ids?: string[];
+  badges?: Array<{ badge_id: string; name: string; description?: string; icon_url?: string }>;
   cover_image?: MediaRef;
 }
 
@@ -151,12 +151,24 @@ export interface CreateAssignmentRequest {
   note?: string;
 }
 
+export interface HydratedAssignment extends Assignment {
+  assignee?: {
+    id: string;
+    name?: string;
+    email: string;
+  } | null;
+  target?: {
+    id: string;
+    type: 'course' | 'path';
+    title: string;
+  } | null;
+}
+
 export interface CreateCertificateTemplateRequest {
   name: string;
   description?: string;
   applies_to: 'course' | 'path';
   applies_to_id: string;
-  badge_text: string;
   signatory_name?: string;
   signatory_title?: string;
   issued_copy: {
@@ -170,7 +182,6 @@ export interface UpdateCertificateTemplateRequest {
   description?: string;
   applies_to?: 'course' | 'path';
   applies_to_id?: string;
-  badge_text?: string;
   signatory_name?: string;
   signatory_title?: string;
   issued_copy?: {
@@ -305,7 +316,7 @@ export const lmsAdminApi = {
     if (params?.assignee_user_id) query.append('assignee_user_id', params.assignee_user_id);
     if (params?.status) query.append('status', params.status);
     const url = `${BASE_URL}/assignments${query.toString() ? `?${query.toString()}` : ''}`;
-    return apiFetch<{ assignments: Assignment[] }>(url);
+    return apiFetch<{ assignments: HydratedAssignment[] }>(url);
   },
 
   async createAssignment(data: CreateAssignmentRequest) {
@@ -379,6 +390,26 @@ export const lmsAdminApi = {
     });
   },
 
+  async cleanupOrphanedMedia(dryRun: boolean = true) {
+    return apiFetch<{
+      orphaned_media: Array<{
+        media_id: string;
+        type: string;
+        filename?: string;
+        url: string;
+        created_at: string;
+        course_id?: string;
+        lesson_id?: string;
+      }>;
+      orphaned_count: number;
+      deleted_count?: number;
+      deletion_errors?: Array<{ media_id: string; error: string }>;
+    }>(`${BASE_URL}/media/cleanup`, {
+      method: 'POST',
+      body: JSON.stringify({ dry_run: dryRun }),
+    });
+  },
+
   // Course Assets (Content Hub integration)
   async attachAssetToCourse(courseId: string, data: {
     asset_id: string;
@@ -445,6 +476,7 @@ export const lmsAdminApi = {
     size?: '1024x1024' | '512x512' | '256x256';
     quality?: 'standard' | 'hd';
     style?: 'vivid' | 'natural';
+    helper_id?: string;
   }) {
     return apiFetch<{ image_url: string; revised_prompt?: string; provider: string }>(`${BASE_URL}/ai/generate-image`, {
       method: 'POST',
@@ -465,6 +497,7 @@ export const lmsAdminApi = {
     prompt: string;
     context?: string;
     existing_content?: string;
+    helper_id?: string;
   }) {
     return apiFetch<{ 
       content: string; 
@@ -603,6 +636,69 @@ export const lmsAdminApi = {
       total: number;
       total_pages: number;
     }>(url);
+  },
+
+  // Assessment Admin APIs
+  async getAssessmentConfig(courseId: string) {
+    const url = `${BASE_URL}/courses/${courseId}/assessment`;
+    return apiFetch<{ config: any }>(url);
+  },
+
+  async saveAssessmentConfig(courseId: string, config: {
+    is_enabled?: boolean;
+    title?: string;
+    description?: string;
+    passing_score?: number;
+    score_mode?: 'best' | 'latest';
+    max_attempts?: number | null;
+    required_for_completion?: boolean;
+    is_certification?: boolean;
+  }) {
+    const url = `${BASE_URL}/courses/${courseId}/assessment`;
+    return apiFetch<{ config: any }>(url, {
+      method: 'PUT',
+      body: JSON.stringify(config),
+    });
+  },
+
+  async getAssessmentQuestions(courseId: string) {
+    const url = `${BASE_URL}/courses/${courseId}/assessment/questions`;
+    return apiFetch<{ questions: Array<any & { options?: any[] }> }>(url);
+  },
+
+  async saveAssessmentQuestions(courseId: string, questions: Array<{
+    question_id?: string;
+    type: 'multiple_choice' | 'true_false';
+    prompt: string;
+    points?: number;
+    order_index: number;
+    is_required?: boolean;
+    correct_boolean_answer?: boolean;
+    options?: Array<{
+      option_id?: string;
+      label: string;
+      order_index: number;
+      is_correct: boolean;
+    }>;
+  }>) {
+    const url = `${BASE_URL}/courses/${courseId}/assessment/questions`;
+    return apiFetch<{ questions: Array<any & { options?: any[] }> }>(url, {
+      method: 'PUT',
+      body: JSON.stringify({ questions }),
+    });
+  },
+
+  async getAssessmentResults(courseId: string, params?: { limit?: number; cursor?: string }) {
+    const query = new URLSearchParams();
+    if (params?.limit) query.append('limit', params.limit.toString());
+    if (params?.cursor) query.append('cursor', params.cursor);
+    const url = `${BASE_URL}/courses/${courseId}/assessment/results${query.toString() ? `?${query.toString()}` : ''}`;
+    return apiFetch<{ items: any[]; next_cursor?: string }>(url);
+  },
+
+  async getLearnerAssessmentResults(courseId: string, learnerId: string) {
+    const url = `${BASE_URL}/courses/${courseId}/assessment/results/${learnerId}`;
+    return apiFetch<{ attempts: any[] }>(url);
   },
 };
 

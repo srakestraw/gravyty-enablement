@@ -6,7 +6,6 @@
  * 
  * Conditionally renders fields based on entity type:
  * - Product, Product Suite, Topic Tags, Audience: All entity types
- * - Badges: Only Courses, Learning Paths, Role Playing
  */
 
 import { useEffect } from 'react';
@@ -36,10 +35,6 @@ export interface MetadataSectionProps {
   audienceIds: string[];
   onAudienceIdsChange: (ids: string[]) => void;
   
-  // Badges (conditional - only Courses, Learning Paths, Role Playing)
-  badgeIds?: string[];
-  onBadgeIdsChange?: (ids: string[]) => void;
-  
   // Error handling
   shouldShowError?: (fieldKey: string) => boolean;
   markFieldTouched?: (fieldKey: string) => void;
@@ -50,7 +45,6 @@ export interface MetadataSectionProps {
     productSuiteRef?: React.RefObject<HTMLDivElement>;
     topicTagsRef?: React.RefObject<HTMLDivElement>;
     audienceRef?: React.RefObject<HTMLDivElement>;
-    badgesRef?: React.RefObject<HTMLDivElement>;
   };
 }
 
@@ -65,8 +59,6 @@ export function MetadataSection({
   onTopicTagIdsChange,
   audienceIds,
   onAudienceIdsChange,
-  badgeIds,
-  onBadgeIdsChange,
   shouldShowError,
   markFieldTouched,
   refs,
@@ -91,11 +83,6 @@ export function MetadataSection({
   // Fetch all audiences to validate selected IDs exist
   const { options: allAudiences } = useMetadataOptions('audience', {
     include_archived: true, // Include archived to check all audiences
-  });
-  
-  // Fetch all badges to validate selected IDs exist (if badges are used)
-  const { options: allBadges } = useMetadataOptions('badge', {
-    include_archived: true, // Include archived to check all badges
   });
   
   // Validate and remove invalid Product Suite IDs (e.g., after deletion)
@@ -184,35 +171,6 @@ export function MetadataSection({
       onAudienceIdsChange(validAudienceIds);
     }
   }, [audienceIds, allAudiences, onAudienceIdsChange]);
-
-  // Validate and remove invalid Badge IDs (e.g., after deletion)
-  useEffect(() => {
-    if (!badgeIds || badgeIds.length === 0) {
-      // No Badges selected, nothing to validate
-      return;
-    }
-    
-    if (allBadges.length === 0) {
-      // Badges not loaded yet, skip validation
-      return;
-    }
-    
-    // Filter out Badge IDs that don't exist in the database
-    const validBadgeIds = badgeIds.filter((badgeId) =>
-      allBadges.find((b) => b.option_id === badgeId)
-    );
-    
-    // If any Badge IDs were removed, update the selection
-    const currentIdsStr = JSON.stringify([...badgeIds].sort());
-    const validIdsStr = JSON.stringify([...validBadgeIds].sort());
-    if (currentIdsStr !== validIdsStr && onBadgeIdsChange) {
-      console.log('[MetadataSection] Removing invalid Badge IDs:', {
-        removed: badgeIds.filter((id) => !validBadgeIds.includes(id)),
-        validBadgeIds,
-      });
-      onBadgeIdsChange(validBadgeIds);
-    }
-  }, [badgeIds, allBadges, onBadgeIdsChange]);
 
   // Validate and remove invalid products when Product Suite selection changes
   useEffect(() => {
@@ -365,33 +323,6 @@ export function MetadataSection({
                 shouldShowError && shouldShowError('audience_ids')
                   ? // Check if any selected Audience IDs don't exist (invalid references)
                     audienceIds.some((id) => !allAudiences.find((a) => a.option_id === id))
-                  : false
-              }
-            />
-          </Box>
-        </Grid>
-      )}
-
-      {/* Badges (conditional) */}
-      {shouldShowMetadataField('badge', entityType) && badgeIds !== undefined && onBadgeIdsChange && (
-        <Grid item xs={12}>
-          <Box ref={refs?.badgesRef}>
-            <MetadataMultiSelect
-              groupKey="badge"
-              values={badgeIds}
-              onChange={(optionIds: string[]) => {
-                if (onBadgeIdsChange) {
-                  onBadgeIdsChange(optionIds);
-                  handleFieldChange('badge_ids', optionIds);
-                }
-              }}
-              label="Badges"
-              placeholder="Select badges"
-              fullWidth
-              error={
-                shouldShowError && shouldShowError('badge_ids')
-                  ? // Check if any selected Badge IDs don't exist (invalid references)
-                    badgeIds.some((id) => !allBadges.find((b) => b.option_id === id))
                   : false
               }
             />

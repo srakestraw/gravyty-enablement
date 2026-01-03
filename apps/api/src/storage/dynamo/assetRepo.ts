@@ -4,7 +4,7 @@
  * DynamoDB implementation of AssetRepository using content_registry table (single-table design)
  */
 
-import { QueryCommand, GetCommand, PutCommand, UpdateCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb';
+import { QueryCommand, GetCommand, PutCommand, UpdateCommand, DeleteCommand, ScanCommand } from '@aws-sdk/lib-dynamodb';
 import { dynamoDocClient } from '../../aws/dynamoClient';
 import type { Asset } from '@gravyty/domain';
 import type { AssetRepository } from '../../repositories/assetRepository';
@@ -149,7 +149,6 @@ export class DynamoAssetRepo implements AssetRepository {
     
     // Fallback: scan with entity_type filter (less efficient)
     // TODO: Consider adding a GSI for all assets
-    const { ScanCommand } = await import('@aws-sdk/lib-dynamodb');
     const command = new ScanCommand({
       TableName: TABLE_NAME,
       FilterExpression: '#entity_type = :entity_type',

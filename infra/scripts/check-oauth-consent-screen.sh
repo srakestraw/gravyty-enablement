@@ -86,3 +86,4 @@ echo "Option 3: Configure via API (if needed)"
 echo "  See: https://cloud.google.com/identity-platform/docs/reference/rest/v2/projects/updateOAuthIdpConfig"
 echo ""
 
+

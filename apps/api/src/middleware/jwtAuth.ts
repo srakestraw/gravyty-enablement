@@ -12,6 +12,13 @@ import { AuthenticatedRequest } from '../types';
 const USER_POOL_ID = process.env.COGNITO_USER_POOL_ID || '';
 const USER_POOL_CLIENT_ID = process.env.COGNITO_USER_POOL_CLIENT_ID || '';
 
+// Log configuration on startup
+console.log('[JWT Auth] Configuration:', {
+  userPoolId: USER_POOL_ID || 'NOT SET',
+  clientId: USER_POOL_CLIENT_ID ? `${USER_POOL_CLIENT_ID.substring(0, 10)}...` : 'NOT SET',
+  isConfigured: !!(USER_POOL_ID && USER_POOL_CLIENT_ID),
+});
+
 // Create JWT verifier with cache configuration
 const jwtVerifier = USER_POOL_ID && USER_POOL_CLIENT_ID
   ? CognitoJwtVerifier.create({
@@ -25,29 +32,95 @@ const jwtVerifier = USER_POOL_ID && USER_POOL_CLIENT_ID
   : null;
 
 /**
+ * Extract groups from various formats and normalize to string array
+ * Handles: arrays, strings, JSON strings, single values, null/undefined
+ */
+export function normalizeGroups(groups: any): string[] {
+  if (!groups) {
+    return [];
+  }
+
+  // Already an array - normalize and return
+  if (Array.isArray(groups)) {
+    return groups
+      .map(g => String(g).trim())
+      .filter(Boolean)
+      .filter(g => g.length > 0);
+  }
+
+  // String - try parsing as JSON first, then treat as single value
+  if (typeof groups === 'string') {
+    const trimmed = groups.trim();
+    if (!trimmed) return [];
+    
+    // Try parsing as JSON
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) {
+        return parsed
+          .map(g => String(g).trim())
+          .filter(Boolean)
+          .filter(g => g.length > 0);
+      }
+      // Single value from JSON
+      return [String(parsed).trim()].filter(Boolean);
+    } catch {
+      // Not JSON, treat as single string value
+      return [trimmed].filter(Boolean);
+    }
+  }
+
+  // Other types - convert to string
+  return [String(groups).trim()].filter(Boolean);
+}
+
+/**
  * Extract role from Cognito groups claim
  * Falls back to Viewer if no groups or invalid group
+ * 
+ * REFACTORED: Simplified and made more robust
  */
-function extractRoleFromGroups(groups?: string[]): UserRole {
-  if (!groups || groups.length === 0) {
+export function extractRoleFromGroups(groups?: string[] | any): UserRole {
+  // Normalize groups to string array
+  const normalizedGroups = normalizeGroups(groups);
+  
+  // Log for debugging
+  console.log('[extractRoleFromGroups]', {
+    input: groups,
+    inputType: typeof groups,
+    normalized: normalizedGroups,
+    normalizedLowercase: normalizedGroups.map(g => g.toLowerCase()),
+  });
+
+  if (normalizedGroups.length === 0) {
+    console.log('[extractRoleFromGroups] No groups found, returning Viewer');
     return 'Viewer';
   }
 
-  // Check groups in precedence order (Admin > Approver > Contributor > Viewer)
-  if (groups.includes('Admin')) {
+  // Convert to lowercase for case-insensitive matching
+  const lowerGroups = normalizedGroups.map(g => g.toLowerCase());
+
+  // Check in precedence order (Admin > Approver > Contributor > Viewer)
+  // Use exact match on lowercase version
+  if (lowerGroups.includes('admin')) {
+    console.log('[extractRoleFromGroups] ✅ Admin role detected');
     return 'Admin';
   }
-  if (groups.includes('Approver')) {
+  if (lowerGroups.includes('approver')) {
+    console.log('[extractRoleFromGroups] ✅ Approver role detected');
     return 'Approver';
   }
-  if (groups.includes('Contributor')) {
+  if (lowerGroups.includes('contributor')) {
+    console.log('[extractRoleFromGroups] ✅ Contributor role detected');
     return 'Contributor';
   }
-  if (groups.includes('Viewer')) {
+  if (lowerGroups.includes('viewer')) {
+    console.log('[extractRoleFromGroups] ✅ Viewer role detected');
     return 'Viewer';
   }
 
-  // Default to Viewer if group doesn't match
+  // Default to Viewer
+  console.log('[extractRoleFromGroups] ⚠️ No matching role found, defaulting to Viewer. Groups:', normalizedGroups);
   return 'Viewer';
 }
 
@@ -88,7 +161,18 @@ export async function jwtAuthMiddleware(
 
   const token = authHeader.substring(7); // Remove 'Bearer ' prefix
 
-  // Decode token header to check kid and issuer before verification (for error reporting)
+  // Log request details for debugging
+  console.log('[JWT Auth] ========================================');
+  console.log('[JWT Auth] 🔍 NEW REQUEST - Starting JWT verification');
+  console.log('[JWT Auth] Request path:', req.path);
+  console.log('[JWT Auth] Request method:', req.method);
+  console.log('[JWT Auth] Authorization header present:', !!authHeader);
+  console.log('[JWT Auth] Token length:', token.length);
+  console.log('[JWT Auth] Token preview:', token.substring(0, 50) + '...');
+
+  // Decode token manually BEFORE verification to see raw payload
+  // This helps debug if the verifier is stripping claims
+  let rawPayload: any = null;
   let tokenIssuer: string | null = null;
   let tokenKid: string | null = null;
   try {
@@ -97,12 +181,44 @@ export async function jwtAuthMiddleware(
       const header = JSON.parse(Buffer.from(tokenParts[0], 'base64url').toString());
       tokenKid = header.kid || null;
       
-      // Decode payload to get issuer
-      const payload = JSON.parse(Buffer.from(tokenParts[1], 'base64url').toString());
-      tokenIssuer = payload.iss || null;
+      // Decode payload BEFORE verification to see raw claims
+      rawPayload = JSON.parse(Buffer.from(tokenParts[1], 'base64url').toString());
+      tokenIssuer = rawPayload.iss || null;
+      
+      // Log raw payload groups BEFORE verification - CRITICAL DEBUG INFO
+      const rawGroups = rawPayload['cognito:groups'] || rawPayload.groups || [];
+      console.log('[JWT Auth] 📋 Raw token payload (BEFORE verification):', {
+        hasCognitoGroups: !!rawPayload['cognito:groups'],
+        cognitoGroups: rawPayload['cognito:groups'],
+        cognitoGroupsType: typeof rawPayload['cognito:groups'],
+        cognitoGroupsIsArray: Array.isArray(rawPayload['cognito:groups']),
+        cognitoGroupsStringified: JSON.stringify(rawPayload['cognito:groups']),
+        hasGroups: !!rawPayload.groups,
+        groups: rawPayload.groups,
+        groupsType: typeof rawPayload.groups,
+        groupsIsArray: Array.isArray(rawPayload.groups),
+        rawGroupsExtracted: rawGroups,
+        rawGroupsExtractedType: typeof rawGroups,
+        rawGroupsExtractedIsArray: Array.isArray(rawGroups),
+        allKeys: Object.keys(rawPayload).filter(k => k.toLowerCase().includes('group')),
+        allPayloadKeys: Object.keys(rawPayload),
+        email: rawPayload.email,
+        issuer: rawPayload.iss,
+        sub: rawPayload.sub,
+        // Show full raw payload for debugging (truncated)
+        fullRawPayload: JSON.stringify(rawPayload).substring(0, 1000),
+      });
+    } else {
+      console.error('[JWT Auth] ❌ Invalid token format - expected 3 parts separated by dots, got:', tokenParts.length);
     }
   } catch (decodeError) {
-    // Ignore decode errors, will be caught by verifier
+    console.error('[JWT Auth] ❌ Failed to decode token before verification:', decodeError);
+    if (decodeError instanceof Error) {
+      console.error('[JWT Auth] Decode error details:', {
+        message: decodeError.message,
+        stack: decodeError.stack,
+      });
+    }
   }
 
   try {
@@ -112,33 +228,171 @@ export async function jwtAuthMiddleware(
     // Extract user ID from 'sub' claim
     const userId = payload.sub;
 
-    // Extract groups from 'cognito:groups' claim
-    const groups = payload['cognito:groups'] as string[] | undefined;
-    const role = extractRoleFromGroups(groups);
+    // Extract groups from token - REFACTORED to be more robust
+    // CRITICAL: Always use raw payload first since aws-jwt-verify may strip custom claims
+    console.log('[JWT Auth] 🔍 STEP 1: Extracting groups from token...');
+    
+    let groups: string[] = [];
+    
+    // PRIORITY 1: Extract from raw payload (most reliable - before verification)
+    if (rawPayload) {
+      // Try cognito:groups first (standard Cognito claim)
+      if (rawPayload['cognito:groups']) {
+        groups = normalizeGroups(rawPayload['cognito:groups']);
+        console.log('[JWT Auth] ✅ Extracted groups from raw payload (cognito:groups):', {
+          original: rawPayload['cognito:groups'],
+          normalized: groups,
+        });
+      }
+      // Fallback to 'groups' claim
+      else if (rawPayload.groups && groups.length === 0) {
+        groups = normalizeGroups(rawPayload.groups);
+        console.log('[JWT Auth] ✅ Extracted groups from raw payload (groups):', {
+          original: rawPayload.groups,
+          normalized: groups,
+        });
+      }
+      
+      // Log what we found
+      if (groups.length === 0) {
+        console.warn('[JWT Auth] ⚠️ No groups found in raw payload', {
+          hasCognitoGroups: !!rawPayload['cognito:groups'],
+          hasGroups: !!rawPayload.groups,
+          allKeys: Object.keys(rawPayload),
+          groupKeys: Object.keys(rawPayload).filter(k => k.toLowerCase().includes('group')),
+        });
+      }
+    }
+    
+    // PRIORITY 2: Fallback to verified payload if raw didn't have groups
+    if (groups.length === 0) {
+      console.log('[JWT Auth] 🔄 Checking verified payload for groups...');
+      
+      if (payload['cognito:groups']) {
+        groups = normalizeGroups(payload['cognito:groups']);
+        console.log('[JWT Auth] ✅ Extracted groups from verified payload (cognito:groups):', groups);
+      } else if (payload.groups) {
+        groups = normalizeGroups(payload.groups);
+        console.log('[JWT Auth] ✅ Extracted groups from verified payload (groups):', groups);
+      } else if (payload.cognito_groups) {
+        groups = normalizeGroups(payload.cognito_groups);
+        console.log('[JWT Auth] ✅ Extracted groups from verified payload (cognito_groups):', groups);
+      }
+      
+      if (groups.length === 0) {
+        console.error('[JWT Auth] ❌ No groups found in verified payload either!', {
+          verifiedPayloadKeys: Object.keys(payload),
+          groupKeys: Object.keys(payload).filter(k => k.toLowerCase().includes('group')),
+        });
+      }
+    }
+    
+    // FINAL FALLBACK: Try raw payload again if still no groups
+    if (groups.length === 0 && rawPayload) {
+      console.error('[JWT Auth] 🚨 CRITICAL: No groups extracted! Trying raw payload recovery...');
+      // Try all possible group claim names
+      const possibleKeys = ['cognito:groups', 'groups', 'cognito_groups'];
+      for (const key of possibleKeys) {
+        if (rawPayload[key]) {
+          groups = normalizeGroups(rawPayload[key]);
+          if (groups.length > 0) {
+            console.log(`[JWT Auth] ✅ Recovered groups from raw payload (${key}):`, groups);
+            break;
+          }
+        }
+      }
+    }
+    
+    // Log final groups state
+    console.log('[JWT Auth] 📊 Final groups extracted:', {
+      groups,
+      count: groups.length,
+      stringified: JSON.stringify(groups),
+      hasAdmin: groups.some(g => g.toLowerCase() === 'admin'),
+    });
+    
+    // Extract role from groups - REFACTORED
+    console.log('[JWT Auth] 🎯 STEP 2: Extracting role from groups...');
+    let role = extractRoleFromGroups(groups);
+    
+    // CRITICAL SAFETY CHECK: If groups contain Admin but role is not Admin, force Admin
+    // This handles edge cases where role extraction might fail
+    if (role !== 'Admin' && groups.length > 0) {
+      const hasAdmin = groups.some(g => {
+        const normalized = String(g).trim().toLowerCase();
+        return normalized === 'admin';
+      });
+      
+      if (hasAdmin) {
+        console.error('[JWT Auth] 🚨 CRITICAL: Groups contain Admin but role extraction returned:', role);
+        console.error('[JWT Auth] 🚨 Forcing Admin role - this should not happen!');
+        role = 'Admin';
+        console.log('[JWT Auth] ✅ Corrected role to Admin');
+      }
+    }
+    
+    const finalRole = role;
+    
+    console.log('[JWT Auth] 🎯 STEP 3: Final role determination:', {
+      groups,
+      extractedRole: role,
+      finalRole,
+      hasAdminInGroups: groups.some(g => g.toLowerCase() === 'admin'),
+    });
 
     // Extract email if available
     const email = payload.email as string | undefined;
 
-    // Debug logging in development
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('[JWT Auth] Token verified:', {
-        userId,
-        email,
-        groups,
-        extractedRole: role,
-        hasCognitoGroups: !!payload['cognito:groups'],
-        cognitoGroupsValue: payload['cognito:groups'],
-        allClaims: Object.keys(payload),
-        rawPayload: JSON.stringify(payload, null, 2).substring(0, 500),
-      });
-    }
+    // Always log token verification details (not just in dev mode)
+    // This helps debug authentication issues
+    console.log('[JWT Auth] ✅ Token verified (AFTER verification):', {
+      userId,
+      email,
+      groups,
+      groupsType: typeof groups,
+      groupsIsArray: Array.isArray(groups),
+      groupsLength: Array.isArray(groups) ? groups.length : 'N/A',
+      groupsContent: Array.isArray(groups) ? groups : [groups],
+      groupsStringified: JSON.stringify(groups),
+      extractedRole: role,
+      finalRole: finalRole,
+      roleWasCorrected: role !== finalRole,
+      hasCognitoGroups: !!payload['cognito:groups'],
+      cognitoGroupsValue: payload['cognito:groups'],
+      cognitoGroupsType: typeof payload['cognito:groups'],
+      cognitoGroupsIsArray: Array.isArray(payload['cognito:groups']),
+      cognitoGroupsStringified: JSON.stringify(payload['cognito:groups']),
+      hasGroupsClaim: !!payload.groups,
+      groupsClaimValue: payload.groups,
+      groupsClaimType: typeof payload.groups,
+      groupsClaimIsArray: Array.isArray(payload.groups),
+      allPayloadKeys: Object.keys(payload).filter(k => k.toLowerCase().includes('group')),
+      tokenIssuer: payload.iss,
+      expectedIssuer: USER_POOL_ID ? `https://cognito-idp.${process.env.AWS_REGION || 'us-east-1'}.amazonaws.com/${USER_POOL_ID}` : 'not configured',
+      issuerMatches: payload.iss === (USER_POOL_ID ? `https://cognito-idp.${process.env.AWS_REGION || 'us-east-1'}.amazonaws.com/${USER_POOL_ID}` : null),
+      // Compare with raw payload
+      rawPayloadHadGroups: rawPayload ? !!rawPayload['cognito:groups'] : 'N/A',
+      rawPayloadGroups: rawPayload ? rawPayload['cognito:groups'] : 'N/A',
+      rawPayloadGroupsType: rawPayload ? typeof rawPayload['cognito:groups'] : 'N/A',
+      rawPayloadGroupsIsArray: rawPayload ? Array.isArray(rawPayload['cognito:groups']) : 'N/A',
+      rawPayloadGroupsStringified: rawPayload ? JSON.stringify(rawPayload['cognito:groups']) : 'N/A',
+      // Log full payload keys for debugging
+      verifiedPayloadKeys: Object.keys(payload),
+      rawPayloadKeys: rawPayload ? Object.keys(rawPayload) : 'N/A',
+    });
+    
+    console.log('[JWT Auth] ========================================');
 
-    // Attach user context to request
+    // Attach user context to request (use finalRole which may have been corrected)
     req.user = {
-      role,
+      role: finalRole,
       user_id: userId,
       email,
     };
+    
+    // Store groups in request for debugging (always, not just dev mode)
+    (req as any).tokenGroups = groups;
+    (req as any).tokenPayloadGroups = payload['cognito:groups'];
 
     next();
   } catch (error) {
@@ -221,25 +475,78 @@ export function requireRole(minRole: UserRole) {
     const userLevel = roleHierarchy[userRole] || 0;
     const requiredLevel = roleHierarchy[minRole] || 0;
 
+    // Always log role check (helps debug permission issues)
+    console.log('[RBAC] 🔐 Role check:', {
+      userRole,
+      userLevel,
+      requiredRole: minRole,
+      requiredLevel,
+      userId: req.user?.user_id,
+      email: req.user?.email,
+      groupsFromToken: (req as any).tokenGroups || 'not available',
+      groupsFromTokenType: typeof (req as any).tokenGroups,
+      groupsFromTokenIsArray: Array.isArray((req as any).tokenGroups),
+      groupsFromTokenStringified: JSON.stringify((req as any).tokenGroups || 'not available'),
+      groupsFromPayload: (req as any).tokenPayloadGroups || 'not available',
+      groupsFromPayloadType: typeof (req as any).tokenPayloadGroups,
+      groupsFromPayloadIsArray: Array.isArray((req as any).tokenPayloadGroups),
+      groupsFromPayloadStringified: JSON.stringify((req as any).tokenPayloadGroups || 'not available'),
+      endpoint: req.path,
+      method: req.method,
+      reqUserObject: req.user,
+      willPass: userLevel >= requiredLevel,
+      comparison: `${userLevel} >= ${requiredLevel} = ${userLevel >= requiredLevel}`,
+    });
+
     if (userLevel < requiredLevel) {
       const requestId = req.headers['x-request-id'] as string || generateRequestId();
       
-      // Debug logging in development
-      if (process.env.NODE_ENV !== 'production') {
-        console.log('[RBAC] Access denied:', {
-          userRole,
-          userLevel,
-          requiredRole: minRole,
-          requiredLevel,
-          userId: req.user?.user_id,
-          email: req.user?.email,
-        });
-      }
+      // Always log access denied (helps debug permission issues)
+      console.error('[RBAC] ❌ Access denied:', {
+        userRole,
+        userLevel,
+        requiredRole: minRole,
+        requiredLevel,
+        userId: req.user?.user_id,
+        email: req.user?.email,
+        // Include groups from the original token payload if available
+        groupsFromToken: (req as any).tokenGroups || 'not available',
+        groupsFromTokenType: typeof (req as any).tokenGroups,
+        groupsFromTokenIsArray: Array.isArray((req as any).tokenGroups),
+        groupsFromTokenStringified: JSON.stringify((req as any).tokenGroups || 'not available'),
+        groupsFromPayload: (req as any).tokenPayloadGroups || 'not available',
+        groupsFromPayloadType: typeof (req as any).tokenPayloadGroups,
+        groupsFromPayloadIsArray: Array.isArray((req as any).tokenPayloadGroups),
+        groupsFromPayloadStringified: JSON.stringify((req as any).tokenPayloadGroups || 'not available'),
+        endpoint: req.path,
+        method: req.method,
+        comparison: `${userLevel} >= ${requiredLevel} = ${userLevel >= requiredLevel}`,
+        reqUserObject: req.user,
+      });
+      
+      // Enhanced error response with debugging info
+      const debugInfo = {
+        userRole,
+        userLevel,
+        requiredRole: minRole,
+        requiredLevel,
+        userId: req.user?.user_id,
+        email: req.user?.email,
+        groupsFromToken: (req as any).tokenGroups || 'not available',
+        groupsFromTokenStringified: JSON.stringify((req as any).tokenGroups || 'not available'),
+        groupsFromPayload: (req as any).tokenPayloadGroups || 'not available',
+        groupsFromPayloadStringified: JSON.stringify((req as any).tokenPayloadGroups || 'not available'),
+        reqUserObject: req.user,
+      };
+      
+      console.error('[RBAC] ❌ Sending 403 response with debug info:', debugInfo);
       
       res.status(403).json({
         error: {
           code: 'FORBIDDEN',
           message: `Requires ${minRole} role or higher. Current role: ${userRole}`,
+          // Include debug info in development
+          ...(process.env.NODE_ENV !== 'production' && { debug: debugInfo }),
         },
         request_id: requestId,
       });

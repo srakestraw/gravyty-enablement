@@ -55,7 +55,6 @@ export declare const LearningPathSchema: z.ZodObject<{
     legacy_product_concept: z.ZodOptional<z.ZodString>;
     legacy_product_suite_id: z.ZodOptional<z.ZodString>;
     legacy_product_concept_id: z.ZodOptional<z.ZodString>;
-    badges: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
     cover_image: z.ZodOptional<z.ZodObject<{
         media_id: z.ZodString;
         type: z.ZodEnum<["image", "video", "document", "audio", "other"]>;
@@ -149,7 +148,6 @@ export declare const LearningPathSchema: z.ZodObject<{
     created_by: string;
     topic_tags: string[];
     audience_ids: string[];
-    badges: string[];
     updated_at: string;
     updated_by: string;
     path_id: string;
@@ -235,7 +233,6 @@ export declare const LearningPathSchema: z.ZodObject<{
         transcription_language?: string | undefined;
         transcription_error?: string | undefined;
     } | undefined;
-    badges?: string[] | undefined;
     published_version?: number | undefined;
     published_at?: string | undefined;
     published_by?: string | undefined;

@@ -49,6 +49,7 @@ import {
   HubOutlined,
   ExpandMore,
   ExpandLess,
+  EmojiEventsOutlined,
 } from '@mui/icons-material';
 import { useAuth } from '../../contexts/AuthContext';
 import { isAdmin } from '../../lib/roles';
@@ -139,12 +140,14 @@ export function SideNav() {
       label: 'Admin',
       icon: <AdminPanelSettingsOutlined fontSize="small" />,
       items: [
-        { label: 'Users & Roles', path: '/enablement/admin/users', icon: <ManageAccountsOutlined fontSize="small" /> },
-        { label: 'Metadata', path: '/enablement/admin/metadata', icon: <CategoryOutlined fontSize="small" /> },
+        { label: 'AI Prompt Helpers', path: '/enablement/admin/prompt-helpers', icon: <SmartToyOutlined fontSize="small" /> },
+        { label: 'Assignments', path: '/enablement/admin/learning/assignments', icon: <AssignmentIndOutlined fontSize="small" /> },
+        { label: 'Badges', path: '/enablement/admin/badges', icon: <EmojiEventsOutlined fontSize="small" /> },
+        { label: 'Certificate Templates', path: '/enablement/admin/learning/certificates', icon: <WorkspacePremiumOutlined fontSize="small" /> },
         { label: 'Integrations', path: '/enablement/admin/integrations', icon: <HubOutlined fontSize="small" /> },
         { label: 'Media Library', path: '/enablement/admin/learning/media', icon: <PermMediaOutlined fontSize="small" /> },
-        { label: 'Assignments', path: '/enablement/admin/learning/assignments', icon: <AssignmentIndOutlined fontSize="small" /> },
-        { label: 'Certificate Templates', path: '/enablement/admin/learning/certificates', icon: <WorkspacePremiumOutlined fontSize="small" /> },
+        { label: 'Metadata', path: '/enablement/admin/metadata', icon: <CategoryOutlined fontSize="small" /> },
+        { label: 'Users & Roles', path: '/enablement/admin/users', icon: <ManageAccountsOutlined fontSize="small" /> },
       ],
       adminOnly: true,
     },
@@ -390,7 +393,7 @@ export function SideNav() {
 
   // Render nav content (shared between permanent and temporary drawer)
   const renderNavContent = () => (
-    <Box sx={{ overflow: 'auto' }}>
+    <Box sx={{ overflowY: 'auto', overflowX: 'hidden', height: '100%' }}>
       <List>
         {visibleGroups.map((group, index) => {
           // Special handling for single-item groups (Home, AI Assistant) - no collapse needed
@@ -424,8 +427,11 @@ export function SideNav() {
             width: expandedWidth,
             boxSizing: 'border-box',
             mt: 8, // Account for fixed header
+            height: 'calc(100vh - 64px)', // Account for header height
             borderRight: 1,
             borderColor: 'divider',
+            overflowY: 'auto',
+            overflowX: 'hidden',
           },
         }}
       >
@@ -449,6 +455,7 @@ export function SideNav() {
           width: drawerWidth,
           boxSizing: 'border-box',
           mt: 8, // Account for fixed header
+          height: 'calc(100vh - 64px)', // Account for header height
           borderRight: 1,
           borderColor: 'divider',
           transition: theme.transitions.create('width', {
@@ -456,6 +463,7 @@ export function SideNav() {
             duration: theme.transitions.duration.enteringScreen,
           }),
           overflowX: 'hidden',
+          overflowY: 'auto',
         },
       }}
     >

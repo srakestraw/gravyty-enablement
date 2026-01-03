@@ -7,8 +7,8 @@
  * 
  * Contains all course details fields organized into stable groups:
  * - Basics: Title, Short Description, Long Description
- * - Metadata: Product, Product Suite, Topic Tags
  * - Media: Cover Image, Badges
+ * - Metadata: Product, Product Suite, Topic Tags
  */
 
 import { useRef, useEffect, useState, useCallback } from 'react';
@@ -82,7 +82,6 @@ export function CourseDetailsEditor({
   const topicTagsRef = useRef<HTMLDivElement>(null);
   const audienceRef = useRef<HTMLDivElement>(null);
   const coverImageRef = useRef<HTMLDivElement>(null);
-  const badgesRef = useRef<HTMLDivElement>(null);
 
   // Clear Product Suite when Product is cleared
   useEffect(() => {
@@ -143,14 +142,6 @@ export function CourseDetailsEditor({
       }));
     }
 
-    if (badgesRef.current) {
-      unregisters.push(focusRegistry.register({
-        entityType: 'course',
-        entityId: course.course_id,
-        fieldKey: 'badge_ids',
-        ref: badgesRef,
-      }));
-    }
 
     return () => {
       unregisters.forEach((unregister) => unregister());
@@ -266,6 +257,31 @@ export function CourseDetailsEditor({
           </Box>
         </Paper>
 
+        {/* Media Section */}
+        <Paper sx={{ p: 2 }}>
+          <Typography variant="subtitle2" gutterBottom sx={{ mb: 2 }}>
+            Media
+          </Typography>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {/* Cover Image */}
+            <Box ref={coverImageRef}>
+              <CoverImageSelector
+                entityType="course"
+                entityId={course.course_id}
+                coverImage={course.cover_image}
+                entityTitle={course.title || ''}
+                entityShortDescription={course.short_description || ''}
+                entityDescription={course.description || ''}
+                onCoverImageSelected={(mediaRef) => handleFieldChange('cover_image', mediaRef)}
+                onCoverImageRemoved={() => handleFieldChange('cover_image', undefined)}
+                onTemporaryMediaCreated={onTemporaryMediaCreated}
+              />
+            </Box>
+
+            {/* Badges - moved to MetadataSection */}
+          </Box>
+        </Paper>
+
         {/* Metadata Section */}
         <Paper sx={{ p: 2 }}>
           <Typography variant="subtitle2" gutterBottom sx={{ mb: 2 }}>
@@ -290,8 +306,6 @@ export function CourseDetailsEditor({
             onTopicTagIdsChange={(ids) => handleFieldChange('topic_tag_ids', ids)}
             audienceIds={course.audience_ids && course.audience_ids.length > 0 ? course.audience_ids : []}
             onAudienceIdsChange={(ids) => handleFieldChange('audience_ids', ids)}
-            badgeIds={course.badge_ids && course.badge_ids.length > 0 ? course.badge_ids : []}
-            onBadgeIdsChange={(ids) => handleFieldChange('badge_ids', ids)}
             shouldShowError={(fieldKey) => {
               return shouldShowError ? shouldShowError('course', course.course_id, fieldKey) : false;
             }}
@@ -305,7 +319,6 @@ export function CourseDetailsEditor({
               productSuiteRef,
               topicTagsRef,
               audienceRef,
-              badgesRef,
             }}
           />
           
@@ -340,31 +353,6 @@ export function CourseDetailsEditor({
               />
             </Grid>
           </Grid>
-        </Paper>
-
-        {/* Media Section */}
-        <Paper sx={{ p: 2 }}>
-          <Typography variant="subtitle2" gutterBottom sx={{ mb: 2 }}>
-            Media
-          </Typography>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            {/* Cover Image */}
-            <Box ref={coverImageRef}>
-              <CoverImageSelector
-                entityType="course"
-                entityId={course.course_id}
-                coverImage={course.cover_image}
-                entityTitle={course.title || ''}
-                entityShortDescription={course.short_description || ''}
-                entityDescription={course.description || ''}
-                onCoverImageSelected={(mediaRef) => handleFieldChange('cover_image', mediaRef)}
-                onCoverImageRemoved={() => handleFieldChange('cover_image', undefined)}
-                onTemporaryMediaCreated={onTemporaryMediaCreated}
-              />
-            </Box>
-
-            {/* Badges - moved to MetadataSection */}
-          </Box>
         </Paper>
       </Box>
 

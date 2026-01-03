@@ -1,0 +1,52 @@
+{
+  "prompt_helpers": [
+    {
+      "id": "ph_cover_saas_launch_hero_banner_v1",
+      "name": "Cover - SaaS Launch Hero Banner (Clean, Modern, Floating Icons)",
+      "description": "Modern SaaS hero banner with right-side floating icon tiles and left-side whitespace for headline overlay. No text or logos.",
+      "applies_to": ["cover_image_prompt"],
+      "composition_mode": "style_pack",
+      "prefix_text": "Create a modern SaaS marketing hero banner in a clean, minimal 2D/3D hybrid illustration style (vector-like shapes with soft depth). Use a bright white or very light cool background with subtle gradient and lots of negative space. Composition should reserve a large empty area on the left for headline text overlay (do not render any text). Place the main visual cluster on the right side.",
+      "template_text": "Subject theme: {{cover.subject}}\nVisual metaphor: a circular hub or ring motif with a central badge, surrounded by 5-7 floating rounded-square UI tiles/icons that represent communication and productivity (generic icons only).\nStyle: crisp, minimal, premium SaaS aesthetic, rounded corners, soft shadows, gentle blur highlights, subtle concentric rings in the background behind the cluster.\nMood: modern, confident, calm, professional.",
+      "suffix_text": "Do not include any words, letters, numbers, logos, or brand names. Use only generic UI icons (no recognizable app logos). Keep icon tiles simple and consistent. Maintain strong whitespace on the left (at least 45% of the canvas). Right-side cluster should feel balanced and slightly elevated with soft shadows. Avoid clutter.",
+      "negative_text": "Avoid: photorealism, busy scenes, heavy texture, hard outlines, high-contrast neon, detailed illustrations, stock photo look, visible text, watermarks, recognizable trademarks/logos.",
+      "provider_overrides": {
+        "openai": {
+          "additional_instructions": "16:9 hero banner composition. Clean edges, high clarity."
+        },
+        "gemini": {
+          "additional_instructions": "16:9 hero banner composition. Preserve whitespace on the left and keep icons generic."
+        }
+      },
+      "allowed_variables": ["cover.subject", "cover.metaphor", "cover.must_include", "cover.avoid"],
+      "status": "published",
+      "is_default_for": [],
+      "created_by": "system_seed",
+      "updated_by": "system_seed"
+    }
+  ],
+  "prompt_helper_versions": [
+    {
+      "id": "phv_cover_saas_launch_hero_banner_1",
+      "prompt_helper_id": "ph_cover_saas_launch_hero_banner_v1",
+      "version_number": 1,
+      "snapshot_json": {
+        "name": "Cover - SaaS Launch Hero Banner (Clean, Modern, Floating Icons)",
+        "description": "Modern SaaS hero banner with right-side floating icon tiles and left-side whitespace for headline overlay. No text or logos.",
+        "applies_to": ["cover_image_prompt"],
+        "composition_mode": "style_pack",
+        "prefix_text": "Create a modern SaaS marketing hero banner in a clean, minimal 2D/3D hybrid illustration style (vector-like shapes with soft depth). Use a bright white or very light cool background with subtle gradient and lots of negative space. Composition should reserve a large empty area on the left for headline text overlay (do not render any text). Place the main visual cluster on the right side.",
+        "template_text": "Subject theme: {{cover.subject}}\nVisual metaphor: a circular hub or ring motif with a central badge, surrounded by 5-7 floating rounded-square UI tiles/icons that represent communication and productivity (generic icons only).\nStyle: crisp, minimal, premium SaaS aesthetic, rounded corners, soft shadows, gentle blur highlights, subtle concentric rings in the background behind the cluster.\nMood: modern, confident, calm, professional.",
+        "suffix_text": "Do not include any words, letters, numbers, logos, or brand names. Use only generic UI icons (no recognizable app logos). Keep icon tiles simple and consistent. Maintain strong whitespace on the left (at least 45% of the canvas). Right-side cluster should feel balanced and slightly elevated with soft shadows. Avoid clutter.",
+        "negative_text": "Avoid: photorealism, busy scenes, heavy texture, hard outlines, high-contrast neon, detailed illustrations, stock photo look, visible text, watermarks, recognizable trademarks/logos.",
+        "provider_overrides": {
+          "openai": { "additional_instructions": "16:9 hero banner composition. Clean edges, high clarity." },
+          "gemini": { "additional_instructions": "16:9 hero banner composition. Preserve whitespace on the left and keep icons generic." }
+        },
+        "allowed_variables": ["cover.subject", "cover.metaphor", "cover.must_include", "cover.avoid"]
+      },
+      "published_by": "system_seed"
+    }
+  ]
+}
+

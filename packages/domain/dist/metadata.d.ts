@@ -2,7 +2,7 @@
  * Metadata Domain Types
  *
  * Defines metadata groups and options for categorizing content (Courses, Resources).
- * Metadata groups: product, product_suite, topic_tag, badge, audience
+ * Metadata groups: product, product_suite, topic_tag, audience
  *
  * Note: Renamed from legacy naming:
  * - Legacy "product_suite" -> "product"
@@ -19,7 +19,7 @@ import { z } from 'zod';
  * - "product_suite" (was "product_concept")
  * - "topic_tag" (unchanged)
  */
-export declare const MetadataGroupKeySchema: z.ZodEnum<["product", "product_suite", "topic_tag", "badge", "audience", "entity_type"]>;
+export declare const MetadataGroupKeySchema: z.ZodEnum<["product", "product_suite", "topic_tag", "audience", "entity_type", "badge"]>;
 export type MetadataGroupKey = z.infer<typeof MetadataGroupKeySchema>;
 /**
  * Metadata Option
@@ -29,7 +29,7 @@ export type MetadataGroupKey = z.infer<typeof MetadataGroupKeySchema>;
  */
 export declare const MetadataOptionSchema: z.ZodObject<{
     option_id: z.ZodString;
-    group_key: z.ZodEnum<["product", "product_suite", "topic_tag", "badge", "audience", "entity_type"]>;
+    group_key: z.ZodEnum<["product", "product_suite", "topic_tag", "audience", "entity_type", "badge"]>;
     label: z.ZodString;
     slug: z.ZodString;
     sort_order: z.ZodDefault<z.ZodNumber>;
@@ -50,8 +50,8 @@ export declare const MetadataOptionSchema: z.ZodObject<{
     updated_at: string;
     updated_by: string;
     option_id: string;
-    group_key: "product" | "product_suite" | "topic_tag" | "badge" | "audience" | "entity_type";
     label: string;
+    group_key: "product" | "product_suite" | "topic_tag" | "audience" | "entity_type" | "badge";
     slug: string;
     sort_order: number;
     short_description?: string | undefined;
@@ -65,8 +65,8 @@ export declare const MetadataOptionSchema: z.ZodObject<{
     updated_at: string;
     updated_by: string;
     option_id: string;
-    group_key: "product" | "product_suite" | "topic_tag" | "badge" | "audience" | "entity_type";
     label: string;
+    group_key: "product" | "product_suite" | "topic_tag" | "audience" | "entity_type" | "badge";
     slug: string;
     status?: "archived" | "active" | undefined;
     short_description?: string | undefined;
@@ -81,7 +81,7 @@ export type MetadataOption = z.infer<typeof MetadataOptionSchema>;
  * Create Metadata Option Request
  */
 export declare const CreateMetadataOptionSchema: z.ZodObject<{
-    group_key: z.ZodEnum<["product", "product_suite", "topic_tag", "badge", "audience", "entity_type"]>;
+    group_key: z.ZodEnum<["product", "product_suite", "topic_tag", "audience", "entity_type", "badge"]>;
     label: z.ZodString;
     slug: z.ZodOptional<z.ZodString>;
     sort_order: z.ZodOptional<z.ZodNumber>;
@@ -89,16 +89,16 @@ export declare const CreateMetadataOptionSchema: z.ZodObject<{
     color: z.ZodOptional<z.ZodString>;
     short_description: z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
-    group_key: "product" | "product_suite" | "topic_tag" | "badge" | "audience" | "entity_type";
     label: string;
+    group_key: "product" | "product_suite" | "topic_tag" | "audience" | "entity_type" | "badge";
     short_description?: string | undefined;
     slug?: string | undefined;
     sort_order?: number | undefined;
     parent_id?: string | undefined;
     color?: string | undefined;
 }, {
-    group_key: "product" | "product_suite" | "topic_tag" | "badge" | "audience" | "entity_type";
     label: string;
+    group_key: "product" | "product_suite" | "topic_tag" | "audience" | "entity_type" | "badge";
     short_description?: string | undefined;
     slug?: string | undefined;
     sort_order?: number | undefined;

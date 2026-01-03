@@ -22,7 +22,6 @@ export const UnifiedSearchResultSchema = z.object({
         product_suite_ids: z.array(z.string()).optional(),
         topic_tag_ids: z.array(z.string()).optional(),
         audience_ids: z.array(z.string()).optional(),
-        badge_ids: z.array(z.string()).optional(),
     }),
     // Entity-specific fields
     status: z.string().optional(),
@@ -42,7 +41,6 @@ export const UnifiedSearchParamsSchema = z.object({
     product_suite_ids: z.array(z.string()).optional(),
     topic_tag_ids: z.array(z.string()).optional(),
     audience_ids: z.array(z.string()).optional(),
-    badge_ids: z.array(z.string()).optional(),
     // Pagination
     limit: z.number().int().min(1).max(100).optional().default(20),
     cursor: z.string().optional(),

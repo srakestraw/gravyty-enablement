@@ -108,3 +108,4 @@ export function getMediaFormatFromContentType(contentType: string): string | und
   return formatMap[contentType.toLowerCase()];
 }
 
+

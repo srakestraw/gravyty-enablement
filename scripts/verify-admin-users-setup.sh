@@ -212,3 +212,4 @@ echo "2. Test Invite Flow: Use the UI to invite a test user"
 echo "3. Test Role Changes: Change a user's role and verify in Cognito console"
 echo "4. Verify Audit Events: Check DynamoDB events table for admin_users_* events"
 
+

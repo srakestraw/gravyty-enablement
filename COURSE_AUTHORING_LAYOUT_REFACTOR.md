@@ -226,3 +226,4 @@ Refactored the Course Authoring page to use a cleaner 3-column layout with inlin
 - Focus registry enables keyboard-friendly navigation from Issues panel to fields
 - Auto-save debounce: 500ms for node changes, existing delays for field changes
 
+

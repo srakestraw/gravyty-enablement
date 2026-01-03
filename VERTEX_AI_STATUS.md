@@ -78,3 +78,4 @@ Until the Imagen API endpoint is fixed, users can:
 - Troubleshooting: `docs/runbooks/troubleshooting-vertex-ai.md`
 - Implementation: `docs/architecture/vertex-ai-implementation.md`
 
+

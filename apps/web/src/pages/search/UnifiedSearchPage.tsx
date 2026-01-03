@@ -40,7 +40,6 @@ export function UnifiedSearchPage() {
   const [selectedProductSuiteIds, setSelectedProductSuiteIds] = useState<string[]>([]);
   const [selectedTopicTagIds, setSelectedTopicTagIds] = useState<string[]>([]);
   const [selectedAudienceIds, setSelectedAudienceIds] = useState<string[]>([]);
-  const [selectedBadgeIds, setSelectedBadgeIds] = useState<string[]>([]);
   
   const [results, setResults] = useState<UnifiedSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -50,7 +49,6 @@ export function UnifiedSearchPage() {
   const { options: productSuiteOptions } = useMetadataOptions('product_suite');
   const { options: topicTagOptions } = useMetadataOptions('topic_tag');
   const { options: audienceOptions } = useMetadataOptions('audience');
-  const { options: badgeOptions } = useMetadataOptions('badge');
   
   // Perform search
   useEffect(() => {
@@ -66,7 +64,6 @@ export function UnifiedSearchPage() {
           product_suite_ids: selectedProductSuiteIds.length > 0 ? selectedProductSuiteIds : undefined,
           topic_tag_ids: selectedTopicTagIds.length > 0 ? selectedTopicTagIds : undefined,
           audience_ids: selectedAudienceIds.length > 0 ? selectedAudienceIds : undefined,
-          badge_ids: selectedBadgeIds.length > 0 ? selectedBadgeIds : undefined,
           limit: 50,
         };
         
@@ -96,7 +93,6 @@ export function UnifiedSearchPage() {
     selectedProductSuiteIds,
     selectedTopicTagIds,
     selectedAudienceIds,
-    selectedBadgeIds,
   ]);
   
   const handleEntityTypeToggle = (entityType: string) => {
@@ -297,33 +293,6 @@ export function UnifiedSearchPage() {
                     )}
                   >
                     {audienceOptions.map((option) => (
-                      <MenuItem key={option.option_id} value={option.option_id}>
-                        {option.label}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Box>
-              
-              <Box sx={{ mb: 2 }}>
-                <Typography variant="subtitle2" gutterBottom>
-                  Badges
-                </Typography>
-                <FormControl fullWidth size="small">
-                  <Select
-                    multiple
-                    value={selectedBadgeIds}
-                    onChange={(e) => setSelectedBadgeIds(e.target.value as string[])}
-                    renderValue={(selected) => (
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                        {(selected as string[]).map((id) => {
-                          const option = badgeOptions.find((o) => o.option_id === id);
-                          return <Chip key={id} label={option?.label || id} size="small" />;
-                        })}
-                      </Box>
-                    )}
-                  >
-                    {badgeOptions.map((option) => (
                       <MenuItem key={option.option_id} value={option.option_id}>
                         {option.label}
                       </MenuItem>

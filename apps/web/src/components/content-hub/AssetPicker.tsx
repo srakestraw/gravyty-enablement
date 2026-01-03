@@ -158,9 +158,9 @@ export function AssetPicker({ open, onClose, onSelect, courseId, moduleId, lesso
                         primary={asset.title}
                         secondary={
                           <>
-                            {asset.description && (
+                            {(asset.short_description || asset.description) && (
                               <Typography variant="caption" display="block">
-                                {asset.description}
+                                {asset.short_description || asset.description}
                               </Typography>
                             )}
                             <Box sx={{ display: 'flex', gap: 0.5, mt: 0.5 }}>
@@ -240,4 +240,5 @@ export function AssetPicker({ open, onClose, onSelect, courseId, moduleId, lesso
     </Dialog>
   );
 }
+
 

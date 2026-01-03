@@ -111,9 +111,6 @@ export function UnifiedSearchCard({ result }: UnifiedSearchCardProps) {
             {result.metadata.topic_tag_ids && result.metadata.topic_tag_ids.length > 0 && (
               <Chip label={`${result.metadata.topic_tag_ids.length} Tag${result.metadata.topic_tag_ids.length > 1 ? 's' : ''}`} size="small" variant="outlined" />
             )}
-            {result.metadata.badge_ids && result.metadata.badge_ids.length > 0 && (
-              <Chip label={`${result.metadata.badge_ids.length} Badge${result.metadata.badge_ids.length > 1 ? 's' : ''}`} size="small" variant="outlined" color="success" />
-            )}
           </Stack>
         </CardContent>
       </CardActionArea>

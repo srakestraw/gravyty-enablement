@@ -203,10 +203,45 @@ export function AdminCourseEditorPage() {
   const [archiving, setArchiving] = useState(false);
   const [restoring, setRestoring] = useState(false);
   
+  // Assessment data for validation
+  const [assessmentConfig, setAssessmentConfig] = useState<{ is_enabled: boolean; required_for_completion: boolean } | null>(null);
+  const [assessmentQuestionCount, setAssessmentQuestionCount] = useState<number>(0);
+  
+  // Fetch assessment data for validation
+  useEffect(() => {
+    if (!courseId || isNew) {
+      setAssessmentConfig(null);
+      setAssessmentQuestionCount(0);
+      return;
+    }
+    
+    Promise.all([
+      lmsAdminApi.getAssessmentConfig(courseId).catch(() => null),
+      lmsAdminApi.getAssessmentQuestions(courseId).catch(() => null),
+    ]).then(([configResponse, questionsResponse]) => {
+      if (configResponse && !('error' in configResponse)) {
+        setAssessmentConfig({
+          is_enabled: configResponse.data.is_enabled,
+          required_for_completion: configResponse.data.required_for_completion,
+        });
+      } else {
+        setAssessmentConfig(null);
+      }
+      
+      if (questionsResponse && !('error' in questionsResponse)) {
+        setAssessmentQuestionCount(questionsResponse.data.questions?.length ?? 0);
+      } else {
+        setAssessmentQuestionCount(0);
+      }
+    });
+  }, [courseId, isNew]);
+  
   // Phase 2: Validation Hook (must be before editorActions)
   const validation = useCourseValidation({
     course,
     lessons,
+    assessmentConfig,
+    assessmentQuestionCount,
   });
 
 
@@ -232,8 +267,8 @@ export function AdminCourseEditorPage() {
   // Draft validation with warnings (for Inspector display)
   const draftValidation = useMemo(() => {
     if (!course) return { errors: [], warnings: [] };
-    return validateCourseDraft(course, lessons);
-  }, [course, lessons]);
+    return validateCourseDraft(course, lessons, assessmentConfig, assessmentQuestionCount);
+  }, [course, lessons, assessmentConfig, assessmentQuestionCount]);
 
   // Build tree from course data
   const courseTree = useMemo(() => {

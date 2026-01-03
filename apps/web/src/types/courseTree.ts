@@ -132,3 +132,4 @@ export function flattenTree(tree: CourseTreeNode | null): CourseTreeNode[] {
   return result;
 }
 
+

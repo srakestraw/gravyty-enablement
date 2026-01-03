@@ -16,6 +16,8 @@ import type { NodeType } from '../types/courseTree';
 export interface UseCourseValidationOptions {
   course: Course | null;
   lessons: Lesson[];
+  assessmentConfig?: { is_enabled: boolean; required_for_completion: boolean } | null;
+  assessmentQuestionCount?: number;
 }
 
 export interface UseCourseValidationReturn {
@@ -57,6 +59,8 @@ export interface UseCourseValidationReturn {
 export function useCourseValidation({
   course,
   lessons,
+  assessmentConfig,
+  assessmentQuestionCount,
 }: UseCourseValidationOptions): UseCourseValidationReturn {
   // Track if user has attempted to publish (for showing all errors)
   const [hasAttemptedPublish, setHasAttemptedPublish] = useState(false);
@@ -95,10 +99,10 @@ export function useCourseValidation({
     }
     
     // Use validateCoursePublish for publish validation
-    const publishResult = validateCoursePublish(course, lessons);
+    const publishResult = validateCoursePublish(course, lessons, assessmentConfig, assessmentQuestionCount);
     
     // Also get draft validation for warnings
-    const draftResult = validateCourseDraft(course, lessons);
+    const draftResult = validateCourseDraft(course, lessons, assessmentConfig, assessmentQuestionCount);
     
     // Convert ValidationError[] to ValidationIssue[] for consistency
     const errors: ValidationIssue[] = publishResult.errors.map((error) => ({
@@ -116,7 +120,7 @@ export function useCourseValidation({
       errors,
       warnings: draftResult.warnings,
     };
-  }, [course, course?.title, course?.short_description, course?.sections?.length, lessons]);
+  }, [course, course?.title, course?.short_description, course?.sections?.length, lessons, assessmentConfig, assessmentQuestionCount]);
 
   const canPublish = useCallback((): boolean => {
     return publishValidation.valid;

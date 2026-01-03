@@ -117,3 +117,4 @@ If Vertex AI isn't configured, you can use OpenAI for image generation:
 3. **Test SSM Access**: Try reading the parameter manually with AWS CLI using the same credentials
 4. **Review Setup Guide**: See `docs/runbooks/vertex-ai-setup.md` for complete setup instructions
 
+

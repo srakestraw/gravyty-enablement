@@ -94,9 +94,9 @@ export function ContentHubLandingPage() {
             <Typography variant="h6" gutterBottom>
               {asset.title}
             </Typography>
-            {asset.description && (
+            {(asset.short_description || asset.description) && (
               <Typography variant="body2" color="text.secondary" gutterBottom>
-                {asset.description}
+                {asset.short_description || asset.description}
               </Typography>
             )}
             <Box sx={{ mt: 1, display: 'flex', gap: 1, flexWrap: 'wrap' }}>

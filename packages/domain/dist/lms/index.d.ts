@@ -10,6 +10,7 @@ export * from './path.js';
 export * from './progress.js';
 export * from './assignment.js';
 export * from './certificates.js';
+export * from './assessment.js';
 export * from './contracts.js';
 export * from './fixtures.js';
 //# sourceMappingURL=index.d.ts.map

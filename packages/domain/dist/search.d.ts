@@ -78,19 +78,16 @@ export declare const UnifiedSearchResultSchema: z.ZodObject<{
         product_suite_ids: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
         topic_tag_ids: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
         audience_ids: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
-        badge_ids: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
     }, "strip", z.ZodTypeAny, {
         product_ids?: string[] | undefined;
         product_suite_ids?: string[] | undefined;
         topic_tag_ids?: string[] | undefined;
         audience_ids?: string[] | undefined;
-        badge_ids?: string[] | undefined;
     }, {
         product_ids?: string[] | undefined;
         product_suite_ids?: string[] | undefined;
         topic_tag_ids?: string[] | undefined;
         audience_ids?: string[] | undefined;
-        badge_ids?: string[] | undefined;
     }>;
     status: z.ZodOptional<z.ZodString>;
     published_at: z.ZodOptional<z.ZodString>;
@@ -102,7 +99,6 @@ export declare const UnifiedSearchResultSchema: z.ZodObject<{
         product_suite_ids?: string[] | undefined;
         topic_tag_ids?: string[] | undefined;
         audience_ids?: string[] | undefined;
-        badge_ids?: string[] | undefined;
     };
     updated_at: string;
     entity_type: "content" | "course" | "learning_path" | "role_playing" | "content_kit";
@@ -137,7 +133,6 @@ export declare const UnifiedSearchResultSchema: z.ZodObject<{
         product_suite_ids?: string[] | undefined;
         topic_tag_ids?: string[] | undefined;
         audience_ids?: string[] | undefined;
-        badge_ids?: string[] | undefined;
     };
     updated_at: string;
     entity_type: "content" | "course" | "learning_path" | "role_playing" | "content_kit";
@@ -177,7 +172,6 @@ export declare const UnifiedSearchParamsSchema: z.ZodObject<{
     product_suite_ids: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
     topic_tag_ids: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
     audience_ids: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
-    badge_ids: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
     limit: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
     cursor: z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
@@ -186,7 +180,6 @@ export declare const UnifiedSearchParamsSchema: z.ZodObject<{
     product_suite_ids?: string[] | undefined;
     topic_tag_ids?: string[] | undefined;
     audience_ids?: string[] | undefined;
-    badge_ids?: string[] | undefined;
     q?: string | undefined;
     entity_types?: ("content" | "course" | "learning_path" | "role_playing" | "content_kit")[] | undefined;
     cursor?: string | undefined;
@@ -195,7 +188,6 @@ export declare const UnifiedSearchParamsSchema: z.ZodObject<{
     product_suite_ids?: string[] | undefined;
     topic_tag_ids?: string[] | undefined;
     audience_ids?: string[] | undefined;
-    badge_ids?: string[] | undefined;
     q?: string | undefined;
     entity_types?: ("content" | "course" | "learning_path" | "role_playing" | "content_kit")[] | undefined;
     limit?: number | undefined;

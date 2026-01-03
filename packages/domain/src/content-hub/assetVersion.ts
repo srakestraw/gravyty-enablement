@@ -53,10 +53,21 @@ export const AssetVersionSchema = z.object({
   change_log: z.string().optional(), // Required on publish
   
   // File metadata (for UPLOAD source)
-  storage_key: z.string().optional(), // S3 key
-  checksum: z.string().optional(),
-  mime_type: z.string().optional(),
-  size_bytes: z.number().int().min(0).optional(),
+  storage_key: z.string().optional(), // S3 key (deprecated, use storage_keys)
+  storage_keys: z.array(z.string()).optional(), // S3 keys for multiple files
+  file_metadata: z.array(z.object({
+    storage_key: z.string(),
+    filename: z.string().optional(),
+    mime_type: z.string().optional(),
+    size_bytes: z.number().int().min(0).optional(),
+    checksum: z.string().optional(),
+  })).optional(), // Metadata for multiple files
+  checksum: z.string().optional(), // Deprecated, use file_metadata
+  mime_type: z.string().optional(), // Deprecated, use file_metadata
+  size_bytes: z.number().int().min(0).optional(), // Deprecated, use file_metadata
+  
+  // Rich text content (for RICHTEXT source or text_content type)
+  content_html: z.string().optional(), // HTML content for rich text documents (deprecated, use body_rich_text on Asset)
   
   // Rendition metadata (thumbnails/previews)
   thumbnail_key: z.string().optional(),
@@ -78,4 +89,5 @@ export const AssetVersionSchema = z.object({
 });
 
 export type AssetVersion = z.infer<typeof AssetVersionSchema>;
+
 

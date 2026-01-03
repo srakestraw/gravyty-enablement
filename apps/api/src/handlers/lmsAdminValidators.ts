@@ -19,7 +19,12 @@ export interface ValidationResult {
 /**
  * Validate course publish readiness
  */
-export function validateCoursePublish(course: Course, lessons: Lesson[]): ValidationResult {
+export function validateCoursePublish(
+  course: Course,
+  lessons: Lesson[],
+  assessmentConfig?: { is_enabled: boolean; required_for_completion: boolean } | null,
+  assessmentQuestionCount?: number
+): ValidationResult {
   const errors: ValidationError[] = [];
 
   // Required fields
@@ -176,6 +181,34 @@ export function validateCoursePublish(course: Course, lessons: Lesson[]): Valida
             break;
         }
       });
+    }
+  }
+
+  // Assessment validation
+  if (assessmentConfig?.is_enabled) {
+    const questionCount = assessmentQuestionCount ?? 0;
+    if (questionCount === 0) {
+      errors.push({
+        field: 'assessment',
+        message: 'Assessment is enabled but has no questions. Add at least one question or disable the assessment.',
+      });
+    }
+  }
+
+  if (assessmentConfig?.required_for_completion) {
+    if (!assessmentConfig.is_enabled) {
+      errors.push({
+        field: 'assessment.required_for_completion',
+        message: 'Assessment is required for completion but is not enabled. Enable the assessment or remove the requirement.',
+      });
+    } else {
+      const questionCount = assessmentQuestionCount ?? 0;
+      if (questionCount === 0) {
+        errors.push({
+          field: 'assessment',
+          message: 'Assessment is required for completion but has no questions. Add at least one question.',
+        });
+      }
     }
   }
 

@@ -26,7 +26,7 @@ export async function publishVersionHandler(req: AuthenticatedRequest, res: Resp
   
   try {
     const PublishSchema = z.object({
-      change_log: z.string().min(1, 'Change log is required'),
+      change_log: z.string().optional(),
     });
     
     const parsed = PublishSchema.safeParse(req.body);
@@ -62,15 +62,7 @@ export async function publishVersionHandler(req: AuthenticatedRequest, res: Resp
       return;
     }
     
-    // Enforce publish requirements: metadata and required metadata
-    if (!asset.metadata_node_ids || asset.metadata_node_ids.length === 0) {
-      res.status(400).json({
-        error: { code: 'VALIDATION_ERROR', message: 'Metadata is required to publish. Please assign metadata nodes to the asset.' },
-        request_id: requestId,
-      });
-      return;
-    }
-    
+    // Enforce publish requirements: required metadata
     if (!asset.title || !asset.asset_type || !asset.owner_id) {
       res.status(400).json({
         error: { code: 'VALIDATION_ERROR', message: 'Required metadata missing: title, asset_type, and owner_id are required to publish.' },
@@ -83,7 +75,7 @@ export async function publishVersionHandler(req: AuthenticatedRequest, res: Resp
     const { version: publishedVersion, asset: assetUpdate } = publishVersion(
       version,
       userId,
-      parsed.data.change_log
+      parsed.data.change_log || ''
     );
     
     // Update version

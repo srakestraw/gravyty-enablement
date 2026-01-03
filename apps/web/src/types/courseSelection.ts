@@ -41,3 +41,4 @@ export function selectionToUrlParam(selection: CourseSelection | null): string |
   return null;
 }
 
+

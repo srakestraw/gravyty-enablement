@@ -583,6 +583,20 @@ export async function updateProgress(req: AuthenticatedRequest, res: Response) {
       percent_complete: result.progress.percent_complete,
       completed: result.progress.completed,
     });
+
+    // Check if course was just completed and evaluate badges
+    if (result.courseJustCompleted) {
+      // Emit course completed event
+      await emitLmsEvent(req, 'lms_course_completed' as any, {
+        course_id: courseId,
+      });
+
+      // Evaluate badges
+      const { processBadgeEvent } = await import('../services/badgeService');
+      await processBadgeEvent('lms_course_completed', userId, {
+        course_id: courseId,
+      });
+    }
     
     const response: ApiSuccessResponse<{ progress: typeof result.progress }> = {
       data: { progress: result.progress },

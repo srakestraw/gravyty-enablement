@@ -37,6 +37,7 @@ import {
   Image as ImageIcon,
   VideoLibrary as VideoIcon,
   AttachFile as AttachmentIcon,
+  DeleteOutline as DeleteIcon,
 } from '@mui/icons-material';
 import { useAdminMedia } from '../../../hooks/useAdminMedia';
 import { lmsAdminApi } from '../../../api/lmsAdminClient';
@@ -49,6 +50,22 @@ export function AdminLearningMediaPage() {
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  
+  // Cleanup dialog state
+  const [cleanupOpen, setCleanupOpen] = useState(false);
+  const [cleanupLoading, setCleanupLoading] = useState(false);
+  const [cleanupError, setCleanupError] = useState<string | null>(null);
+  const [orphanedMedia, setOrphanedMedia] = useState<Array<{
+    media_id: string;
+    type: string;
+    filename?: string;
+    url: string;
+    created_at: string;
+    course_id?: string;
+    lesson_id?: string;
+  }>>([]);
+  const [deletedCount, setDeletedCount] = useState<number | undefined>(undefined);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   const handleUpload = async () => {
     if (!file) return;
@@ -103,6 +120,62 @@ export function AdminLearningMediaPage() {
     return <AttachmentIcon />;
   };
 
+  const handleCleanupDryRun = async () => {
+    setCleanupLoading(true);
+    setCleanupError(null);
+    setOrphanedMedia([]);
+    setDeletedCount(undefined);
+    
+    try {
+      const response = await lmsAdminApi.cleanupOrphanedMedia(true);
+      if ('data' in response) {
+        setOrphanedMedia(response.data.orphaned_media);
+      } else {
+        setCleanupError(response.error.message);
+      }
+    } catch (err) {
+      setCleanupError(err instanceof Error ? err.message : 'Failed to run cleanup');
+    } finally {
+      setCleanupLoading(false);
+    }
+  };
+
+  const handleDeleteOrphaned = async () => {
+    setConfirmDeleteOpen(false);
+    setCleanupLoading(true);
+    setCleanupError(null);
+    
+    try {
+      const response = await lmsAdminApi.cleanupOrphanedMedia(false);
+      if ('data' in response) {
+        setDeletedCount(response.data.deleted_count);
+        setOrphanedMedia(response.data.orphaned_media);
+        // Refresh media list
+        refetch();
+      } else {
+        setCleanupError(response.error.message);
+      }
+    } catch (err) {
+      setCleanupError(err instanceof Error ? err.message : 'Failed to delete orphaned media');
+    } finally {
+      setCleanupLoading(false);
+    }
+  };
+
+  const handleOpenCleanup = () => {
+    setCleanupOpen(true);
+    setOrphanedMedia([]);
+    setDeletedCount(undefined);
+    setCleanupError(null);
+  };
+
+  const handleCloseCleanup = () => {
+    setCleanupOpen(false);
+    setOrphanedMedia([]);
+    setDeletedCount(undefined);
+    setCleanupError(null);
+  };
+
   const filteredMedia = media?.filter((item: any) => {
     if (mediaTypeFilter === 'all') return true;
     return item.type === mediaTypeFilter;
@@ -128,9 +201,14 @@ export function AdminLearningMediaPage() {
     <Box sx={{ p: 3 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Typography variant="h4">Media Library</Typography>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={() => setOpen(true)}>
-          Upload Media
-        </Button>
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          <Button variant="outlined" startIcon={<DeleteIcon />} onClick={handleOpenCleanup}>
+            Cleanup Orphaned Media
+          </Button>
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setOpen(true)}>
+            Upload Media
+          </Button>
+        </Box>
       </Box>
 
       {/* Filter */}
@@ -210,6 +288,117 @@ export function AdminLearningMediaPage() {
           </TableBody>
         </Table>
       </TableContainer>
+
+      {/* Cleanup Dialog */}
+      <Dialog open={cleanupOpen} onClose={handleCloseCleanup} maxWidth="md" fullWidth>
+        <DialogTitle>Cleanup Orphaned Media</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Find and delete media files that are not referenced by any course, path, lesson, or asset.
+          </Typography>
+          
+          {cleanupError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {cleanupError}
+            </Alert>
+          )}
+          
+          {deletedCount !== undefined && (
+            <Alert severity="success" sx={{ mb: 2 }}>
+              Successfully deleted {deletedCount} orphaned media item{deletedCount !== 1 ? 's' : ''}.
+            </Alert>
+          )}
+          
+          {orphanedMedia.length > 0 && (
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="h6" gutterBottom>
+                Found {orphanedMedia.length} orphaned media item{orphanedMedia.length !== 1 ? 's' : ''}
+              </Typography>
+              <TableContainer component={Paper} sx={{ maxHeight: 400, mt: 2 }}>
+                <Table size="small" stickyHeader>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Type</TableCell>
+                      <TableCell>Media ID</TableCell>
+                      <TableCell>Filename</TableCell>
+                      <TableCell>Created</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {orphanedMedia.map((item) => (
+                      <TableRow key={item.media_id}>
+                        <TableCell>
+                          <Chip
+                            icon={getMediaIcon(item.type)}
+                            label={item.type}
+                            size="small"
+                            color={item.type === 'cover' || item.type === 'image' ? 'primary' : item.type === 'video' ? 'secondary' : 'default'}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>
+                            {item.media_id}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>{item.filename || '-'}</TableCell>
+                        <TableCell>
+                          {item.created_at ? new Date(item.created_at).toLocaleDateString() : '-'}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Box>
+          )}
+          
+          {orphanedMedia.length === 0 && deletedCount === undefined && !cleanupLoading && (
+            <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>
+              Click "Run Dry Run" to scan for orphaned media.
+            </Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseCleanup}>Close</Button>
+          {orphanedMedia.length === 0 && deletedCount === undefined && (
+            <Button
+              onClick={handleCleanupDryRun}
+              variant="outlined"
+              disabled={cleanupLoading}
+              startIcon={cleanupLoading ? <CircularProgress size={16} /> : null}
+            >
+              {cleanupLoading ? 'Scanning...' : 'Run Dry Run'}
+            </Button>
+          )}
+          {orphanedMedia.length > 0 && deletedCount === undefined && (
+            <Button
+              onClick={() => setConfirmDeleteOpen(true)}
+              variant="contained"
+              color="error"
+              startIcon={<DeleteIcon />}
+            >
+              Delete All ({orphanedMedia.length})
+            </Button>
+          )}
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={confirmDeleteOpen} onClose={() => setConfirmDeleteOpen(false)}>
+        <DialogTitle>Confirm Deletion</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Are you sure you want to delete {orphanedMedia.length} orphaned media item{orphanedMedia.length !== 1 ? 's' : ''}?
+            This action cannot be undone.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmDeleteOpen(false)}>Cancel</Button>
+          <Button onClick={handleDeleteOrphaned} variant="contained" color="error">
+            Delete All
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Upload Dialog */}
       <Dialog open={open} onClose={() => setOpen(false)} maxWidth="sm" fullWidth>

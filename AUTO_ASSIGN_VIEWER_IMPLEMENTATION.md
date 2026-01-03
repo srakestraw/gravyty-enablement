@@ -137,3 +137,4 @@ aws logs tail /aws/lambda/EnablementPortalStack-AutoAssignViewerFunction-XXXXX -
 - `infra/lib/enablement-portal-stack.ts` - Stack integration
 - `infra/lambda/email-domain-validator/index.js` - Pre-token generation validator
 
+

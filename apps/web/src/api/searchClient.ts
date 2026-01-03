@@ -44,10 +44,6 @@ export async function searchUnified(
     queryParams.append('audience_ids', params.audience_ids.join(','));
   }
   
-  if (params.badge_ids && params.badge_ids.length > 0) {
-    queryParams.append('badge_ids', params.badge_ids.join(','));
-  }
-  
   if (params.limit) {
     queryParams.append('limit', params.limit.toString());
   }

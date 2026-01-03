@@ -248,6 +248,157 @@ const tables = [
     ],
     BillingMode: 'PAY_PER_REQUEST',
   },
+  // Assessment Tables
+  {
+    TableName: process.env.LMS_ASSESSMENT_CONFIGS_TABLE || 'lms_assessment_configs',
+    KeySchema: [
+      { AttributeName: 'assessment_config_id', KeyType: 'HASH' },
+    ],
+    AttributeDefinitions: [
+      { AttributeName: 'assessment_config_id', AttributeType: 'S' },
+      { AttributeName: 'course_id', AttributeType: 'S' },
+    ],
+    GlobalSecondaryIndexes: [
+      {
+        IndexName: 'CourseAssessmentIndex',
+        KeySchema: [
+          { AttributeName: 'course_id', KeyType: 'HASH' },
+        ],
+        Projection: { ProjectionType: 'ALL' },
+      },
+    ],
+    BillingMode: 'PAY_PER_REQUEST',
+  },
+  {
+    TableName: process.env.LMS_ASSESSMENT_QUESTIONS_TABLE || 'lms_assessment_questions',
+    KeySchema: [
+      { AttributeName: 'question_id', KeyType: 'HASH' },
+      { AttributeName: 'assessment_config_id', KeyType: 'RANGE' },
+    ],
+    AttributeDefinitions: [
+      { AttributeName: 'question_id', AttributeType: 'S' },
+      { AttributeName: 'assessment_config_id', AttributeType: 'S' },
+      { AttributeName: 'order_index', AttributeType: 'N' },
+    ],
+    GlobalSecondaryIndexes: [
+      {
+        IndexName: 'QuestionsByConfigIndex',
+        KeySchema: [
+          { AttributeName: 'assessment_config_id', KeyType: 'HASH' },
+          { AttributeName: 'order_index', KeyType: 'RANGE' },
+        ],
+        Projection: { ProjectionType: 'ALL' },
+      },
+    ],
+    BillingMode: 'PAY_PER_REQUEST',
+  },
+  {
+    TableName: process.env.LMS_ASSESSMENT_OPTIONS_TABLE || 'lms_assessment_options',
+    KeySchema: [
+      { AttributeName: 'option_id', KeyType: 'HASH' },
+      { AttributeName: 'question_id', KeyType: 'RANGE' },
+    ],
+    AttributeDefinitions: [
+      { AttributeName: 'option_id', AttributeType: 'S' },
+      { AttributeName: 'question_id', AttributeType: 'S' },
+    ],
+    BillingMode: 'PAY_PER_REQUEST',
+  },
+  {
+    TableName: process.env.LMS_ASSESSMENT_ATTEMPTS_TABLE || 'lms_assessment_attempts',
+    KeySchema: [
+      { AttributeName: 'attempt_id', KeyType: 'HASH' },
+      { AttributeName: 'SK', KeyType: 'RANGE' }, // course_id#learner_id
+    ],
+    AttributeDefinitions: [
+      { AttributeName: 'attempt_id', AttributeType: 'S' },
+      { AttributeName: 'SK', AttributeType: 'S' },
+      { AttributeName: 'course_id', AttributeType: 'S' },
+      { AttributeName: 'learner_id', AttributeType: 'S' },
+      { AttributeName: 'attempt_number', AttributeType: 'N' },
+      { AttributeName: 'submitted_at', AttributeType: 'S' },
+    ],
+    GlobalSecondaryIndexes: [
+      {
+        IndexName: 'LearnerAttemptsIndex',
+        KeySchema: [
+          { AttributeName: 'SK', KeyType: 'HASH' }, // course_id#learner_id
+          { AttributeName: 'attempt_number', KeyType: 'RANGE' },
+        ],
+        Projection: { ProjectionType: 'ALL' },
+      },
+      {
+        IndexName: 'CourseAttemptsIndex',
+        KeySchema: [
+          { AttributeName: 'course_id', KeyType: 'HASH' },
+          { AttributeName: 'submitted_at', KeyType: 'RANGE' },
+        ],
+        Projection: { ProjectionType: 'ALL' },
+      },
+      {
+        IndexName: 'AttemptByIdIndex',
+        KeySchema: [
+          { AttributeName: 'attempt_id', KeyType: 'HASH' },
+        ],
+        Projection: { ProjectionType: 'ALL' },
+      },
+    ],
+    BillingMode: 'PAY_PER_REQUEST',
+  },
+  {
+    TableName: process.env.LMS_ASSESSMENT_ANSWERS_TABLE || 'lms_assessment_answers',
+    KeySchema: [
+      { AttributeName: 'answer_id', KeyType: 'HASH' },
+      { AttributeName: 'attempt_id', KeyType: 'RANGE' },
+    ],
+    AttributeDefinitions: [
+      { AttributeName: 'answer_id', AttributeType: 'S' },
+      { AttributeName: 'attempt_id', AttributeType: 'S' },
+    ],
+    GlobalSecondaryIndexes: [
+      {
+        IndexName: 'AttemptAnswersIndex',
+        KeySchema: [
+          { AttributeName: 'attempt_id', KeyType: 'HASH' },
+        ],
+        Projection: { ProjectionType: 'ALL' },
+      },
+    ],
+    BillingMode: 'PAY_PER_REQUEST',
+  },
+  // User Badges Table
+  {
+    TableName: process.env.USER_BADGES_TABLE || 'user_badges',
+    KeySchema: [
+      { AttributeName: 'user_id', KeyType: 'HASH' },
+      { AttributeName: 'SK', KeyType: 'RANGE' }, // badge_id#course_id or badge_id
+    ],
+    AttributeDefinitions: [
+      { AttributeName: 'user_id', AttributeType: 'S' },
+      { AttributeName: 'SK', AttributeType: 'S' },
+      { AttributeName: 'badge_id', AttributeType: 'S' },
+      { AttributeName: 'awarded_at', AttributeType: 'S' },
+    ],
+    GlobalSecondaryIndexes: [
+      {
+        IndexName: 'BadgesByUserIndex',
+        KeySchema: [
+          { AttributeName: 'user_id', KeyType: 'HASH' },
+          { AttributeName: 'awarded_at', KeyType: 'RANGE' },
+        ],
+        Projection: { ProjectionType: 'ALL' },
+      },
+      {
+        IndexName: 'BadgesByIdIndex',
+        KeySchema: [
+          { AttributeName: 'badge_id', KeyType: 'HASH' },
+          { AttributeName: 'awarded_at', KeyType: 'RANGE' },
+        ],
+        Projection: { ProjectionType: 'ALL' },
+      },
+    ],
+    BillingMode: 'PAY_PER_REQUEST',
+  },
   // Metadata Table
   {
     TableName: process.env.METADATA_TABLE || 'metadata',

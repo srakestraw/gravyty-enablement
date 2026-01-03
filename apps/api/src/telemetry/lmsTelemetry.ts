@@ -223,6 +223,11 @@ export const LMS_EVENTS = {
   ADMIN_CERTIFICATE_TEMPLATE_ARCHIVED: 'lms_admin_certificate_template_archived',
   CERTIFICATE_ISSUED: 'lms_certificate_issued',
   
+  // Assessment events
+  ASSESSMENT_ATTEMPT_STARTED: 'assessment.attempt_started',
+  ASSESSMENT_ATTEMPT_SUBMITTED: 'assessment.attempt_submitted',
+  ASSESSMENT_PASSED: 'assessment.passed',
+  
   // Optional
   SEARCH_PERFORMED: 'lms_search_performed',
   FILTER_APPLIED: 'lms_filter_applied',

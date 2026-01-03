@@ -97,3 +97,4 @@ export function CourseCard({ course, issuesCount = 0, onEditDetails }: CourseCar
   );
 }
 
+

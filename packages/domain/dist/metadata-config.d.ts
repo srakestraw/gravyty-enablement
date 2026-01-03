@@ -28,7 +28,6 @@ export interface MetadataFieldConfig {
  * Defines which metadata fields are available for each entity type.
  *
  * - Product, Product Suite, Topic Tags, Audience: Available for ALL entity types
- * - Badges: Only available for Courses, Learning Paths, and Role Playing
  */
 export declare const METADATA_FIELD_CONFIG: MetadataFieldConfig[];
 /**

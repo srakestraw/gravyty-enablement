@@ -40,9 +40,6 @@ export async function unifiedSearch(req: AuthenticatedRequest, res: Response) {
       audience_ids: z.string().optional().transform((val) => 
         val ? val.split(',').map(id => id.trim()) : undefined
       ),
-      badge_ids: z.string().optional().transform((val) => 
-        val ? val.split(',').map(id => id.trim()) : undefined
-      ),
       limit: z.string().optional().transform((val) => 
         val ? parseInt(val, 10) : undefined
       ),
@@ -69,7 +66,6 @@ export async function unifiedSearch(req: AuthenticatedRequest, res: Response) {
       product_suite_ids: parsed.data.product_suite_ids,
       topic_tag_ids: parsed.data.topic_tag_ids,
       audience_ids: parsed.data.audience_ids,
-      badge_ids: parsed.data.badge_ids,
       limit: parsed.data.limit || 20,
       cursor: parsed.data.cursor,
     };
@@ -93,9 +89,6 @@ export async function unifiedSearch(req: AuthenticatedRequest, res: Response) {
             continue;
           }
           if (params.audience_ids && (!course.audience_ids || !course.audience_ids.some(id => params.audience_ids!.includes(id)))) {
-            continue;
-          }
-          if (params.badge_ids && (!course.badge_ids || !course.badge_ids.some(id => params.badge_ids!.includes(id)))) {
             continue;
           }
           
@@ -122,7 +115,6 @@ export async function unifiedSearch(req: AuthenticatedRequest, res: Response) {
               product_suite_ids: course.product_suite_ids,
               topic_tag_ids: course.topic_tag_ids,
               audience_ids: course.audience_ids,
-              badge_ids: course.badge_ids,
             },
             status: course.status,
             published_at: course.published_at,
@@ -152,9 +144,6 @@ export async function unifiedSearch(req: AuthenticatedRequest, res: Response) {
           if (params.audience_ids && (!path.audience_ids || !path.audience_ids.some(id => params.audience_ids!.includes(id)))) {
             continue;
           }
-          if (params.badge_ids && (!path.badges || !path.badges.some(id => params.badge_ids!.includes(id)))) {
-            continue;
-          }
           
           // Text search
           if (params.q) {
@@ -179,7 +168,6 @@ export async function unifiedSearch(req: AuthenticatedRequest, res: Response) {
               product_suite_ids: path.product_suite_ids,
               topic_tag_ids: path.topic_tag_ids,
               audience_ids: path.audience_ids,
-              badge_ids: path.badges,
             },
             status: path.status,
             published_at: path.published_at,
@@ -203,9 +191,14 @@ export async function unifiedSearch(req: AuthenticatedRequest, res: Response) {
           // Text search
           if (params.q) {
             const searchLower = params.q.toLowerCase();
+            const keywordMatch = asset.keywords?.some(kw => 
+              kw.toLowerCase().includes(searchLower)
+            ) || false;
             if (
               !asset.title.toLowerCase().includes(searchLower) &&
-              !asset.description?.toLowerCase().includes(searchLower)
+              !asset.description?.toLowerCase().includes(searchLower) &&
+              !asset.short_description?.toLowerCase().includes(searchLower) &&
+              !keywordMatch
             ) {
               continue;
             }

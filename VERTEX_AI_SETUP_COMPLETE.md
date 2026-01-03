@@ -169,3 +169,4 @@ curl -X POST $API_URL/v1/lms/admin/ai/generate-image \
 
 **Setup Script**: `./infra/scripts/setup-gcp-vertex-ai.sh`
 
+

@@ -21,7 +21,7 @@ interface AuthContextType {
   signIn: () => Promise<void>;
   signOut: () => Promise<void>;
   getIdToken: () => Promise<string | null>;
-  checkAuth: () => Promise<void>;
+  checkAuth: (forceRefresh?: boolean) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -31,8 +31,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [isAuth, setIsAuth] = useState(false);
 
-  const checkAuth = useCallback(async () => {
+  const checkAuth = useCallback(async (forceRefresh: boolean = false) => {
     try {
+      // If forcing refresh, get a fresh token first
+      if (forceRefresh) {
+        try {
+          await getIdToken(true);
+        } catch (error) {
+          console.warn('[Auth] Failed to refresh token:', error);
+        }
+      }
+      
       const authenticated = await isAuthenticated();
       if (authenticated) {
         const currentUser = await getCurrentAuthUser();
@@ -52,13 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             authMode = 'dev';
             role = normalizeRole(devRole);
             
-            if (import.meta.env.DEV) {
-              console.log('[Auth] Using dev mode role:', {
-                raw: devRole,
-                normalized: role,
-                authMode,
-              });
-            }
+            // Using dev mode role
           } else {
             // Cognito path - extract from groups
             authMode = 'cognito';
@@ -70,25 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             
             role = roleFromGroups(rawGroups);
             
-            // Always log role extraction in dev mode for debugging
-            if (import.meta.env.DEV) {
-              console.log('[Auth] Using Cognito role:', {
-                rawGroups,
-                normalized: role,
-                authMode,
-                userEmail: currentUser.email,
-                userId: currentUser.userId,
-              });
-            }
-            
-            // Also log if Admin role is detected (dev mode only)
-            if (role === 'Admin' && import.meta.env.DEV) {
-              console.log('[Auth] ✅ Admin role detected!', {
-                rawGroups,
-                normalized: role,
-                userEmail: currentUser.email,
-              });
-            }
+            // Using Cognito role
           }
           
           // Ensure role is always set (default to Viewer if missing)

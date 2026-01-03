@@ -13,6 +13,8 @@ import { MediaRefSchema } from '../lms/media.js';
 export const AssetTypeSchema = z.enum([
   'deck',
   'doc',
+  'document',
+  'text_content', // Text Content - rich text body is primary content
   'image',
   'video',
   'logo',
@@ -29,6 +31,7 @@ export const AssetSourceTypeSchema = z.enum([
   'UPLOAD',
   'LINK',
   'GOOGLE_DRIVE',
+  'RICHTEXT',
 ]);
 
 export type AssetSourceType = z.infer<typeof AssetSourceTypeSchema>;
@@ -37,7 +40,7 @@ export type AssetSourceType = z.infer<typeof AssetSourceTypeSchema>;
  * Source Reference (JSON)
  * 
  * Structure depends on sourceType:
- * - LINK: { url: string, preview?: string }
+ * - LINK: { url: string, preview?: string } or { urls: string[], previews?: string[] } for multiple links
  * - GOOGLE_DRIVE: { driveFileId: string, driveMimeType: string, driveWebViewLink?: string, connectorId: string }
  */
 export const SourceRefSchema = z.record(z.unknown());
@@ -55,7 +58,10 @@ export const AssetSchema = z.object({
   
   // Basic metadata
   title: z.string(),
-  description: z.string().optional(),
+  description: z.string().optional(), // Plain text description (deprecated, use descriptionRichText or bodyRichText)
+  short_description: z.string().optional(), // Brief description for card displays (renamed to summary in UI)
+  description_rich_text: z.string().optional(), // Rich text description for non-text content types
+  body_rich_text: z.string().optional(), // Rich text body for text_content type
   asset_type: AssetTypeSchema,
   
   // Ownership
@@ -64,6 +70,7 @@ export const AssetSchema = z.object({
   // Metadata
   metadata_node_ids: z.array(z.string()).default([]),
   audience_ids: z.array(z.string()).default([]), // Multi-select audience IDs
+  keywords: z.array(z.string()).default([]), // Free-form search keywords
   
   // Source information
   source_type: AssetSourceTypeSchema,

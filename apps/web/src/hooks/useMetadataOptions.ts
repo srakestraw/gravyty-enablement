@@ -46,31 +46,11 @@ export function useMetadataOptions(
   }, [params]);
 
   const fetchOptions = useCallback(async () => {
-    console.log(`[useMetadataOptions:${groupKey}] Fetching options:`, {
-      groupKey,
-      params,
-      parentIds: params?.parentIds,
-      parent_id: apiParams?.parent_id,
-      query: params?.query,
-      timestamp: new Date().toISOString(),
-    });
     setLoading(true);
     setError(null);
 
     try {
       const response = await metadataApi.listOptions(groupKey, apiParams);
-      console.log(`[useMetadataOptions:${groupKey}] API response:`, {
-        groupKey,
-        hasError: 'error' in response,
-        error: 'error' in response ? response.error : null,
-        optionsCount: 'data' in response ? response.data.options.length : 0,
-        options: 'data' in response ? response.data.options.map(opt => ({ 
-          id: opt.option_id, 
-          label: opt.label, 
-          parent_id: opt.parent_id 
-        })) : [],
-        timestamp: new Date().toISOString(),
-      });
       if ('error' in response) {
         console.error(`[useMetadataOptions:${groupKey}] API error:`, response.error);
         setError(response.error.message);
@@ -93,9 +73,7 @@ export function useMetadataOptions(
         // fetch all products to ensure products with null parent_id are shown
         // This handles the case where backend filtering might be too strict
         if (fetchedOptions.length === 0 && params?.parentIds && params.parentIds.length > 0 && groupKey === 'product') {
-          console.log(`[useMetadataOptions:${groupKey}] Backend filtering returned empty results, fetching all products to show products with null parent_id`);
           // Don't refetch here to avoid infinite loop - the backend should handle this
-          // Instead, log for debugging
         }
         
         setOptions(fetchedOptions);

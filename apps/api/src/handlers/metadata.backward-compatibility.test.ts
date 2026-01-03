@@ -77,14 +77,12 @@ describe('Metadata Backward Compatibility Tests', () => {
         product_ids: ['product-1', 'product-2'],
         product_suite_ids: ['suite-1'],
         topic_tag_ids: ['tag-1', 'tag-2'],
-        badge_ids: ['badge-1'],
       };
 
       // Course should have metadata fields
       expect(course.product_ids).toBeDefined();
       expect(course.product_suite_ids).toBeDefined();
       expect(course.topic_tag_ids).toBeDefined();
-      expect(course.badge_ids).toBeDefined();
     });
 
     it('should support metadata in learning paths', () => {
@@ -94,7 +92,6 @@ describe('Metadata Backward Compatibility Tests', () => {
         product_id: 'product-1',
         product_suite_id: 'suite-1',
         topic_tag_ids: ['tag-1'],
-        badges: ['badge-1'],
       };
 
       // Path should have metadata fields

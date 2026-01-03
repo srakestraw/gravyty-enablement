@@ -10,7 +10,6 @@
  * Defines which metadata fields are available for each entity type.
  *
  * - Product, Product Suite, Topic Tags, Audience: Available for ALL entity types
- * - Badges: Only available for Courses, Learning Paths, and Role Playing
  */
 export const METADATA_FIELD_CONFIG = [
     {
@@ -32,11 +31,6 @@ export const METADATA_FIELD_CONFIG = [
         groupKey: 'audience',
         label: 'Audience',
         entityTypes: ['course', 'learning_path', 'role_playing', 'content', 'content_kit'],
-    },
-    {
-        groupKey: 'badge',
-        label: 'Badges',
-        entityTypes: ['course', 'learning_path', 'role_playing'], // Only these 3
     },
 ];
 /**

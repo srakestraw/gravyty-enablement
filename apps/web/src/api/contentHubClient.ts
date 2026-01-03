@@ -9,14 +9,18 @@ import type { Asset, AssetVersion, Comment, OutdatedFlag, UpdateRequest, Subscri
 
 export interface CreateAssetRequest {
   title: string;
+  short_description?: string;
   description?: string;
+  description_rich_text?: string; // Rich text description for non-text content
+  body_rich_text?: string; // Rich text body for text_content type
   cover_image?: MediaRef;
-  asset_type: 'deck' | 'doc' | 'image' | 'video' | 'logo' | 'worksheet' | 'link';
+  asset_type: 'deck' | 'doc' | 'document' | 'text_content' | 'image' | 'video' | 'logo' | 'worksheet' | 'link';
   owner_id?: string;
   metadata_node_ids?: string[];
   audience_ids?: string[];
-  source_type: 'UPLOAD' | 'LINK' | 'GOOGLE_DRIVE';
-  source_ref?: Record<string, unknown>;
+  keywords?: string[];
+  source_type?: 'UPLOAD' | 'LINK' | 'GOOGLE_DRIVE' | 'RICHTEXT'; // Optional, inferred from attachments
+  source_ref?: Record<string, unknown>; // For LINK: { url: string } or { urls: string[] }
 }
 
 export interface ListAssetsParams {
@@ -40,29 +44,52 @@ export interface ListVersionsResponse {
 }
 
 export interface InitUploadRequest {
-  filename: string;
-  content_type: string;
+  filename?: string; // Single file (backward compatible)
+  content_type?: string;
   size_bytes?: number;
+  files?: Array<{ // Multiple files
+    filename: string;
+    content_type: string;
+    size_bytes?: number;
+  }>;
 }
 
 export interface InitUploadResponse {
   version_id: string;
-  upload_url: string;
-  s3_bucket: string;
-  s3_key: string;
-  expires_in_seconds: number;
+  upload_url?: string; // Single file response (backward compatible)
+  s3_bucket?: string;
+  s3_key?: string;
+  expires_in_seconds?: number;
+  uploads?: Array<{ // Multiple files response
+    filename: string;
+    upload_url: string;
+    s3_bucket: string;
+    s3_key: string;
+    expires_in_seconds: number;
+  }>;
 }
 
 export interface CompleteUploadRequest {
   version_id: string;
-  storage_key: string;
+  storage_key?: string; // Single file (backward compatible)
   checksum?: string;
-  size_bytes: number;
+  size_bytes?: number;
+  files?: Array<{ // Multiple files
+    storage_key: string;
+    filename?: string;
+    checksum?: string;
+    size_bytes: number;
+  }>;
 }
 
 export interface DownloadUrlResponse {
   download_url: string;
   expires_in_seconds: number;
+  files?: Array<{
+    storage_key: string;
+    filename: string;
+    download_url: string;
+  }>;
 }
 
 export interface PublishVersionRequest {
@@ -146,6 +173,33 @@ export async function completeUpload(
   });
 }
 
+export interface SaveRichTextContentRequest {
+  version_id?: string;
+  content_html: string;
+}
+
+/**
+ * Save rich text content to a version
+ */
+export async function saveRichTextContent(
+  assetId: string,
+  data: SaveRichTextContentRequest
+): Promise<ApiResponse<{ version: AssetVersion }>> {
+  return apiFetch<{ version: AssetVersion }>(`/v1/assets/${assetId}/versions/save-rich-text`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+/**
+ * Get all unique keywords from published assets (for autocomplete)
+ */
+export async function getAssetKeywords(): Promise<ApiResponse<{ keywords: string[] }>> {
+  return apiFetch<{ keywords: string[] }>('/v1/assets/keywords', {
+    method: 'GET',
+  });
+}
+
 /**
  * List versions for an asset
  */
@@ -158,6 +212,68 @@ export async function listVersions(assetId: string): Promise<ApiResponse<ListVer
  */
 export async function getDownloadUrl(versionId: string): Promise<ApiResponse<DownloadUrlResponse>> {
   return apiFetch<DownloadUrlResponse>(`/v1/versions/${versionId}/download-url`);
+}
+
+/**
+ * Download a specific attachment
+ * Opens download URL in new window (server redirects to presigned URL)
+ */
+export async function downloadAttachment(assetId: string, attachmentId: string): Promise<void> {
+  const apiUrl = import.meta.env.VITE_API_URL || '';
+  const token = localStorage.getItem('token') || '';
+  
+  // Open URL directly - server will redirect to presigned URL
+  const url = `${apiUrl}/v1/assets/${assetId}/attachments/${attachmentId}/download`;
+  window.open(url, '_blank');
+}
+
+/**
+ * Download all attachments as ZIP
+ * Fetches ZIP blob and triggers download
+ */
+export async function downloadAllAttachments(assetId: string): Promise<void> {
+  const apiUrl = import.meta.env.VITE_API_URL || '';
+  const token = localStorage.getItem('token') || '';
+  
+  const response = await fetch(`${apiUrl}/v1/assets/${assetId}/download`, {
+    method: 'GET',
+    credentials: 'include',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+  
+  if (!response.ok) {
+    let errorMessage = 'Failed to download attachments';
+    try {
+      const error = await response.json();
+      errorMessage = error.error?.message || errorMessage;
+    } catch {
+      // Ignore JSON parse errors
+    }
+    throw new Error(errorMessage);
+  }
+  
+  // Get filename from Content-Disposition header
+  const contentDisposition = response.headers.get('Content-Disposition');
+  let filename = `${assetId}.zip`;
+  if (contentDisposition) {
+    const match = contentDisposition.match(/filename="(.+)"/);
+    if (match) {
+      filename = match[1];
+    }
+  }
+  
+  // Download blob
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  window.URL.revokeObjectURL(url);
 }
 
 /**

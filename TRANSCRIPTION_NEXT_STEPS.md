@@ -220,3 +220,4 @@ Monitor costs via AWS Cost Explorer with filters for:
    - Auto-detect language instead of fixed en-US
    - Support multiple languages
 
+

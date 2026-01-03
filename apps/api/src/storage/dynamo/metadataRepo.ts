@@ -366,17 +366,7 @@ export class MetadataRepo {
       const courseResult = await dynamoDocClient.send(courseCommand);
       let courses = (courseResult.Items || []) as Course[];
       
-      // For badge group, also check legacy badges array (can't filter in DynamoDB for nested arrays)
-      if (groupKey === 'badge') {
-        courses = courses.filter((c) => {
-          // Check new badge_ids first
-          if (c.badge_ids && c.badge_ids.includes(optionId)) {
-            return true;
-          }
-          // Fallback to legacy badges
-          return c.badges?.some((badge) => badge.badge_id === optionId);
-        });
-      } else if (groupKey === 'audience') {
+      if (groupKey === 'audience') {
         // Filter courses that have this audience_id in their audience_ids array
         courses = courses.filter((c) => {
           return c.audience_ids && c.audience_ids.includes(optionId);
@@ -395,40 +385,36 @@ export class MetadataRepo {
       courseLastKey = courseResult.LastEvaluatedKey;
     } while (courseLastKey);
 
-    // Skip resource scanning for badges - badges only apply to courses, learning paths, and role playing
-    // Not to content items/resources
-    if (groupKey !== 'badge') {
-      // Build filter expression for resources
-      const resourceFilter = this.buildUsageFilterExpression(groupKey, optionId, 'resource');
+    // Build filter expression for resources
+    const resourceFilter = this.buildUsageFilterExpression(groupKey, optionId, 'resource');
 
-      // Check Resources/Content table
-      let resourceLastKey;
-      do {
-        const resourceCommand = new ScanCommand({
-          TableName: CONTENT_TABLE,
-          ...(resourceFilter.filterExpression && {
-            FilterExpression: resourceFilter.filterExpression,
-            ExpressionAttributeNames: resourceFilter.attributeNames,
-            ExpressionAttributeValues: resourceFilter.attributeValues,
-          }),
-          ...(resourceLastKey && { ExclusiveStartKey: resourceLastKey }),
-        });
+    // Check Resources/Content table
+    let resourceLastKey;
+    do {
+      const resourceCommand = new ScanCommand({
+        TableName: CONTENT_TABLE,
+        ...(resourceFilter.filterExpression && {
+          FilterExpression: resourceFilter.filterExpression,
+          ExpressionAttributeNames: resourceFilter.attributeNames,
+          ExpressionAttributeValues: resourceFilter.attributeValues,
+        }),
+        ...(resourceLastKey && { ExclusiveStartKey: resourceLastKey }),
+      });
 
-        const resourceResult = await dynamoDocClient.send(resourceCommand);
-        const resources = (resourceResult.Items || []) as ContentItem[];
+      const resourceResult = await dynamoDocClient.send(resourceCommand);
+      const resources = (resourceResult.Items || []) as ContentItem[];
 
-        resourceCount += resources.length;
+      resourceCount += resources.length;
 
-        // Collect sample resource IDs
-        resources.forEach((resource) => {
-          if (sampleResourceIds.length < 10) {
-            sampleResourceIds.push(resource.content_id);
-          }
-        });
+      // Collect sample resource IDs
+      resources.forEach((resource) => {
+        if (sampleResourceIds.length < 10) {
+          sampleResourceIds.push(resource.content_id);
+        }
+      });
 
-        resourceLastKey = resourceResult.LastEvaluatedKey;
-      } while (resourceLastKey);
-    }
+      resourceLastKey = resourceResult.LastEvaluatedKey;
+    } while (resourceLastKey);
 
     return {
       used_by_courses: courseCount,
@@ -476,10 +462,6 @@ export class MetadataRepo {
         attributeNames,
         attributeValues,
       };
-    } else if (groupKey === 'badge') {
-      // For badges, we'll filter in memory after scanning (DynamoDB can't easily filter nested arrays)
-      // Return empty filter to scan all, then filter in memory
-      return { attributeNames, attributeValues };
     } else if (groupKey === 'audience') {
       attributeNames['#audience_ids'] = 'audience_ids';
       return {

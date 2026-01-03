@@ -4,6 +4,6 @@
  * EventBridge scheduled Lambda that publishes scheduled versions and expires published versions.
  */
 
-import { handler as schedulerHandler } from '@gravyty/jobs';
+import { contentHubSchedulerHandler } from '@gravyty/jobs';
 
-export const handler = schedulerHandler;
+export const handler = contentHubSchedulerHandler;

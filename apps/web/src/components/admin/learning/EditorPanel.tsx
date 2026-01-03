@@ -38,12 +38,15 @@ import {
   MoreVert as MoreVertIcon,
   Archive as ArchiveIcon,
   Unarchive as RestoreIcon,
+  Assignment as AssignmentIcon,
 } from '@mui/icons-material';
 import { LessonEditor } from './LessonEditor';
 import { DetailsTabContent } from './DetailsTabContent';
 import { CourseDetailsEditor } from './CourseDetailsEditor';
 import { TreeOutlinePanel } from './TreeOutlinePanel';
+import { AssessmentTabContent } from './AssessmentTabContent';
 import { RichTextEditor } from '../../common/RichTextEditor';
+import { CreateAssignmentModal } from './CreateAssignmentModal';
 import { focusRegistry } from '../../../utils/focusRegistry';
 import type { Course, CourseSection, Lesson } from '@gravyty/domain';
 import type { CourseTreeNode, NodeType } from '../../../types/courseTree';
@@ -221,6 +224,9 @@ export function EditorPanel({
   // Menu state for more actions (Discard/Delete)
   const [moreMenuAnchor, setMoreMenuAnchor] = useState<HTMLElement | null>(null);
   const isMoreMenuOpen = Boolean(moreMenuAnchor);
+  
+  // Assignment modal state
+  const [assignModalOpen, setAssignModalOpen] = useState(false);
 
   const handleMoreMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
     setMoreMenuAnchor(event.currentTarget);
@@ -449,6 +455,18 @@ export function EditorPanel({
           {/* Right: Actions (no wrap, always visible) */}
           {selection?.kind === 'course_details' && course && (
             <Box sx={{ display: 'flex', gap: 1, flexShrink: 0, flexWrap: 'nowrap' }}>
+              {course.status === 'published' && (
+                <Tooltip title="Assign this course to learners">
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    startIcon={<AssignmentIcon />}
+                    onClick={() => setAssignModalOpen(true)}
+                  >
+                    Assign
+                  </Button>
+                </Tooltip>
+              )}
               {course.status === 'published' ? (
                 <Tooltip title="Preview course as a learner">
                   <Button
@@ -602,6 +620,7 @@ export function EditorPanel({
           >
             <Tab value="details" label="Details" />
             <Tab value="outline" label="Course Outline" />
+            <Tab value="assessment" label="Assessment" />
           </Tabs>
         </Box>
       )}
@@ -633,6 +652,13 @@ export function EditorPanel({
           </Box>
         )}
         
+        {/* Show Assessment tab content when on Assessment tab */}
+        {editorTab === 'assessment' && course && (
+          <Box sx={{ display: 'block' }}>
+            <AssessmentTabContent course={course} />
+          </Box>
+        )}
+
         {/* Show Course Outline tab content when on Outline tab (regardless of selection kind) */}
         {editorTab === 'outline' && courseTree && onSelectNode && onAddSection && onRenameNode && onDeleteNode && onReorderNode && (
           <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -733,6 +759,19 @@ export function EditorPanel({
           />
         )}
       </Box>
+      
+      {/* Assignment Modal */}
+      {course && course.status === 'published' && (
+        <CreateAssignmentModal
+          open={assignModalOpen}
+          onClose={() => setAssignModalOpen(false)}
+          contextualTarget={{
+            type: 'course',
+            id: course.course_id,
+            title: course.title,
+          }}
+        />
+      )}
     </Box>
   );
 }

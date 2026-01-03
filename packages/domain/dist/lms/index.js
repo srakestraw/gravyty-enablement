@@ -11,6 +11,7 @@ export * from './path.js';
 export * from './progress.js';
 export * from './assignment.js';
 export * from './certificates.js';
+export * from './assessment.js';
 // API contracts
 export * from './contracts.js';
 // Fixtures (for UI development)

@@ -8,4 +8,6 @@ export * from './metadata-normalization.js';
 export * from './metadata-config.js';
 export * from './content-hub/index.js';
 export * from './search.js';
+export * from './promptHelpers.js';
+export * from './badges/badge.js';
 //# sourceMappingURL=index.d.ts.map

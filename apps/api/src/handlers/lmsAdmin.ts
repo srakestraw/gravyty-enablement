@@ -10,6 +10,7 @@ import { AuthenticatedRequest, ApiSuccessResponse } from '../types';
 import { 
   lmsRepo, 
   LMS_COURSES_TABLE,
+  LMS_LESSONS_TABLE,
   LMS_PATHS_TABLE,
   LMS_ASSIGNMENTS_TABLE,
   LMS_CERTIFICATES_TABLE,
@@ -246,6 +247,7 @@ export async function createCourse(req: AuthenticatedRequest, res: Response) {
     product_id: z.string().optional(), // Was "product_suite_id"
     product_suite_id: z.string().optional(), // Was "product_concept_id"
     topic_tag_ids: z.array(z.string()).optional(),
+    badge_ids: z.array(z.string()).optional(),
     // Legacy fields (for backward compatibility - will be normalized)
     legacy_product_suite: z.string().optional(), // Old product_suite -> maps to product
     legacy_product_concept: z.string().optional(), // Old product_concept -> maps to product_suite
@@ -257,7 +259,6 @@ export async function createCourse(req: AuthenticatedRequest, res: Response) {
       description: z.string().optional(),
       icon_url: z.string().optional(),
     })).optional(),
-    badge_ids: z.array(z.string()).optional(),
     estimated_minutes: z.union([z.number(), z.string(), z.null()]).optional(),
   });
   
@@ -316,8 +317,8 @@ export async function createCourse(req: AuthenticatedRequest, res: Response) {
       product_id,
       product_suite_id,
       topic_tag_ids: parsed.data.topic_tag_ids || [],
-      badges: parsed.data.badges || [],
       badge_ids: parsed.data.badge_ids || [],
+      badges: parsed.data.badges || [],
       estimated_minutes: estimatedMinutes,
       sections: [],
       related_course_ids: [],
@@ -428,7 +429,6 @@ export async function updateCourse(req: AuthenticatedRequest, res: Response) {
       description: z.string().optional(),
       icon_url: z.string().optional(),
     })).optional(),
-    badge_ids: z.array(z.string()).optional(),
     cover_image: z.object({
       media_id: z.string(),
       type: z.enum(['image', 'video', 'document', 'audio', 'other']),
@@ -711,9 +711,22 @@ export async function publishCourse(req: AuthenticatedRequest, res: Response) {
     // Get lessons for validation
     const lessons = await lmsRepo.getLessonsForCourse(courseId);
     
+    // Get assessment data for validation
+    const { assessmentRepo } = await import('../storage/dynamo/assessmentRepo');
+    const assessmentConfig = await assessmentRepo.getAssessmentConfig(courseId);
+    const assessmentQuestions = assessmentConfig ? await assessmentRepo.getQuestions(assessmentConfig.assessment_config_id) : [];
+    
     // Validate publish readiness
     const { validateCoursePublish } = await import('./lmsAdminValidators');
-    const validation = validateCoursePublish(course, lessons);
+    const validation = validateCoursePublish(
+      course,
+      lessons,
+      assessmentConfig ? {
+        is_enabled: assessmentConfig.is_enabled,
+        required_for_completion: assessmentConfig.required_for_completion,
+      } : null,
+      assessmentQuestions.length
+    );
     
     if (!validation.valid) {
       res.status(400).json({
@@ -980,7 +993,6 @@ export async function createPath(req: AuthenticatedRequest, res: Response) {
     product: z.string().optional(), // Was "product_suite"
     product_suite: z.string().optional(), // Was "product_concept"
     topic_tags: z.array(z.string()).optional(),
-    badges: z.array(z.string()).optional(),
     audience_ids: z.array(z.string()).optional(),
     cover_image: z.object({
       media_id: z.string(),
@@ -1027,7 +1039,6 @@ export async function createPath(req: AuthenticatedRequest, res: Response) {
       product,
       product_suite,
       topic_tags: parsed.data.topic_tags || [],
-      badges: parsed.data.badges || [],
       audience_ids: parsed.data.audience_ids || [],
       cover_image: parsed.data.cover_image,
       courses: (parsed.data.courses || []).map((c) => ({
@@ -1160,7 +1171,6 @@ export async function updatePath(req: AuthenticatedRequest, res: Response) {
     product: z.string().optional(), // Was "product_suite"
     product_suite: z.string().optional(), // Was "product_concept"
     topic_tags: z.array(z.string()).optional(),
-    badges: z.array(z.string()).optional(),
     audience_ids: z.array(z.string()).optional(),
     cover_image: z.object({
       media_id: z.string(),
@@ -1310,8 +1320,61 @@ export async function listAdminAssignments(req: AuthenticatedRequest, res: Respo
       status,
     });
     
-    const response: ApiSuccessResponse<{ assignments: Assignment[] }> = {
-      data: { assignments },
+    // Hydrate assignments with user info and target titles
+    const { getUserByUsername } = await import('../aws/cognitoClient');
+    const hydratedAssignments = await Promise.all(
+      assignments.map(async (assignment) => {
+        // Get assignee info
+        let assignee: { id: string; name?: string; email: string } | null = null;
+        try {
+          const user = await getUserByUsername(assignment.user_id);
+          if (user) {
+            assignee = {
+              id: user.username,
+              name: user.name,
+              email: user.email,
+            };
+          }
+        } catch (error) {
+          console.warn(`[${requestId}] Failed to fetch user ${assignment.user_id}:`, error);
+        }
+        
+        // Get target title
+        let target: { id: string; type: 'course' | 'path'; title: string } | null = null;
+        try {
+          if (assignment.assignment_type === 'course' && assignment.course_id) {
+            const course = await lmsRepo.getCourseDraftOrPublished(assignment.course_id);
+            if (course) {
+              target = {
+                id: course.course_id,
+                type: 'course',
+                title: course.title,
+              };
+            }
+          } else if (assignment.assignment_type === 'path' && assignment.path_id) {
+            const path = await lmsRepo.getPathById(assignment.path_id, false);
+            if (path) {
+              target = {
+                id: path.path_id,
+                type: 'path',
+                title: path.title,
+              };
+            }
+          }
+        } catch (error) {
+          console.warn(`[${requestId}] Failed to fetch target for assignment ${assignment.assignment_id}:`, error);
+        }
+        
+        return {
+          ...assignment,
+          assignee,
+          target,
+        };
+      })
+    );
+    
+    const response: ApiSuccessResponse<{ assignments: typeof hydratedAssignments }> = {
+      data: { assignments: hydratedAssignments },
       request_id: requestId,
     };
     res.json(response);
@@ -1519,7 +1582,6 @@ export async function createCertificateTemplate(req: AuthenticatedRequest, res: 
     description: z.string().optional(),
     applies_to: z.enum(['course', 'path']),
     applies_to_id: z.string().min(1),
-    badge_text: z.string().min(1),
     signatory_name: z.string().optional(),
     signatory_title: z.string().optional(),
     issued_copy: z.object({
@@ -1551,7 +1613,6 @@ export async function createCertificateTemplate(req: AuthenticatedRequest, res: 
       status: 'draft',
       applies_to: parsed.data.applies_to,
       applies_to_id: parsed.data.applies_to_id,
-      badge_text: parsed.data.badge_text,
       signatory_name: parsed.data.signatory_name,
       signatory_title: parsed.data.signatory_title,
       issued_copy: parsed.data.issued_copy,
@@ -1650,7 +1711,6 @@ export async function updateCertificateTemplate(req: AuthenticatedRequest, res: 
     description: z.string().optional(),
     applies_to: z.enum(['course', 'path']).optional(),
     applies_to_id: z.string().min(1).optional(),
-    badge_text: z.string().min(1).optional(),
     signatory_name: z.string().optional(),
     signatory_title: z.string().optional(),
     issued_copy: z.object({
@@ -2502,6 +2562,295 @@ export async function deleteMedia(req: AuthenticatedRequest, res: Response) {
   }
 }
 
+/**
+ * POST /v1/lms/admin/media/cleanup
+ * Find and optionally delete orphaned media (media not referenced by any entity)
+ */
+export async function cleanupOrphanedMedia(req: AuthenticatedRequest, res: Response) {
+  const requestId = req.headers['x-request-id'] as string;
+  const userId = req.user?.user_id;
+
+  if (!userId) {
+    res.status(401).json({
+      error: { code: 'UNAUTHORIZED', message: 'User ID required' },
+      request_id: requestId,
+    });
+    return;
+  }
+
+  const CleanupSchema = z.object({
+    dry_run: z.boolean().optional().default(true),
+  });
+
+  const parsed = CleanupSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: parsed.error.errors.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+      },
+      request_id: requestId,
+    });
+    return;
+  }
+
+  const dryRun = parsed.data.dry_run;
+
+  try {
+    const { ScanCommand, DeleteCommand } = await import('@aws-sdk/lib-dynamodb');
+    
+    // Step 1: Get all media records
+    console.log(`[${requestId}] Scanning all media records...`);
+    let mediaItems: any[] = [];
+    try {
+      const mediaCommand = new ScanCommand({
+        TableName: LMS_CERTIFICATES_TABLE,
+        FilterExpression: 'entity_type = :entityType',
+        ExpressionAttributeValues: {
+          ':entityType': 'MEDIA',
+        },
+      });
+      
+      const result = await dynamoDocClient.send(mediaCommand);
+      mediaItems = result.Items || [];
+      console.log(`[${requestId}] Found ${mediaItems.length} media records`);
+    } catch (mediaError) {
+      console.error(`[${requestId}] Error scanning media records:`, mediaError);
+      throw new Error(`Failed to scan media records: ${mediaError instanceof Error ? mediaError.message : 'Unknown error'}`);
+    }
+
+    // Step 2: Collect all referenced media IDs from entities
+    const referencedMediaIds = new Set<string>();
+
+    // Scan courses for cover_image.media_id
+    console.log(`[${requestId}] Scanning courses for media references...`);
+    let courseLastKey;
+    do {
+      const courseCommand = new ScanCommand({
+        TableName: LMS_COURSES_TABLE,
+        ...(courseLastKey && { ExclusiveStartKey: courseLastKey }),
+      });
+      const courseResult = await dynamoDocClient.send(courseCommand);
+      const courses = (courseResult.Items || []) as Course[];
+      
+      for (const course of courses) {
+        // Check cover_image
+        if (course.cover_image?.media_id) {
+          referencedMediaIds.add(course.cover_image.media_id);
+        }
+      }
+      
+      courseLastKey = courseResult.LastEvaluatedKey;
+    } while (courseLastKey);
+    console.log(`[${requestId}] Found ${referencedMediaIds.size} media references in courses`);
+
+    // Scan lessons table for video_id and resources
+    console.log(`[${requestId}] Scanning lessons for media references...`);
+    try {
+      let lessonLastKey;
+      do {
+        const lessonCommand = new ScanCommand({
+          TableName: LMS_LESSONS_TABLE,
+          ...(lessonLastKey && { ExclusiveStartKey: lessonLastKey }),
+        });
+        const lessonResult = await dynamoDocClient.send(lessonCommand);
+        const lessons = (lessonResult.Items || []) as any[];
+        
+        for (const lesson of lessons) {
+          // Check video_id in content (for video lessons) - new format
+          if (lesson.content?.kind === 'video' && lesson.content.video_id) {
+            referencedMediaIds.add(lesson.content.video_id);
+          }
+          
+          // Check old format: video_media.media_id
+          if (lesson.video_media?.media_id) {
+            referencedMediaIds.add(lesson.video_media.media_id);
+          }
+          
+          // Check resources array
+          if (lesson.resources && Array.isArray(lesson.resources)) {
+            for (const resource of lesson.resources) {
+              if (resource.media_id) {
+                referencedMediaIds.add(resource.media_id);
+              }
+            }
+          }
+        }
+        
+        lessonLastKey = lessonResult.LastEvaluatedKey;
+      } while (lessonLastKey);
+      console.log(`[${requestId}] Found ${referencedMediaIds.size} total media references after lessons`);
+    } catch (lessonError) {
+      console.error(`[${requestId}] Error scanning lessons:`, lessonError);
+      // Continue with other scans even if lessons scan fails
+    }
+
+    // Scan paths for cover_image.media_id
+    console.log(`[${requestId}] Scanning paths for media references...`);
+    let pathLastKey;
+    do {
+      const pathCommand = new ScanCommand({
+        TableName: LMS_PATHS_TABLE,
+        ...(pathLastKey && { ExclusiveStartKey: pathLastKey }),
+      });
+      const pathResult = await dynamoDocClient.send(pathCommand);
+      const paths = (pathResult.Items || []) as LearningPath[];
+      
+      for (const path of paths) {
+        if (path.cover_image?.media_id) {
+          referencedMediaIds.add(path.cover_image.media_id);
+        }
+      }
+      
+      pathLastKey = pathResult.LastEvaluatedKey;
+    } while (pathLastKey);
+    console.log(`[${requestId}] Found ${referencedMediaIds.size} total media references after paths`);
+
+    // Scan assets (content_registry table) for cover_image.media_id
+    console.log(`[${requestId}] Scanning assets for media references...`);
+    try {
+      const CONTENT_REGISTRY_TABLE = process.env.DDB_TABLE_CONTENT || 'content_registry';
+      let assetLastKey;
+      do {
+        const assetCommand = new ScanCommand({
+          TableName: CONTENT_REGISTRY_TABLE,
+          FilterExpression: 'entity_type = :entityType',
+          ExpressionAttributeValues: {
+            ':entityType': 'ASSET',
+          },
+          ...(assetLastKey && { ExclusiveStartKey: assetLastKey }),
+        });
+        const assetResult = await dynamoDocClient.send(assetCommand);
+        const assets = (assetResult.Items || []) as any[];
+        
+        for (const asset of assets) {
+          if (asset.cover_image?.media_id) {
+            referencedMediaIds.add(asset.cover_image.media_id);
+          }
+        }
+        
+        assetLastKey = assetResult.LastEvaluatedKey;
+      } while (assetLastKey);
+      console.log(`[${requestId}] Found ${referencedMediaIds.size} total media references after assets`);
+    } catch (assetError) {
+      console.error(`[${requestId}] Error scanning assets (table may not exist or be accessible):`, assetError);
+      // Continue even if assets scan fails - assets might not be implemented yet
+    }
+
+    // Step 3: Find orphaned media (media not in referencedMediaIds set)
+    const orphanedMedia = mediaItems.filter((item: any) => {
+      // Media ID can be in media_id field or SK field (depending on storage structure)
+      const mediaId = item.media_id || item.SK || item.sk;
+      if (!mediaId) {
+        console.warn(`[${requestId}] Media item missing ID:`, item);
+        return false; // Skip items without IDs
+      }
+      return !referencedMediaIds.has(mediaId);
+    });
+
+    console.log(`[${requestId}] Found ${orphanedMedia.length} orphaned media items`);
+
+    // Step 4: If dry_run=false, delete orphaned media
+    let deletedCount = 0;
+    const deletionErrors: Array<{ media_id: string; error: string }> = [];
+
+    if (!dryRun && orphanedMedia.length > 0) {
+      console.log(`[${requestId}] Deleting ${orphanedMedia.length} orphaned media items...`);
+      
+      for (const mediaItem of orphanedMedia) {
+        const mediaId = mediaItem.media_id || mediaItem.SK || mediaItem.sk;
+        if (!mediaId) {
+          console.warn(`[${requestId}] Skipping orphaned media item without ID:`, mediaItem);
+          continue;
+        }
+        
+        try {
+          // Delete from S3 if s3_key exists
+          if (mediaItem.s3_key && mediaItem.s3_bucket) {
+            try {
+              const deleteS3Command = new DeleteObjectCommand({
+                Bucket: mediaItem.s3_bucket,
+                Key: mediaItem.s3_key,
+              });
+              await s3Client.send(deleteS3Command);
+            } catch (s3Error) {
+              // Log but don't fail if S3 delete fails
+              console.warn(`[${requestId}] Failed to delete S3 object ${mediaItem.s3_key}:`, s3Error);
+            }
+          }
+
+          // Delete from DynamoDB
+          const deleteDbCommand = new DeleteCommand({
+            TableName: LMS_CERTIFICATES_TABLE,
+            Key: {
+              entity_type: 'MEDIA',
+              SK: mediaId,
+            },
+          });
+          await dynamoDocClient.send(deleteDbCommand);
+          
+          deletedCount++;
+          
+          // Emit telemetry
+          await emitLmsEvent(req, 'lms_admin_media_deleted' as any, {
+            media_id: mediaId,
+            media_type: mediaItem.type,
+            cleanup: true,
+          });
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          console.error(`[${requestId}] Error deleting orphaned media ${mediaId}:`, error);
+          deletionErrors.push({
+            media_id: mediaId,
+            error: errorMessage,
+          });
+        }
+      }
+      
+      console.log(`[${requestId}] Deleted ${deletedCount} orphaned media items, ${deletionErrors.length} errors`);
+    }
+
+    // Format orphaned media for response
+    const orphanedMediaList = orphanedMedia.map((item: any) => ({
+      media_id: item.media_id || item.SK,
+      type: item.type,
+      filename: item.filename,
+      url: item.url,
+      created_at: item.created_at,
+      course_id: item.course_id,
+      lesson_id: item.lesson_id,
+    }));
+
+    const response: ApiSuccessResponse<{
+      orphaned_media: typeof orphanedMediaList;
+      orphaned_count: number;
+      deleted_count?: number;
+      deletion_errors?: typeof deletionErrors;
+    }> = {
+      data: {
+        orphaned_media: orphanedMediaList,
+        orphaned_count: orphanedMedia.length,
+        ...(dryRun ? {} : {
+          deleted_count: deletedCount,
+          ...(deletionErrors.length > 0 && { deletion_errors: deletionErrors }),
+        }),
+      },
+      request_id: requestId,
+    };
+    
+    res.json(response);
+  } catch (error) {
+    console.error(`[${requestId}] Error cleaning up orphaned media:`, error);
+    res.status(500).json({
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: error instanceof Error ? error.message : 'Failed to cleanup orphaned media',
+      },
+      request_id: requestId,
+    });
+  }
+}
+
 // ============================================================================
 // AI IMAGE GENERATION
 // ============================================================================
@@ -2605,6 +2954,7 @@ export async function generateAIImage(req: AuthenticatedRequest, res: Response) 
       size: z.enum(['256x256', '512x512', '1024x1024']).optional(),
       quality: z.enum(['standard', 'hd']).optional(),
       style: z.enum(['vivid', 'natural']).optional(),
+      helper_id: z.string().uuid().optional(),
     });
 
     const parsed = GenerateImageSchema.safeParse(req.body);
@@ -2619,10 +2969,39 @@ export async function generateAIImage(req: AuthenticatedRequest, res: Response) 
       return;
     }
 
-    const { prompt, provider, size, quality, style } = parsed.data;
+    const { prompt, provider, size, quality, style, helper_id } = parsed.data;
+
+    // Compose prompt if helper_id is provided
+    let finalPrompt = prompt;
+    if (helper_id) {
+      try {
+        const { DynamoPromptHelperRepo } = await import('../storage/dynamo/promptHelperRepo');
+        const { composePrompt, buildVariableContext } = await import('../services/promptComposition');
+        const repo = new DynamoPromptHelperRepo();
+        const helper = await repo.get(helper_id);
+        if (helper && helper.status === 'published') {
+          const context = buildVariableContext({
+            helper_id,
+            context: 'cover_image',
+            user_content: prompt,
+            provider,
+          });
+          const composed = composePrompt(helper, {
+            helper_id,
+            context: 'cover_image',
+            user_content: prompt,
+            provider,
+          }, context);
+          finalPrompt = composed.composed_prompt;
+        }
+      } catch (err) {
+        console.error(`[${requestId}] Error composing prompt with helper:`, err);
+        // Fall back to original prompt
+      }
+    }
 
     // Generate image using AI service
-    const imageResponse = await generateImage(prompt, {
+    const imageResponse = await generateImage(finalPrompt, {
       provider,
       size: size || '1024x1024',
       quality: quality || 'standard',
@@ -2685,6 +3064,7 @@ export async function chatCompletion(req: AuthenticatedRequest, res: Response) {
       prompt: z.string().min(1),
       context: z.string().optional(),
       existing_content: z.string().optional(),
+      helper_id: z.string().uuid().optional(),
     });
 
     const parsed = ChatCompletionSchema.safeParse(req.body);
@@ -2699,7 +3079,36 @@ export async function chatCompletion(req: AuthenticatedRequest, res: Response) {
       return;
     }
 
-    const { prompt, context, existing_content } = parsed.data;
+    const { prompt, context, existing_content, helper_id } = parsed.data;
+
+    // Compose prompt if helper_id is provided
+    let finalPrompt = prompt;
+    if (helper_id) {
+      try {
+        const { DynamoPromptHelperRepo } = await import('../storage/dynamo/promptHelperRepo');
+        const { composePrompt, buildVariableContext } = await import('../services/promptComposition');
+        const repo = new DynamoPromptHelperRepo();
+        const helper = await repo.get(helper_id);
+        if (helper && helper.status === 'published') {
+          const variableContext = buildVariableContext({
+            helper_id,
+            context: 'rte',
+            user_content: existing_content,
+            user_instruction: prompt,
+          });
+          const composed = composePrompt(helper, {
+            helper_id,
+            context: 'rte',
+            user_content: existing_content,
+            user_instruction: prompt,
+          }, variableContext);
+          finalPrompt = composed.composed_prompt;
+        }
+      } catch (err) {
+        console.error(`[${requestId}] Error composing prompt with helper:`, err);
+        // Fall back to original prompt
+      }
+    }
 
     // Build messages array
     const messages: ChatMessage[] = [];
@@ -2714,8 +3123,8 @@ export async function chatCompletion(req: AuthenticatedRequest, res: Response) {
       messages.push({ role: 'assistant', content: existing_content });
     }
     
-    // Add user prompt
-    messages.push({ role: 'user', content: prompt });
+    // Add user prompt (may be composed from helper)
+    messages.push({ role: 'user', content: finalPrompt });
 
     // Use default provider for chat completion
     const response = await createChatCompletion(messages, {

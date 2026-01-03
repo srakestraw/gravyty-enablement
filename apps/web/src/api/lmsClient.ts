@@ -251,5 +251,53 @@ export const lmsApi = {
       headers: buildTelemetryHeaders(options?.telemetry),
     });
   },
+
+  // Assessment APIs
+  /**
+   * GET /v1/lms/courses/:courseId/assessment
+   */
+  getAssessmentSummary: async (courseId: string, options?: LmsClientOptions) => {
+    return apiFetch<{ summary: any }>(`/v1/lms/courses/${courseId}/assessment`, {
+      headers: buildTelemetryHeaders(options?.telemetry),
+    });
+  },
+
+  /**
+   * POST /v1/lms/courses/:courseId/assessment/attempts/start
+   */
+  startAssessmentAttempt: async (courseId: string, options?: LmsClientOptions) => {
+    return apiFetch<{ attempt: any }>(`/v1/lms/courses/${courseId}/assessment/attempts/start`, {
+      method: 'POST',
+      headers: buildTelemetryHeaders(options?.telemetry),
+    });
+  },
+
+  /**
+   * POST /v1/lms/courses/:courseId/assessment/attempts/:attemptId/submit
+   */
+  submitAssessmentAttempt: async (
+    courseId: string,
+    attemptId: string,
+    answers: Array<{ question_id: string; selected_option_id?: string | null; boolean_answer?: boolean | null }>,
+    options?: LmsClientOptions
+  ) => {
+    return apiFetch<{ attempt: any; answers: any[] }>(`/v1/lms/courses/${courseId}/assessment/attempts/${attemptId}/submit`, {
+      method: 'POST',
+      headers: {
+        ...buildTelemetryHeaders(options?.telemetry),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ answers }),
+    });
+  },
+
+  /**
+   * GET /v1/lms/courses/:courseId/assessment/attempts/:attemptId
+   */
+  getAttemptResults: async (courseId: string, attemptId: string, options?: LmsClientOptions) => {
+    return apiFetch<{ attempt: any; answers: any[]; questions?: any[] }>(`/v1/lms/courses/${courseId}/assessment/attempts/${attemptId}`, {
+      headers: buildTelemetryHeaders(options?.telemetry),
+    });
+  },
 };
 

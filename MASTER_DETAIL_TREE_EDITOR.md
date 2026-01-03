@@ -244,3 +244,4 @@ interface CourseTreeNode {
 - Section expansion state is managed locally in TreeOutlinePanel
 - Node deletion handles cleanup (lessons deleted with section, selection moves to parent)
 
+

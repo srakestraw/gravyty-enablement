@@ -96,3 +96,4 @@ echo ""
 
 echo "✅ After configuring, wait 1-2 minutes and try signing in again!"
 
+

@@ -2,7 +2,7 @@
  * Admin Learning Certificates Page
  */
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -21,12 +21,11 @@ import {
   DialogContent,
   DialogActions,
   TextField,
-  MenuItem,
-  Select,
-  FormControl,
-  InputLabel,
   Chip,
   IconButton,
+  Autocomplete,
+  ToggleButton,
+  ToggleButtonGroup,
 } from '@mui/material';
 import { Add as AddIcon, Edit as EditIcon, Publish as PublishIcon, Archive as ArchiveIcon } from '@mui/icons-material';
 import { useAdminCertificateTemplates } from '../../../hooks/useAdminCertificateTemplates';
@@ -45,29 +44,80 @@ export function AdminLearningCertificatesPage() {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [appliesTo, setAppliesTo] = useState<'course' | 'path'>('course');
-  const [appliesToId, setAppliesToId] = useState('');
-  const [badgeText, setBadgeText] = useState('');
+  const [selectedTarget, setSelectedTarget] = useState<{ id: string; title: string } | null>(null);
   const [signatoryName, setSignatoryName] = useState('');
   const [signatoryTitle, setSignatoryTitle] = useState('');
   const [issuedCopyTitle, setIssuedCopyTitle] = useState('');
   const [issuedCopyBody, setIssuedCopyBody] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  // Search states for course/path autocomplete
+  const [targetSearchQuery, setTargetSearchQuery] = useState('');
+  const [targetSearchResults, setTargetSearchResults] = useState<Array<{ id: string; title: string }>>([]);
+  const [targetSearchLoading, setTargetSearchLoading] = useState(false);
+
+  // Search courses/paths
+  const searchTargets = useCallback(async (query: string, type: 'course' | 'path') => {
+    if (!query || query.length < 2) {
+      setTargetSearchResults([]);
+      return;
+    }
+
+    setTargetSearchLoading(true);
+    try {
+      if (type === 'course') {
+        const response = await lmsAdminApi.listCourses({ q: query, status: 'published' });
+        if ('data' in response) {
+          setTargetSearchResults(
+            response.data.courses.map((c) => ({ id: c.course_id, title: c.title }))
+          );
+        } else {
+          setTargetSearchResults([]);
+        }
+      } else {
+        const response = await lmsAdminApi.listPaths({ status: 'published' });
+        if ('data' in response) {
+          // Filter client-side since API doesn't support query param for paths yet
+          const filtered = response.data.paths
+            .filter((p) => p.title.toLowerCase().includes(query.toLowerCase()))
+            .map((p) => ({ id: p.path_id, title: p.title }));
+          setTargetSearchResults(filtered);
+        } else {
+          setTargetSearchResults([]);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to search targets:', error);
+      setTargetSearchResults([]);
+    } finally {
+      setTargetSearchLoading(false);
+    }
+  }, []);
+
+  // Debounced target search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      searchTargets(targetSearchQuery, appliesTo);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [targetSearchQuery, appliesTo, searchTargets]);
+
   const resetForm = () => {
     setName('');
     setDescription('');
     setAppliesTo('course');
-    setAppliesToId('');
-    setBadgeText('');
+    setSelectedTarget(null);
     setSignatoryName('');
     setSignatoryTitle('');
     setIssuedCopyTitle('');
     setIssuedCopyBody('');
     setEditingTemplate(null);
+    setTargetSearchQuery('');
+    setTargetSearchResults([]);
   };
 
   const handleCreate = async () => {
-    if (!name || !appliesToId || !badgeText || !issuedCopyTitle || !issuedCopyBody) {
+    if (!name || !selectedTarget || !issuedCopyTitle || !issuedCopyBody) {
       alert('Please fill in all required fields');
       return;
     }
@@ -78,8 +128,7 @@ export function AdminLearningCertificatesPage() {
         name,
         description: description || undefined,
         applies_to: appliesTo,
-        applies_to_id: appliesToId,
-        badge_text: badgeText,
+        applies_to_id: selectedTarget.id,
         signatory_name: signatoryName || undefined,
         signatory_title: signatoryTitle || undefined,
         issued_copy: {
@@ -98,22 +147,49 @@ export function AdminLearningCertificatesPage() {
     }
   };
 
-  const handleEdit = (template: any) => {
+  const handleEdit = async (template: any) => {
     setEditingTemplate(template);
     setName(template.name);
     setDescription(template.description || '');
     setAppliesTo(template.applies_to);
-    setAppliesToId(template.applies_to_id);
-    setBadgeText(template.badge_text);
     setSignatoryName(template.signatory_name || '');
     setSignatoryTitle(template.signatory_title || '');
     setIssuedCopyTitle(template.issued_copy?.title || '');
     setIssuedCopyBody(template.issued_copy?.body || '');
+    
+    // Load the course/path details to populate the autocomplete
+    setTargetSearchLoading(true);
+    try {
+      if (template.applies_to === 'course') {
+        const response = await lmsAdminApi.getCourse(template.applies_to_id);
+        if ('data' in response) {
+          setSelectedTarget({ id: response.data.course.course_id, title: response.data.course.title });
+        } else {
+          // Fallback to ID if course not found
+          setSelectedTarget({ id: template.applies_to_id, title: template.applies_to_id });
+        }
+      } else {
+        const response = await lmsAdminApi.getPath(template.applies_to_id);
+        if ('data' in response) {
+          setSelectedTarget({ id: response.data.path.path_id, title: response.data.path.title });
+        } else {
+          // Fallback to ID if path not found
+          setSelectedTarget({ id: template.applies_to_id, title: template.applies_to_id });
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load target details:', err);
+      // Fallback to just ID if we can't load details
+      setSelectedTarget({ id: template.applies_to_id, title: template.applies_to_id });
+    } finally {
+      setTargetSearchLoading(false);
+    }
+    
     setOpen(true);
   };
 
   const handleUpdate = async () => {
-    if (!editingTemplate || !name || !appliesToId || !badgeText || !issuedCopyTitle || !issuedCopyBody) {
+    if (!editingTemplate || !name || !selectedTarget || !issuedCopyTitle || !issuedCopyBody) {
       alert('Please fill in all required fields');
       return;
     }
@@ -124,8 +200,7 @@ export function AdminLearningCertificatesPage() {
         name,
         description: description || undefined,
         applies_to: appliesTo,
-        applies_to_id: appliesToId,
-        badge_text: badgeText,
+        applies_to_id: selectedTarget.id,
         signatory_name: signatoryName || undefined,
         signatory_title: signatoryTitle || undefined,
         issued_copy: {
@@ -266,30 +341,49 @@ export function AdminLearningCertificatesPage() {
             multiline
             rows={2}
           />
-          <FormControl fullWidth margin="normal" required>
-            <InputLabel>Applies To</InputLabel>
-            <Select value={appliesTo} onChange={(e) => setAppliesTo(e.target.value as 'course' | 'path')}>
-              <MenuItem value="course">Course</MenuItem>
-              <MenuItem value="path">Path</MenuItem>
-            </Select>
-          </FormControl>
-          <TextField
+          <ToggleButtonGroup
+            value={appliesTo}
+            exclusive
+            onChange={(_, newValue) => {
+              if (newValue !== null) {
+                setAppliesTo(newValue);
+                setSelectedTarget(null);
+                setTargetSearchQuery('');
+              }
+            }}
             fullWidth
-            label="Applies To ID"
-            value={appliesToId}
-            onChange={(e) => setAppliesToId(e.target.value)}
-            margin="normal"
-            required
-            helperText="Course ID or Path ID"
-          />
-          <TextField
-            fullWidth
-            label="Badge Text"
-            value={badgeText}
-            onChange={(e) => setBadgeText(e.target.value)}
-            margin="normal"
-            required
-            helperText="Text displayed on certificate badge"
+            sx={{ mt: 2, mb: 1 }}
+          >
+            <ToggleButton value="course">Course</ToggleButton>
+            <ToggleButton value="path">Learning Path</ToggleButton>
+          </ToggleButtonGroup>
+          <Autocomplete
+            options={targetSearchResults}
+            getOptionLabel={(option) => option.title}
+            loading={targetSearchLoading}
+            value={selectedTarget}
+            onChange={(_, newValue) => setSelectedTarget(newValue)}
+            onInputChange={(_, newInputValue) => setTargetSearchQuery(newInputValue)}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label={`${appliesTo === 'course' ? 'Course' : 'Learning Path'}`}
+                required
+                margin="normal"
+                placeholder={`Search ${appliesTo === 'course' ? 'courses' : 'learning paths'}...`}
+                helperText={!selectedTarget && targetSearchQuery.length < 2 ? 'Type at least 2 characters to search' : undefined}
+                InputProps={{
+                  ...params.InputProps,
+                  endAdornment: (
+                    <>
+                      {targetSearchLoading ? <CircularProgress size={20} /> : null}
+                      {params.InputProps.endAdornment}
+                    </>
+                  ),
+                }}
+              />
+            )}
+            noOptionsText={targetSearchQuery.length < 2 ? `Type to search for ${appliesTo === 'course' ? 'courses' : 'learning paths'}...` : `No ${appliesTo === 'course' ? 'courses' : 'learning paths'} found`}
           />
           <TextField
             fullWidth
@@ -333,7 +427,7 @@ export function AdminLearningCertificatesPage() {
           <Button
             onClick={editingTemplate ? handleUpdate : handleCreate}
             variant="contained"
-            disabled={submitting || !name || !appliesToId || !badgeText || !issuedCopyTitle || !issuedCopyBody}
+            disabled={submitting || !name || !selectedTarget || !issuedCopyTitle || !issuedCopyBody}
           >
             {submitting ? (editingTemplate ? 'Updating...' : 'Creating...') : (editingTemplate ? 'Update' : 'Create')}
           </Button>

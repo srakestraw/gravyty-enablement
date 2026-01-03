@@ -3,8 +3,8 @@
  * 
  * Contains all course details fields organized into stable groups:
  * - Basics: Title, Short Description, Long Description
+ * - Media: Cover Image
  * - Metadata: Product, Product Suite, Topic Tags
- * - Media: Cover Image, Badges
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react';
@@ -28,7 +28,20 @@ import { AssetPicker } from '../../content-hub/AssetPicker';
 import { CourseAssets } from '../../lms/CourseAssets';
 import { CoverImageSelector } from '../../shared/CoverImageSelector';
 import { lmsAdminApi } from '../../../api/lmsAdminClient';
+import { promptHelpersApi } from '../../../api/promptHelpersClient';
 import { isErrorResponse } from '../../../lib/apiClient';
+import { AutoAwesome as AutoAwesomeIcon } from '@mui/icons-material';
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  CircularProgress,
+} from '@mui/material';
 import { focusRegistry } from '../../../utils/focusRegistry';
 import type { Course, MediaRef } from '@gravyty/domain';
 import type { NodeType } from '../../../types/courseTree';
@@ -82,7 +95,6 @@ export function DetailsTabContent({
     });
   }, [productIds, productSuiteIds, course?.product_ids, course?.product_id]);
   const [topicTagIds, setTopicTagIds] = useState<string[]>([]);
-  const [badgeIds, setBadgeIds] = useState<string[]>([]);
   const [audienceIds, setAudienceIds] = useState<string[]>([]);
   const [title, setTitle] = useState('');
   const [shortDescription, setShortDescription] = useState('');
@@ -90,6 +102,10 @@ export function DetailsTabContent({
   const [estimatedMinutes, setEstimatedMinutes] = useState<string>('');
   const [assetPickerOpen, setAssetPickerOpen] = useState(false);
   const [assetsRefreshKey, setAssetsRefreshKey] = useState(0);
+  const [descriptionModalOpen, setDescriptionModalOpen] = useState(false);
+  const [descriptionHelpers, setDescriptionHelpers] = useState<any[]>([]);
+  const [selectedDescriptionHelperId, setSelectedDescriptionHelperId] = useState<string>('');
+  const [generatingDescription, setGeneratingDescription] = useState(false);
 
   // Refs for focus registry
   const productRef = useRef<HTMLDivElement>(null);
@@ -97,7 +113,6 @@ export function DetailsTabContent({
   const topicTagsRef = useRef<HTMLDivElement>(null);
   const audienceRef = useRef<HTMLDivElement>(null);
   const coverImageRef = useRef<HTMLDivElement>(null);
-  const badgesRef = useRef<HTMLDivElement>(null);
 
   // Track the last synced course ID to avoid overwriting user input
   const lastSyncedCourseIdRef = useRef<string | null>(null);
@@ -155,7 +170,6 @@ export function DetailsTabContent({
       setProductSuiteIds(courseProductSuiteIds);
       setTopicTagIds(course.topic_tag_ids && course.topic_tag_ids.length > 0 ? course.topic_tag_ids : []);
       setAudienceIds(course.audience_ids && course.audience_ids.length > 0 ? course.audience_ids : []);
-      setBadgeIds(course.badge_ids && course.badge_ids.length > 0 ? course.badge_ids : []);
       setTitle(course.title || '');
       setShortDescription(course.short_description || '');
       setDescription(course.description || '');
@@ -264,14 +278,6 @@ export function DetailsTabContent({
       }));
     }
 
-    if (badgesRef.current) {
-      unregisters.push(focusRegistry.register({
-        entityType: 'course',
-        entityId: course.course_id,
-        fieldKey: 'badge_ids',
-        ref: badgesRef,
-      }));
-    }
 
     return () => {
       unregisters.forEach((unregister) => unregister());
@@ -319,9 +325,6 @@ export function DetailsTabContent({
         break;
       case 'audience_ids':
         updates = { audience_ids: value };
-        break;
-      case 'badge_ids':
-        updates = { badge_ids: value };
         break;
       case 'estimated_minutes':
         updates = { estimated_minutes: typeof value === 'string' ? parseInt(value, 10) || undefined : value };
@@ -504,18 +507,66 @@ export function DetailsTabContent({
               helperText="Recommended: Brief description for course cards"
             />
 
-            <RichTextEditor
-              inputRef={descriptionRef}
-              label="Description"
-              value={description}
-              onChange={(value) => {
-                setDescription(value);
-                handleCourseFieldChange('description', value);
-              }}
-              rows={4}
-              fullWidth
-              helperText="Optional: Full course description"
-            />
+            <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
+              <RichTextEditor
+                inputRef={descriptionRef}
+                label="Description"
+                value={description}
+                onChange={(value) => {
+                  setDescription(value);
+                  handleCourseFieldChange('description', value);
+                }}
+                rows={4}
+                fullWidth
+                helperText="Optional: Full course description"
+              />
+              <Button
+                variant="outlined"
+                startIcon={<AutoAwesomeIcon />}
+                onClick={async () => {
+                  try {
+                    const response = await promptHelpersApi.getForContext('description');
+                    if (!isErrorResponse(response)) {
+                      setDescriptionHelpers(response.data.helpers);
+                      const defaultHelper = response.data.helpers.find(h => h.is_default_for.includes('description'));
+                      if (defaultHelper) {
+                        setSelectedDescriptionHelperId(defaultHelper.helper_id);
+                      }
+                      setDescriptionModalOpen(true);
+                    }
+                  } catch (err) {
+                    alert('Failed to load description helpers');
+                  }
+                }}
+                sx={{ mt: 1 }}
+              >
+                Generate
+              </Button>
+            </Box>
+          </Box>
+        </Paper>
+
+        {/* Media Section */}
+        <Paper sx={{ p: 2 }}>
+          <Typography variant="subtitle2" gutterBottom sx={{ mb: 2 }}>
+            Media
+          </Typography>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {/* Cover Image */}
+            <Box ref={coverImageRef}>
+              <CoverImageSelector
+                entityType="course"
+                entityId={course.course_id}
+                coverImage={course.cover_image}
+                entityTitle={course.title || ''}
+                entityShortDescription={course.short_description || ''}
+                entityDescription={course.description || ''}
+                onCoverImageSelected={(mediaRef) => handleCourseFieldChange('cover_image', mediaRef)}
+                onCoverImageRemoved={() => handleCourseFieldChange('cover_image', undefined)}
+                onTemporaryMediaCreated={onTemporaryMediaCreated}
+              />
+            </Box>
+
           </Box>
         </Paper>
 
@@ -547,11 +598,6 @@ export function DetailsTabContent({
               setAudienceIds(ids);
               handleCourseFieldChange('audience_ids', ids);
             }}
-            badgeIds={badgeIds}
-            onBadgeIdsChange={(ids) => {
-              setBadgeIds(ids);
-              handleCourseFieldChange('badge_ids', ids);
-            }}
             shouldShowError={(fieldKey) => {
               return shouldShowError ? shouldShowError('course', course.course_id, fieldKey) : false;
             }}
@@ -565,7 +611,6 @@ export function DetailsTabContent({
               productSuiteRef,
               topicTagsRef,
               audienceRef,
-              badgesRef,
             }}
           />
           
@@ -628,30 +673,6 @@ export function DetailsTabContent({
             </Grid>
           </Grid>
         </Paper>
-
-        {/* Media Section */}
-        <Paper sx={{ p: 2 }}>
-          <Typography variant="subtitle2" gutterBottom sx={{ mb: 2 }}>
-            Media
-          </Typography>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            {/* Cover Image */}
-            <Box ref={coverImageRef}>
-              <CoverImageSelector
-                entityType="course"
-                entityId={course.course_id}
-                coverImage={course.cover_image}
-                entityTitle={course.title || ''}
-                entityShortDescription={course.short_description || ''}
-                entityDescription={course.description || ''}
-                onCoverImageSelected={(mediaRef) => handleCourseFieldChange('cover_image', mediaRef)}
-                onCoverImageRemoved={() => handleCourseFieldChange('cover_image', undefined)}
-                onTemporaryMediaCreated={onTemporaryMediaCreated}
-              />
-            </Box>
-
-          </Box>
-        </Paper>
       </Box>
 
       {/* Course Assets */}
@@ -702,6 +723,88 @@ export function DetailsTabContent({
         }}
         courseId={course.course_id}
       />
+
+      {/* Description Generation Modal */}
+      <Dialog open={descriptionModalOpen} onClose={() => setDescriptionModalOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Generate Description</DialogTitle>
+        <DialogContent>
+          <FormControl fullWidth sx={{ mt: 2 }}>
+            <InputLabel>Prompt Helper</InputLabel>
+            <Select
+              value={selectedDescriptionHelperId}
+              onChange={(e) => setSelectedDescriptionHelperId(e.target.value)}
+              label="Prompt Helper"
+            >
+              <MenuItem value="">
+                {descriptionHelpers.find(h => h.is_default_for.includes('description'))
+                  ? 'Default (recommended)'
+                  : 'None'}
+              </MenuItem>
+              {descriptionHelpers.map((helper) => (
+                <MenuItem key={helper.helper_id} value={helper.helper_id}>
+                  {helper.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDescriptionModalOpen(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            onClick={async () => {
+              setGeneratingDescription(true);
+              try {
+                const response = await promptHelpersApi.composePreview({
+                  helper_id: selectedDescriptionHelperId || undefined,
+                  context: 'description',
+                  variables: {
+                    course: {
+                      title: course.title,
+                      audience: course.audience_ids?.join(', '),
+                      level: course.difficulty_level,
+                      duration: course.estimated_minutes?.toString(),
+                      topics: course.topic_tag_ids?.join(', '),
+                    },
+                  },
+                });
+                
+                if (!isErrorResponse(response)) {
+                  // Use chat completion to generate actual description
+                  const chatResponse = await lmsAdminApi.chatCompletion({
+                    prompt: response.data.composed_prompt,
+                    context: 'course description',
+                  });
+                  
+                  if (!isErrorResponse(chatResponse)) {
+                    const generated = chatResponse.data.content;
+                    // Try to split into short and long description
+                    const lines = generated.split('\n').filter(l => l.trim());
+                    if (lines.length >= 2) {
+                      setShortDescription(lines[0].replace(/^\d+\.\s*/, '').trim());
+                      handleCourseFieldChange('short_description', lines[0].replace(/^\d+\.\s*/, '').trim());
+                      setDescription(lines.slice(1).join('\n').trim());
+                      handleCourseFieldChange('description', lines.slice(1).join('\n').trim());
+                    } else {
+                      setDescription(generated);
+                      handleCourseFieldChange('description', generated);
+                    }
+                    setDescriptionModalOpen(false);
+                  }
+                }
+              } catch (err) {
+                alert('Failed to generate description');
+              } finally {
+                setGeneratingDescription(false);
+              }
+            }}
+            disabled={generatingDescription}
+            startIcon={generatingDescription ? <CircularProgress size={16} /> : <AutoAwesomeIcon />}
+          >
+            {generatingDescription ? 'Generating...' : 'Generate'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </>
   );
 }

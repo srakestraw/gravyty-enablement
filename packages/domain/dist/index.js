@@ -16,4 +16,8 @@ export * from './metadata-config.js';
 export * from './content-hub/index.js';
 // Search Domain Module
 export * from './search.js';
+// Prompt Helpers Domain Module
+export * from './promptHelpers.js';
+// Badges Domain Module
+export * from './badges/badge.js';
 //# sourceMappingURL=index.js.map

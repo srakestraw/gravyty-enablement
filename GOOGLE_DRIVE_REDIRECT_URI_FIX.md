@@ -75,3 +75,4 @@ After adding the redirect URIs, check:
 2. The redirect URI matches exactly what's being sent (check browser console)
 3. Wait 1-2 minutes after saving before retrying
 
+

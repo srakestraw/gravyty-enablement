@@ -63,8 +63,8 @@ export const sampleCourseDetail: CourseDetail = {
   topic_tag_ids: [],
   audience_ids: [],
   related_course_ids: ['course-2'],
-  badges: [],
   badge_ids: [],
+  badges: [],
   sections: [
     {
       section_id: 'section-1',

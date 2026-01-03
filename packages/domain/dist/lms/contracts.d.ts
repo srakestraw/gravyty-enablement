@@ -70,6 +70,7 @@ export declare const CourseDetailSchema: z.ZodObject<{
     product_suite_ids: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
     topic_tag_ids: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
     audience_ids: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
+    badge_ids: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
     legacy_product_suite: z.ZodOptional<z.ZodString>;
     legacy_product_concept: z.ZodOptional<z.ZodString>;
     legacy_product_suite_id: z.ZodOptional<z.ZodString>;
@@ -149,7 +150,6 @@ export declare const CourseDetailSchema: z.ZodObject<{
         description?: string | undefined;
         icon_url?: string | undefined;
     }>, "many">>;
-    badge_ids: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
     status: z.ZodEnum<["draft", "published", "archived"]>;
     version: z.ZodDefault<z.ZodNumber>;
     published_version: z.ZodOptional<z.ZodNumber>;
@@ -233,6 +233,7 @@ export declare const CourseDetailSchema: z.ZodObject<{
     course_id: string;
     topic_tags: string[];
     audience_ids: string[];
+    badge_ids: string[];
     related_course_ids: string[];
     badges: {
         name: string;
@@ -240,7 +241,6 @@ export declare const CourseDetailSchema: z.ZodObject<{
         description?: string | undefined;
         icon_url?: string | undefined;
     }[];
-    badge_ids: string[];
     sections: {
         title: string;
         section_id: string;
@@ -333,6 +333,7 @@ export declare const CourseDetailSchema: z.ZodObject<{
     short_description?: string | undefined;
     topic_tags?: string[] | undefined;
     audience_ids?: string[] | undefined;
+    badge_ids?: string[] | undefined;
     related_course_ids?: string[] | undefined;
     cover_image?: {
         type: "image" | "video" | "document" | "audio" | "other";
@@ -360,7 +361,6 @@ export declare const CourseDetailSchema: z.ZodObject<{
         description?: string | undefined;
         icon_url?: string | undefined;
     }[] | undefined;
-    badge_ids?: string[] | undefined;
     published_version?: number | undefined;
     published_at?: string | undefined;
     published_by?: string | undefined;
@@ -879,7 +879,6 @@ export declare const LearningPathDetailSchema: z.ZodObject<{
     legacy_product_concept: z.ZodOptional<z.ZodString>;
     legacy_product_suite_id: z.ZodOptional<z.ZodString>;
     legacy_product_concept_id: z.ZodOptional<z.ZodString>;
-    badges: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
     cover_image: z.ZodOptional<z.ZodObject<{
         media_id: z.ZodString;
         type: z.ZodEnum<["image", "video", "document", "audio", "other"]>;
@@ -1043,7 +1042,6 @@ export declare const LearningPathDetailSchema: z.ZodObject<{
     created_by: string;
     topic_tags: string[];
     audience_ids: string[];
-    badges: string[];
     updated_at: string;
     updated_by: string;
     path_id: string;
@@ -1163,7 +1161,6 @@ export declare const LearningPathDetailSchema: z.ZodObject<{
         transcription_language?: string | undefined;
         transcription_error?: string | undefined;
     } | undefined;
-    badges?: string[] | undefined;
     published_version?: number | undefined;
     published_at?: string | undefined;
     published_by?: string | undefined;
@@ -1191,7 +1188,6 @@ export declare const PathDetailSchema: z.ZodObject<{
     legacy_product_concept: z.ZodOptional<z.ZodString>;
     legacy_product_suite_id: z.ZodOptional<z.ZodString>;
     legacy_product_concept_id: z.ZodOptional<z.ZodString>;
-    badges: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
     cover_image: z.ZodOptional<z.ZodObject<{
         media_id: z.ZodString;
         type: z.ZodEnum<["image", "video", "document", "audio", "other"]>;
@@ -1385,7 +1381,6 @@ export declare const PathDetailSchema: z.ZodObject<{
     created_by: string;
     topic_tags: string[];
     audience_ids: string[];
-    badges: string[];
     updated_at: string;
     updated_by: string;
     path_id: string;
@@ -1516,7 +1511,6 @@ export declare const PathDetailSchema: z.ZodObject<{
         transcription_language?: string | undefined;
         transcription_error?: string | undefined;
     } | undefined;
-    badges?: string[] | undefined;
     published_version?: number | undefined;
     published_at?: string | undefined;
     published_by?: string | undefined;

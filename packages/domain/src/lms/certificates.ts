@@ -35,7 +35,6 @@ export const CertificateTemplateSchema = z.object({
   applies_to_id: z.string(), // course_id or path_id
   
   // Certificate content
-  badge_text: z.string(), // Text displayed on certificate badge
   signatory_name: z.string().optional(), // Name of signatory
   signatory_title: z.string().optional(), // Title of signatory
   issued_copy: z.object({
@@ -81,7 +80,6 @@ export const IssuedCertificateSchema = z.object({
     course_title: z.string().optional(),
     path_title: z.string().optional(),
     completion_date: z.string(), // ISO datetime
-    badge_text: z.string(), // From template at issuance
     signatory_name: z.string().optional(), // From template at issuance
     signatory_title: z.string().optional(), // From template at issuance
     issued_copy: z.object({
@@ -109,9 +107,6 @@ export function validateCertificateTemplate(template: CertificateTemplate): { va
     }
     
     // Required fields for published templates
-    if (!template.badge_text) {
-      errors.push('Published certificate templates must have badge_text');
-    }
     if (!template.signatory_name) {
       errors.push('Published certificate templates must have signatory_name');
     }

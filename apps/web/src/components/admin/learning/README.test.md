@@ -78,3 +78,4 @@ The bug was fixed by:
 
 This ensures TypeScript and the runtime correctly create the updates object with the exact field names expected by the Course type.
 
+

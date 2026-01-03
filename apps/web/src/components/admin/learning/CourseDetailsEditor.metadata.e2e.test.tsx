@@ -61,7 +61,6 @@ describe('CourseDetailsEditor Metadata E2E Tests', () => {
       product_ids: [],
       product_suite_ids: [],
       topic_tag_ids: [],
-      badge_ids: [],
     };
 
     render(<CourseDetailsEditor course={mockCourse} onSave={vi.fn()} />);
@@ -110,7 +109,6 @@ describe('CourseDetailsEditor Metadata E2E Tests', () => {
       product_ids: [],
       product_suite_ids: [],
       topic_tag_ids: [],
-      badge_ids: [],
     };
 
     render(<CourseDetailsEditor course={mockCourse} onSave={vi.fn()} />);

@@ -192,3 +192,4 @@ const markFieldTouched = (entityType, entityId, fieldKey) => {
 - Publish button no longer disabled by validation (allows attempt to trigger error display)
 - All validation logic remains unchanged - only presentation changed
 
+

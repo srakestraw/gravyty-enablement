@@ -44,11 +44,6 @@ const METADATA_KEYS: MetadataKeyInfo[] = [
     description: 'Topic tags for content tagging',
   },
   {
-    key: 'badge',
-    label: 'Badges',
-    description: 'Badges that can be earned by completing courses',
-  },
-  {
     key: 'audience',
     label: 'Audience',
     description: 'Target audience for courses and content',
@@ -62,10 +57,9 @@ export function AdminMetadataPage() {
   const productQuery = useMetadataOptions('product', { include_archived: true });
   const productSuiteQuery = useMetadataOptions('product_suite', { include_archived: true });
   const topicTagQuery = useMetadataOptions('topic_tag', { include_archived: true });
-  const badgeQuery = useMetadataOptions('badge', { include_archived: true });
   const audienceQuery = useMetadataOptions('audience', { include_archived: true });
 
-  const loading = productQuery.loading || productSuiteQuery.loading || topicTagQuery.loading || badgeQuery.loading || audienceQuery.loading;
+  const loading = productQuery.loading || productSuiteQuery.loading || topicTagQuery.loading || audienceQuery.loading;
 
   // Sort metadata keys alphabetically by label
   const sortedMetadataKeys = useMemo(() => {
@@ -77,7 +71,6 @@ export function AdminMetadataPage() {
     if (key === 'product') options = productQuery.options;
     else if (key === 'product_suite') options = productSuiteQuery.options;
     else if (key === 'topic_tag') options = topicTagQuery.options;
-    else if (key === 'badge') options = badgeQuery.options;
     else if (key === 'audience') options = audienceQuery.options;
 
     const active = options.filter((opt) => !opt.archived_at).length;

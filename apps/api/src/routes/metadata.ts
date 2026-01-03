@@ -5,7 +5,7 @@
  */
 
 import express from 'express';
-import { requireRole } from '../middleware/jwtAuth';
+import { requireRoleNew as requireRole } from '../middleware/jwtAuth.new';
 import * as metadataHandlers from '../handlers/metadata';
 import * as migrationHandlers from '../handlers/metadataMigration';
 

@@ -60,7 +60,6 @@ const METADATA_KEY_LABELS: Record<MetadataGroupKey, string> = {
   product: 'Product',
   product_suite: 'Product Suite',
   topic_tag: 'Topic Tags',
-  badge: 'Badges',
   audience: 'Audience',
 };
 
@@ -125,7 +124,7 @@ export function AdminMetadataDetailPage() {
     return /^#[0-9A-F]{6}$/i.test(hex);
   };
 
-  if (!key || !['product', 'product_suite', 'topic_tag', 'badge', 'audience'].includes(key)) {
+  if (!key || !['product', 'product_suite', 'topic_tag', 'audience'].includes(key)) {
     return (
       <Box sx={{ p: 3 }}>
         <Alert severity="error">Invalid metadata key</Alert>

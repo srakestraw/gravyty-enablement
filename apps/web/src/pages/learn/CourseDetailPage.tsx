@@ -34,6 +34,7 @@ import { track } from '../../lib/telemetry';
 import { isErrorResponse } from '../../lib/apiClient';
 import { CourseCard } from '../../components/lms/CourseCard';
 import { CourseAssets } from '../../components/lms/CourseAssets';
+import { AssessmentCard } from '../../components/lms/AssessmentCard';
 import { formatDurationMinutes } from '../../utils/formatDuration';
 
 export function CourseDetailPage() {
@@ -41,12 +42,30 @@ export function CourseDetailPage() {
   const navigate = useNavigate();
   const { course, relatedCourses, loading, error, refetch } = useLmsCourse(courseId);
   const [enrolling, setEnrolling] = useState(false);
+  const [assessmentSummary, setAssessmentSummary] = useState<any>(null);
+  const [loadingAssessment, setLoadingAssessment] = useState(false);
 
   useEffect(() => {
     if (courseId) {
       track('page_view', { page: 'course_detail', course_id: courseId });
+      loadAssessment();
     }
   }, [courseId]);
+
+  const loadAssessment = async () => {
+    if (!courseId) return;
+    setLoadingAssessment(true);
+    try {
+      const res = await lmsApi.getAssessmentSummary(courseId);
+      if (!isErrorResponse(res) && res.data.summary) {
+        setAssessmentSummary(res.data.summary);
+      }
+    } catch (err) {
+      // Silently fail - assessment is optional
+    } finally {
+      setLoadingAssessment(false);
+    }
+  };
 
   const handleStartOrResume = async () => {
     if (!courseId) return;
@@ -137,6 +156,16 @@ export function CourseDetailPage() {
       </Box>
 
       <Divider sx={{ my: 4 }} />
+
+      {/* Assessment Card */}
+      {assessmentSummary && assessmentSummary.assessment_config?.is_enabled && (
+        <Box sx={{ mb: 4 }}>
+          <AssessmentCard
+            courseId={courseId!}
+            summary={assessmentSummary}
+          />
+        </Box>
+      )}
 
       {/* Outline */}
       <Box sx={{ mb: 4 }}>

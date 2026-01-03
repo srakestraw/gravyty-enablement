@@ -46,3 +46,4 @@ export interface CourseAssetRepository {
   delete(courseAssetId: string): Promise<void>;
 }
 
+

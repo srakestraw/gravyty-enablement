@@ -28,3 +28,4 @@ export function formatDurationMinutes(minutes: number): string {
   return `${hours}h ${remainingMinutes}m`;
 }
 
+

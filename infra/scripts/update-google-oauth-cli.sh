@@ -86,3 +86,4 @@ echo "2. Verify redirect URI is configured:"
 echo "   https://console.cloud.google.com/apis/credentials?project=$PROJECT_ID"
 echo "   Look for: $REDIRECT_URI"
 
+

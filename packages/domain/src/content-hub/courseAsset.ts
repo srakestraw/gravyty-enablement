@@ -44,3 +44,4 @@ export const CourseAssetSchema = z.object({
 
 export type CourseAsset = z.infer<typeof CourseAssetSchema>;
 
+

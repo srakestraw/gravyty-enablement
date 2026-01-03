@@ -195,9 +195,9 @@ export function CourseAssets({ courseId, readOnly = false, onAssetDetached }: Co
                       <Chip label="Expired" size="small" color="error" />
                     )}
                   </Box>
-                  {asset.description && (
+                  {(asset.short_description || asset.description) && (
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                      {asset.description}
+                      {asset.short_description || asset.description}
                     </Typography>
                   )}
                   <Box sx={{ display: 'flex', gap: 1, justifyContent: 'space-between', alignItems: 'center' }}>

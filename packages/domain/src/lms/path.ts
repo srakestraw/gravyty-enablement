@@ -55,7 +55,6 @@ export const LearningPathSchema = z.object({
   legacy_product_concept: z.string().optional(), // Old product_concept -> maps to product_suite
   legacy_product_suite_id: z.string().optional(), // Old product_suite_id -> maps to product_id
   legacy_product_concept_id: z.string().optional(), // Old product_concept_id -> maps to product_suite_id
-  badges: z.array(z.string()).default([]), // Badge IDs that can be earned
   
   // Media
   cover_image: MediaRefSchema.optional(),

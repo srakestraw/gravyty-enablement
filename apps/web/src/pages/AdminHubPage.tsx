@@ -28,6 +28,7 @@ import {
   PermMediaOutlined,
   CategoryOutlined,
   ArrowForwardOutlined,
+  EmojiEventsOutlined,
 } from '@mui/icons-material';
 import { PlaceholderPage } from '../components/shared/PlaceholderPage';
 import { track } from '../lib/telemetry';
@@ -197,6 +198,14 @@ export function AdminHubPage() {
             description="Design and manage certificate templates"
             icon={<WorkspacePremiumOutlined />}
             path="/enablement/admin/learning/certificates"
+          />
+        </Grid>
+        <Grid item xs={12} sm={6} md={4}>
+          <HubTile
+            title="Badges"
+            description="Manage badges that can be awarded to users"
+            icon={<EmojiEventsOutlined />}
+            path="/enablement/admin/badges"
           />
         </Grid>
       </Grid>

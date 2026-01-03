@@ -134,3 +134,4 @@ aws cognito-idp describe-user-pool-domain \
 3. **Check browser console for exact error**
 4. **Try the manual OAuth URL test**
 
+

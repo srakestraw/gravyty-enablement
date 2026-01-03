@@ -92,3 +92,4 @@ Once Phase 1 is validated, we can proceed to:
 - Verify the hook is being called correctly
 - Check that `updateCourse` is being called with correct parameters
 
+

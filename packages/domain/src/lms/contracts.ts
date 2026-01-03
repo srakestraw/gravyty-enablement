@@ -255,7 +255,6 @@ export const CertificateSummarySchema = z.object({
   path_title: z.string().optional(),
   completion_date: z.string(), // ISO datetime
   issued_at: z.string(), // ISO datetime
-  badge_text: z.string(), // Badge text from certificate
 });
 
 export type CertificateSummary = z.infer<typeof CertificateSummarySchema>;

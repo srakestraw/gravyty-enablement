@@ -3,11 +3,10 @@
  */
 
 import { useState, useEffect } from 'react';
-import { lmsAdminApi } from '../api/lmsAdminClient';
-import type { Assignment } from '@gravyty/domain';
+import { lmsAdminApi, type HydratedAssignment } from '../api/lmsAdminClient';
 
 export function useAdminAssignments(params?: { assignee_user_id?: string; status?: string }) {
-  const [data, setData] = useState<Assignment[] | null>(null);
+  const [data, setData] = useState<HydratedAssignment[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 

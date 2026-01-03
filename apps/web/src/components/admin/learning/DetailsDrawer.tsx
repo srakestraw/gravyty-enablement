@@ -6,7 +6,6 @@
  * - Product (single select, independent)
  * - Topic Tags (multi-select)
  * - Cover Image (upload/select)
- * - Badges (multi-select)
  */
 
 import { useState, useRef, useEffect } from 'react';
@@ -57,14 +56,12 @@ export function DetailsDrawer({
   const [productIds, setProductIds] = useState<string[]>([]);
   const [productSuiteIds, setProductSuiteIds] = useState<string[]>([]);
   const [topicTagIds, setTopicTagIds] = useState<string[]>([]);
-  const [badgeIds, setBadgeIds] = useState<string[]>([]);
 
   // Refs for focus registry
   const productRef = useRef<HTMLDivElement>(null);
   const productSuiteRef = useRef<HTMLDivElement>(null);
   const topicTagsRef = useRef<HTMLDivElement>(null);
   const coverImageRef = useRef<HTMLDivElement>(null);
-  const badgesRef = useRef<HTMLDivElement>(null);
 
   // Track the last synced course ID to avoid overwriting user input
   const lastSyncedCourseIdRef = useRef<string | null>(null);
@@ -87,10 +84,9 @@ export function DetailsDrawer({
       setProductIds(courseProductIds);
       setProductSuiteIds(courseProductSuiteIds);
       setTopicTagIds(course.topic_tag_ids && course.topic_tag_ids.length > 0 ? course.topic_tag_ids : []);
-      setBadgeIds(course.badge_ids && course.badge_ids.length > 0 ? course.badge_ids : []);
       lastSyncedCourseIdRef.current = course.course_id;
     }
-  }, [course?.course_id, course?.badge_ids]);
+  }, [course?.course_id]);
 
   // Validate and remove invalid products when Product Suite selection changes
   useEffect(() => {
@@ -207,19 +203,6 @@ export function DetailsDrawer({
       }));
     }
 
-    if (badgesRef.current) {
-      unregisters.push(focusRegistry.register({
-        entityType: 'course',
-        entityId: course.course_id,
-        fieldKey: 'badge_ids',
-        ref: badgesRef,
-        onFocus: () => {
-          if (!open) {
-            onToggle();
-          }
-        },
-      }));
-    }
 
     return () => {
       unregisters.forEach((unregister) => unregister());
@@ -396,27 +379,6 @@ export function DetailsDrawer({
                       No cover image attached
                     </Typography>
                   )}
-                </Paper>
-              </Grid>
-
-              {/* Badges */}
-              <Grid item xs={12}>
-                <Paper ref={badgesRef} sx={{ p: 2 }}>
-                  <MetadataMultiSelect
-                    groupKey="badge"
-                    values={badgeIds}
-                    onChange={(optionIds) => {
-                      setBadgeIds(optionIds);
-                      handleCourseFieldChange('badge_ids', optionIds);
-                      if (markFieldTouched) {
-                        markFieldTouched('course', course.course_id, 'badge_ids');
-                      }
-                    }}
-                    label="Badges"
-                    placeholder="Select badges"
-                    fullWidth
-                    error={shouldShowError && shouldShowError('course', course.course_id, 'badge_ids')}
-                  />
                 </Paper>
               </Grid>
             </Grid>

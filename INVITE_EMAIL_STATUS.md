@@ -167,3 +167,4 @@ This will show:
 - ✅ Enabled status
 - ❌ No email was sent (expected with current config)
 
+

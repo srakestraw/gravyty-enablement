@@ -5,9 +5,10 @@
  */
 
 import express from 'express';
-import { requireRole } from '../middleware/jwtAuth';
+import { requireRoleNew as requireRole } from '../middleware/jwtAuth.new';
 import * as lmsAdminHandlers from '../handlers/lmsAdmin';
 import * as courseAssetHandlers from '../handlers/courseAssets';
+import * as assessmentAdminHandlers from '../handlers/assessmentAdmin';
 
 const router = express.Router();
 
@@ -34,6 +35,14 @@ router.post('/courses/:id/assets', requireRole('Contributor'), courseAssetHandle
 router.get('/courses/:id/assets', courseAssetHandlers.listCourseAssets);
 router.patch('/courses/:id/assets/:courseAssetId', requireRole('Contributor'), courseAssetHandlers.updateCourseAsset);
 router.delete('/courses/:id/assets/:courseAssetId', requireRole('Contributor'), courseAssetHandlers.detachAssetFromCourse);
+
+// Assessment admin
+router.get('/courses/:courseId/assessment', assessmentAdminHandlers.getAssessmentConfig);
+router.put('/courses/:courseId/assessment', requireRole('Contributor'), assessmentAdminHandlers.saveAssessmentConfig);
+router.get('/courses/:courseId/assessment/questions', assessmentAdminHandlers.getAssessmentQuestions);
+router.put('/courses/:courseId/assessment/questions', requireRole('Contributor'), assessmentAdminHandlers.saveAssessmentQuestions);
+router.get('/courses/:courseId/assessment/results', assessmentAdminHandlers.getAssessmentResults);
+router.get('/courses/:courseId/assessment/results/:learnerId', assessmentAdminHandlers.getLearnerAssessmentResults);
 
 // Paths admin
 router.get('/paths', lmsAdminHandlers.listAdminPaths);
@@ -63,6 +72,7 @@ router.put('/media/:media_id/upload', requireRole('Contributor'), rawBodyParser,
 router.get('/media/:media_id/url', requireRole('Contributor'), lmsAdminHandlers.getMediaUrl);
 router.delete('/media/:media_id', requireRole('Admin'), lmsAdminHandlers.deleteMedia); // Only Admins can delete
 router.post('/media/:media_id/transcribe', requireRole('Admin'), lmsAdminHandlers.startMediaTranscription);
+router.post('/media/cleanup', requireRole('Admin'), lmsAdminHandlers.cleanupOrphanedMedia);
 
 // AI Image Generation
 router.post('/ai/suggest-image-prompt', requireRole('Contributor'), lmsAdminHandlers.suggestImagePrompt);

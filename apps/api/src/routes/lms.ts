@@ -5,9 +5,10 @@
  */
 
 import express from 'express';
-import { requireRole } from '../middleware/jwtAuth';
+import { requireRoleNew as requireRole } from '../middleware/jwtAuth.new';
 import * as lmsHandlers from '../handlers/lms';
 import * as courseAssetHandlers from '../handlers/courseAssets';
+import * as assessmentHandlers from '../handlers/assessment';
 
 const router = express.Router();
 
@@ -31,6 +32,13 @@ router.post('/paths/:pathId/start', lmsHandlers.startPath);
 // Enrollment and progress
 router.post('/enrollments', lmsHandlers.createEnrollment);
 router.post('/progress', lmsHandlers.updateProgress);
+
+// Assessments
+router.get('/courses/:courseId/assessment', assessmentHandlers.getAssessmentSummary);
+router.get('/courses/:courseId/assessment/me', assessmentHandlers.getMyAssessment);
+router.post('/courses/:courseId/assessment/attempts/start', assessmentHandlers.startAssessmentAttempt);
+router.post('/courses/:courseId/assessment/attempts/:attemptId/submit', assessmentHandlers.submitAssessmentAttempt);
+router.get('/courses/:courseId/assessment/attempts/:attemptId', assessmentHandlers.getAttemptResults);
 
 // My Learning
 router.get('/me', lmsHandlers.getMyLearning);

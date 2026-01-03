@@ -34,3 +34,4 @@ export function generateVerificationToken(): string {
   return generateShareToken(24); // 24 bytes = ~32 char token
 }
 
+

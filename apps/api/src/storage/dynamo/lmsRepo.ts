@@ -60,8 +60,6 @@ export class LmsRepo {
     query?: string;
     product_suite?: string;
     product_concept?: string;
-    badge?: string;
-    badges?: string[];
     topic?: string;
     topics?: string[];
     limit?: number;
@@ -108,21 +106,6 @@ export class LmsRepo {
 
     if (params.product_suite) {
       courses = courses.filter((c) => c.product_suite === params.product_suite);
-    }
-
-    if (params.badge || params.badges) {
-      const badgeIds = params.badges || [params.badge!];
-      // Filter by badge - check both legacy badges and new badge_ids
-      const coursesWithBadges = (Items as Course[]).filter((c) => {
-        const normalizedCourse = normalizeMetadataFieldsFromStorage(c) as Course;
-        // Check new badge_ids first, fallback to legacy badges
-        if (normalizedCourse.badge_ids && normalizedCourse.badge_ids.length > 0) {
-          return normalizedCourse.badge_ids.some((id) => badgeIds.includes(id));
-        }
-        return c.badges?.some((badge) => badgeIds.includes(badge.badge_id));
-      });
-      const courseIdsWithBadges = new Set(coursesWithBadges.map((c) => c.course_id));
-      courses = courses.filter((c) => courseIdsWithBadges.has(c.course_id));
     }
 
     if (params.topic || params.topics) {
@@ -524,12 +507,14 @@ export class LmsRepo {
     progress: CourseProgress;
     shouldEmitProgressEvent: boolean;
     lessonCompleted: boolean;
+    courseJustCompleted: boolean;
   }> {
     const now = new Date().toISOString();
     const PROGRESS_EVENT_INTERVAL_MS = 30 * 1000; // 30 seconds
 
     // Get existing progress or create new enrollment
     let progress = await this.getProgress(userId, courseId);
+    const wasCompletedBefore = progress?.completed || false;
     if (!progress) {
       progress = await this.upsertEnrollment(userId, courseId, 'self_enrolled');
     }
@@ -609,9 +594,17 @@ export class LmsRepo {
     }
 
     // Check if course is completed (monotonic: once completed, stays completed)
+    // Import assessment completion service dynamically to avoid circular dependency
     if (progress.percent_complete === 100 && !progress.completed) {
-      progress.completed = true;
-      progress.completed_at = now;
+      // Check assessment requirement if applicable
+      const { evaluateCourseCompletion } = await import('../services/courseCompletionService');
+      const completionCheck = await evaluateCourseCompletion(courseId, progress);
+      
+      if (completionCheck.completed) {
+        progress.completed = true;
+        progress.completed_at = now;
+      }
+      // If not completed due to assessment, don't mark as completed yet
     } else if (progress.completed && !progress.completed_at) {
       // Ensure completed_at is set if already marked as completed
       progress.completed_at = now;
@@ -659,10 +652,15 @@ export class LmsRepo {
     });
 
     await dynamoDocClient.send(command);
+    
+    // Check if course was just completed
+    const courseJustCompleted = progress.completed && !wasCompletedBefore;
+    
     return {
       progress,
       shouldEmitProgressEvent,
       lessonCompleted,
+      courseJustCompleted,
     };
   }
 
@@ -781,7 +779,6 @@ export class LmsRepo {
       path_title: cert.certificate_data.path_title,
       completion_date: cert.certificate_data.completion_date,
       issued_at: cert.issued_at,
-      badge_text: cert.certificate_data.badge_text,
     };
   }
 
@@ -1006,7 +1003,6 @@ export class LmsRepo {
       course_title?: string;
       path_title?: string;
       completion_date: string;
-      badge_text: string;
       signatory_name?: string;
       signatory_title?: string;
       issued_copy: {
@@ -1112,7 +1108,7 @@ export class LmsRepo {
   async updateCourseDraft(
     courseId: string,
     userId: string,
-    updates: Partial<Pick<Course, 'title' | 'description' | 'short_description' | 'product' | 'product_suite' | 'topic_tags' | 'product_id' | 'product_suite_id' | 'topic_tag_ids' | 'badges' | 'badge_ids' | 'cover_image' | 'estimated_minutes'>>
+    updates: Partial<Pick<Course, 'title' | 'description' | 'short_description' | 'product' | 'product_suite' | 'topic_tags' | 'product_id' | 'product_suite_id' | 'topic_tag_ids' | 'badge_ids' | 'badges' | 'cover_image' | 'estimated_minutes'>>
   ): Promise<Course> {
     const now = new Date().toISOString();
     
@@ -1358,7 +1354,7 @@ export class LmsRepo {
   async updatePathDraft(
     pathId: string,
     userId: string,
-    updates: Partial<Pick<LearningPath, 'title' | 'description' | 'short_description' | 'product' | 'product_suite' | 'topic_tags' | 'badges'>> & {
+    updates: Partial<Pick<LearningPath, 'title' | 'description' | 'short_description' | 'product' | 'product_suite' | 'topic_tags'>> & {
       courses?: Array<{ course_id: string; order: number; required?: boolean; title_override?: string }>;
     }
   ): Promise<LearningPath> {
@@ -1383,7 +1379,6 @@ export class LmsRepo {
       product: updates.product ?? existing.product,
       product_suite: updates.product_suite ?? existing.product_suite,
       topic_tags: updates.topic_tags ?? existing.topic_tags,
-      badges: updates.badges ?? existing.badges,
       courses: updates.courses 
         ? updates.courses.map((c) => ({
             course_id: c.course_id,

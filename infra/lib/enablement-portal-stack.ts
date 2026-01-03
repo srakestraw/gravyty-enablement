@@ -23,14 +23,14 @@ export class EnablementPortalStack extends cdk.Stack {
   public readonly lmsAssignmentsTable: dynamodb.Table;
   public readonly lmsCertificatesTable: dynamodb.Table;
   public readonly lmsTranscriptsTable: dynamodb.Table;
-  public readonly metadataTable: dynamodb.Table;
+  public readonly metadataTable: dynamodb.ITable;
   // LMS S3 Bucket
   public readonly lmsMediaBucket: s3.Bucket;
   public readonly apiRole: iam.Role;
   public readonly baseStack: BaseStack;
   public readonly apiStack?: ApiStack;
-  public readonly userPool: cognito.UserPool;
-  public readonly userPoolClient: cognito.UserPoolClient;
+  public readonly userPool: cognito.IUserPool;
+  public readonly userPoolClient: cognito.IUserPoolClient;
   public readonly userPoolDomain: cognito.UserPoolDomain;
   public readonly apiLambda: lambda.Function;
   public readonly httpApi: apigatewayv2.HttpApi;
@@ -200,21 +200,17 @@ export class EnablementPortalStack extends cdk.Stack {
       sortKey: { name: 'issued_at', type: dynamodb.AttributeType.STRING },
     });
 
-    // Metadata Table
-    this.metadataTable = new dynamodb.Table(this, 'Metadata', {
-      tableName: 'metadata',
-      partitionKey: { name: 'option_id', type: dynamodb.AttributeType.STRING },
-      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-      removalPolicy: cdk.RemovalPolicy.RETAIN,
-      pointInTimeRecovery: true,
-      encryption: dynamodb.TableEncryption.AWS_MANAGED,
-    });
-    // GSI: GroupKeyIndex
-    this.metadataTable.addGlobalSecondaryIndex({
-      indexName: 'GroupKeyIndex',
-      partitionKey: { name: 'group_key', type: dynamodb.AttributeType.STRING },
-      sortKey: { name: 'sort_order_label', type: dynamodb.AttributeType.STRING },
-    });
+    // Metadata Table - Import existing table (already exists in CloudFormation)
+    this.metadataTable = dynamodb.Table.fromTableName(this, 'Metadata', 'metadata');
+
+    // Prompt Helpers Tables - Import existing tables (already exist in CloudFormation)
+    const promptHelpersTable = dynamodb.Table.fromTableName(this, 'PromptHelpers', 'prompt_helpers');
+
+    // Prompt Helper Versions Table - Import existing if it exists
+    const promptHelperVersionsTable = dynamodb.Table.fromTableName(this, 'PromptHelperVersions', 'prompt_helper_versions');
+
+    // Prompt Helper Audit Log Table - Import existing if it exists  
+    const promptHelperAuditLogTable = dynamodb.Table.fromTableName(this, 'PromptHelperAuditLog', 'prompt_helper_audit_log');
 
     // LMS Transcripts Table
     // Note: If this table already exists from a failed deployment, you may need to:
@@ -264,6 +260,11 @@ export class EnablementPortalStack extends cdk.Stack {
     this.lmsCertificatesTable.grantReadWriteData(lambdaRole);
     this.lmsTranscriptsTable.grantReadWriteData(lambdaRole);
     this.metadataTable.grantReadWriteData(lambdaRole);
+    
+    // Grant Prompt Helpers DynamoDB permissions
+    promptHelpersTable.grantReadWriteData(lambdaRole);
+    promptHelperVersionsTable.grantReadWriteData(lambdaRole);
+    promptHelperAuditLogTable.grantReadWriteData(lambdaRole);
 
     // Grant LMS S3 permissions (read/write on all objects in bucket)
     this.lmsMediaBucket.grantReadWrite(lambdaRole);
@@ -367,7 +368,7 @@ export class EnablementPortalStack extends cdk.Stack {
       memorySize: 256,
       environment: {
         DDB_TABLE_CONTENT: process.env.DDB_TABLE_CONTENT || 'content_registry',
-        AWS_REGION: this.region,
+        // Note: AWS_REGION is automatically set by Lambda runtime, don't set it manually
       },
     });
 

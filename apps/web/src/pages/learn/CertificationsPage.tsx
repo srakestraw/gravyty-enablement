@@ -94,14 +94,6 @@ function CertificateCard({ certificate }: { certificate: any }) {
             <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
               Issued: {new Date(certificate.issued_at).toLocaleDateString()}
             </Typography>
-            {certificate.badge_text && (
-              <Chip
-                label={certificate.badge_text}
-                color="primary"
-                size="small"
-                sx={{ mt: 1, mb: 1 }}
-              />
-            )}
             <Box sx={{ mt: 2 }}>
               <Button
                 startIcon={<DownloadOutlined />}

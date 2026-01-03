@@ -74,3 +74,4 @@ This affects field names, UI labels, and taxonomy group keys while maintaining b
 - [ ] Taxonomy options API works with new group keys
 - [ ] Filtering by product/product_suite works correctly
 
+

@@ -35,7 +35,12 @@ export function issueToError(issue: ValidationIssue): ValidationError {
 /**
  * Validate course publish readiness
  */
-export function validateCoursePublish(course: Course, lessons: Lesson[]): ValidationResult {
+export function validateCoursePublish(
+  course: Course,
+  lessons: Lesson[],
+  assessmentConfig?: { is_enabled: boolean; required_for_completion: boolean } | null,
+  assessmentQuestionCount?: number
+): ValidationResult {
   const errors: ValidationError[] = [];
 
   // Required fields
@@ -230,6 +235,34 @@ export function validateCoursePublish(course: Course, lessons: Lesson[]): Valida
     });
   }
 
+  // Assessment validation
+  if (assessmentConfig?.is_enabled) {
+    const questionCount = assessmentQuestionCount ?? 0;
+    if (questionCount === 0) {
+      errors.push({
+        field: 'assessment',
+        message: 'Assessment is enabled but has no questions. Add at least one question or disable the assessment.',
+      });
+    }
+  }
+
+  if (assessmentConfig?.required_for_completion) {
+    if (!assessmentConfig.is_enabled) {
+      errors.push({
+        field: 'assessment.required_for_completion',
+        message: 'Assessment is required for completion but is not enabled. Enable the assessment or remove the requirement.',
+      });
+    } else {
+      const questionCount = assessmentQuestionCount ?? 0;
+      if (questionCount === 0) {
+        errors.push({
+          field: 'assessment',
+          message: 'Assessment is required for completion but has no questions. Add at least one question.',
+        });
+      }
+    }
+  }
+
   return {
     valid: errors.length === 0,
     errors,
@@ -298,7 +331,12 @@ export function getValidationSummary(result: ValidationResult): string {
 /**
  * Validate course draft (returns errors and warnings)
  */
-export function validateCourseDraft(course: Course, lessons: Lesson[]): { errors: ValidationIssue[]; warnings: ValidationIssue[] } {
+export function validateCourseDraft(
+  course: Course,
+  lessons: Lesson[],
+  assessmentConfig?: { is_enabled: boolean; required_for_completion: boolean } | null,
+  assessmentQuestionCount?: number
+): { errors: ValidationIssue[]; warnings: ValidationIssue[] } {
   const errors: ValidationIssue[] = [];
   const warnings: ValidationIssue[] = [];
 

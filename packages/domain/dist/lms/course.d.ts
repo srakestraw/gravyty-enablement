@@ -78,6 +78,7 @@ export declare const CourseSchema: z.ZodObject<{
     product_suite_ids: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
     topic_tag_ids: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
     audience_ids: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
+    badge_ids: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
     legacy_product_suite: z.ZodOptional<z.ZodString>;
     legacy_product_concept: z.ZodOptional<z.ZodString>;
     legacy_product_suite_id: z.ZodOptional<z.ZodString>;
@@ -157,7 +158,6 @@ export declare const CourseSchema: z.ZodObject<{
         description?: string | undefined;
         icon_url?: string | undefined;
     }>, "many">>;
-    badge_ids: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
     sections: z.ZodDefault<z.ZodArray<z.ZodObject<{
         section_id: z.ZodString;
         title: z.ZodString;
@@ -201,6 +201,7 @@ export declare const CourseSchema: z.ZodObject<{
     course_id: string;
     topic_tags: string[];
     audience_ids: string[];
+    badge_ids: string[];
     related_course_ids: string[];
     badges: {
         name: string;
@@ -208,7 +209,6 @@ export declare const CourseSchema: z.ZodObject<{
         description?: string | undefined;
         icon_url?: string | undefined;
     }[];
-    badge_ids: string[];
     sections: {
         title: string;
         section_id: string;
@@ -278,6 +278,7 @@ export declare const CourseSchema: z.ZodObject<{
     short_description?: string | undefined;
     topic_tags?: string[] | undefined;
     audience_ids?: string[] | undefined;
+    badge_ids?: string[] | undefined;
     related_course_ids?: string[] | undefined;
     cover_image?: {
         type: "image" | "video" | "document" | "audio" | "other";
@@ -305,7 +306,6 @@ export declare const CourseSchema: z.ZodObject<{
         description?: string | undefined;
         icon_url?: string | undefined;
     }[] | undefined;
-    badge_ids?: string[] | undefined;
     sections?: {
         title: string;
         section_id: string;

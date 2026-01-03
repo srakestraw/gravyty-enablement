@@ -27,7 +27,11 @@ import {
   CheckCircle as CheckCircleIcon,
 } from '@mui/icons-material';
 import { lmsAdminApi } from '../../api/lmsAdminClient';
+import { promptHelpersApi } from '../../api/promptHelpersClient';
 import { isErrorResponse } from '../../lib/apiClient';
+import type { PromptHelper } from '@gravyty/domain';
+import { FormControl, InputLabel, Select, MenuItem } from '@mui/material';
+import { useEffect } from 'react';
 
 export interface AIAssistantModalProps {
   open: boolean;
@@ -49,6 +53,69 @@ export function AIAssistantModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [actionType, setActionType] = useState<'generate' | 'shorten' | 'longer' | null>(null);
+  const [rteHelpers, setRteHelpers] = useState<PromptHelper[]>([]);
+  const [selectedHelperId, setSelectedHelperId] = useState<string>('');
+  const [composedPrompt, setComposedPrompt] = useState<string | null>(null);
+
+  // Load RTE helpers on mount
+  useEffect(() => {
+    const loadHelpers = async () => {
+      try {
+        const response = await promptHelpersApi.getForContext('rte');
+        if (!isErrorResponse(response)) {
+          setRteHelpers(response.data.helpers);
+          // Set default helper based on action
+          const defaultHelper = response.data.helpers.find(h => 
+            h.is_default_for.includes('rte_shorten') || 
+            h.is_default_for.includes('rte_expand') ||
+            h.is_default_for.includes('rte_rewrite')
+          );
+          if (defaultHelper) {
+            setSelectedHelperId(defaultHelper.helper_id);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load RTE helpers:', err);
+      }
+    };
+    loadHelpers();
+  }, []);
+
+  // Compose prompt when helper or action changes
+  useEffect(() => {
+    const updateComposedPrompt = async () => {
+      if (!selectedHelperId || !existingContent) {
+        setComposedPrompt(null);
+        return;
+      }
+      
+      try {
+        const actionMap: Record<string, string> = {
+          shorten: 'shorten',
+          longer: 'expand',
+        };
+        const rteAction = actionMap[actionType || ''] || 'rewrite';
+        
+        const response = await promptHelpersApi.composePreview({
+          helper_id: selectedHelperId,
+          context: 'rte',
+          user_content: existingContent,
+          action_type: rteAction as any,
+          user_instruction: prompt,
+        });
+        
+        if (!isErrorResponse(response)) {
+          setComposedPrompt(response.data.composed_prompt);
+        }
+      } catch (err) {
+        console.error('Failed to compose prompt:', err);
+      }
+    };
+    
+    if (selectedHelperId && existingContent) {
+      updateComposedPrompt();
+    }
+  }, [selectedHelperId, existingContent, actionType, prompt]);
 
   const handleClose = () => {
     setPrompt('');
@@ -76,19 +143,41 @@ export function AIAssistantModal({
     try {
       let finalPrompt = prompt.trim();
       
-      // Modify prompt for shorten/longer operations
-      if (modifyType === 'shorten') {
-        const contentToModify = response || existingContent || '';
-        finalPrompt = `Make the following text shorter while preserving key information:\n\n${contentToModify}`;
-      } else if (modifyType === 'longer') {
-        const contentToModify = response || existingContent || '';
-        finalPrompt = `Expand the following text with more detail and examples:\n\n${contentToModify}`;
+      // Use composed prompt if helper is selected, otherwise use default behavior
+      if (selectedHelperId && (modifyType || existingContent)) {
+        const actionMap: Record<string, string> = {
+          shorten: 'shorten',
+          longer: 'expand',
+        };
+        const rteAction = actionMap[modifyType || ''] || 'rewrite';
+        
+        const composeResponse = await promptHelpersApi.composePreview({
+          helper_id: selectedHelperId,
+          context: 'rte',
+          user_content: response || existingContent || '',
+          action_type: rteAction as any,
+          user_instruction: prompt,
+        });
+        
+        if (!isErrorResponse(composeResponse)) {
+          finalPrompt = composeResponse.data.composed_prompt;
+        }
+      } else {
+        // Fallback to default behavior
+        if (modifyType === 'shorten') {
+          const contentToModify = response || existingContent || '';
+          finalPrompt = `Make the following text shorter while preserving key information:\n\n${contentToModify}`;
+        } else if (modifyType === 'longer') {
+          const contentToModify = response || existingContent || '';
+          finalPrompt = `Expand the following text with more detail and examples:\n\n${contentToModify}`;
+        }
       }
 
       const apiResponse = await lmsAdminApi.chatCompletion({
         prompt: finalPrompt,
         context: context,
         existing_content: modifyType && response ? response : existingContent,
+        helper_id: selectedHelperId || undefined,
       });
 
       if (isErrorResponse(apiResponse)) {
@@ -151,6 +240,39 @@ export function AIAssistantModal({
       
       <DialogContent>
         <Stack spacing={3}>
+          {/* Prompt Helper Selector */}
+          <FormControl fullWidth>
+            <InputLabel>Prompt Helper</InputLabel>
+            <Select
+              value={selectedHelperId}
+              onChange={(e) => setSelectedHelperId(e.target.value)}
+              label="Prompt Helper"
+            >
+              <MenuItem value="">
+                {rteHelpers.find(h => h.is_default_for.some(ctx => ctx.startsWith('rte_')))
+                  ? 'Default (recommended)'
+                  : 'None'}
+              </MenuItem>
+              {rteHelpers.map((helper) => (
+                <MenuItem key={helper.helper_id} value={helper.helper_id}>
+                  {helper.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          {/* Composed Prompt Preview */}
+          {composedPrompt && (
+            <Paper variant="outlined" sx={{ p: 2, bgcolor: 'grey.50' }}>
+              <Typography variant="caption" color="text.secondary" gutterBottom>
+                Composed Prompt Preview:
+              </Typography>
+              <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace', fontSize: '0.75rem' }}>
+                {composedPrompt.substring(0, 200)}{composedPrompt.length > 200 ? '...' : ''}
+              </Typography>
+            </Paper>
+          )}
+
           {/* Prompt Input */}
           <TextField
             label="Enter your prompt"

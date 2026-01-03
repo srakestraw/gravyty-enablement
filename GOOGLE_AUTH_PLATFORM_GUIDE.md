@@ -73,3 +73,4 @@ If you're still getting "invalid_client" error after configuring:
    - Changes can take 1-2 minutes to propagate
    - Clear browser cache and try again
 
+
