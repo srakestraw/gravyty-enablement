@@ -23,15 +23,15 @@ interface BaseStackProps extends cdk.NestedStackProps {
   lmsAssignmentsTable: dynamodb.Table;
   lmsCertificatesTable: dynamodb.Table;
   lmsTranscriptsTable: dynamodb.Table;
-  metadataTable: dynamodb.Table;
+  metadataTable: dynamodb.ITable;
   lmsMediaBucket: s3.Bucket;
   allowedOrigins: string[];
 }
 
 export class BaseStack extends cdk.NestedStack {
   public readonly apiLambda: lambda.Function;
-  public readonly userPool: cognito.UserPool;
-  public readonly userPoolClient: cognito.UserPoolClient;
+  public readonly userPool: cognito.IUserPool;
+  public readonly userPoolClient: cognito.IUserPoolClient;
   public readonly userPoolDomain: cognito.UserPoolDomain;
   public readonly lambdaRole: iam.Role;
 
@@ -97,32 +97,53 @@ export class BaseStack extends cdk.NestedStack {
       allowedDomains: ['gravyty.com'],
     });
 
-    // Cognito User Pool (created WITHOUT lambda triggers initially to break circular dependency)
-    this.userPool = new cognito.UserPool(this, 'UserPool', {
-      userPoolName: 'enablement-portal-users',
-      signInAliases: {
-        email: true,
-      },
-      autoVerify: {
-        email: true,
-      },
-      standardAttributes: {
-        email: {
-          required: true,
-          mutable: true,
+    // Cognito User Pool
+    // IMPORTANT: Uses RETAIN policy to prevent deletion on stack destroy
+    // This ensures the pool persists across deployments and prevents creating new pools
+    // 
+    // To use an existing pool instead of creating a new one:
+    //   export EXISTING_USER_POOL_ID=us-east-1_xBNZh7TaB
+    //   npm run cdk:deploy
+    const existingUserPoolId = process.env.EXISTING_USER_POOL_ID;
+    
+    let isExistingPool = false;
+    if (existingUserPoolId) {
+      // Import existing User Pool instead of creating new one
+      // This prevents creating duplicate pools on each deployment
+      console.log(`[BaseStack] Using existing User Pool: ${existingUserPoolId}`);
+      this.userPool = cognito.UserPool.fromUserPoolId(this, 'UserPool', existingUserPoolId);
+      isExistingPool = true;
+    } else {
+      // Create new User Pool (only if EXISTING_USER_POOL_ID is not set)
+      // RETAIN policy ensures it won't be deleted on stack destroy
+      // However, CDK will still create a NEW pool if it doesn't find the existing one
+      // To prevent this, always set EXISTING_USER_POOL_ID when deploying
+      this.userPool = new cognito.UserPool(this, 'UserPool', {
+        userPoolName: 'enablement-portal-users',
+        signInAliases: {
+          email: true,
         },
-      },
-      passwordPolicy: {
-        minLength: 12,
-        requireLowercase: true,
-        requireUppercase: true,
-        requireDigits: true,
-        requireSymbols: true,
-      },
-      accountRecovery: cognito.AccountRecovery.EMAIL_ONLY,
-      removalPolicy: cdk.RemovalPolicy.RETAIN,
-      // Note: lambdaTriggers are set later via CfnUserPool to avoid circular dependency
-    });
+        autoVerify: {
+          email: true,
+        },
+        standardAttributes: {
+          email: {
+            required: true,
+            mutable: true,
+          },
+        },
+        passwordPolicy: {
+          minLength: 12,
+          requireLowercase: true,
+          requireUppercase: true,
+          requireDigits: true,
+          requireSymbols: true,
+        },
+        accountRecovery: cognito.AccountRecovery.EMAIL_ONLY,
+        removalPolicy: cdk.RemovalPolicy.RETAIN, // CRITICAL: Prevents deletion on stack destroy
+        // Note: lambdaTriggers are set later via CfnUserPool to avoid circular dependency
+      });
+    }
 
     // Grant Cognito permission to invoke the email domain validator Lambda
     // Use wildcard ARN to avoid circular dependency with UserPool ARN
@@ -148,15 +169,23 @@ export class BaseStack extends cdk.NestedStack {
 
     // Add lambda triggers to User Pool using CfnUserPool AFTER permissions are set
     // This breaks the circular dependency by configuring triggers after all resources are created
-    const cfnUserPool = this.userPool.node.defaultChild as cognito.CfnUserPool;
-    cfnUserPool.lambdaConfig = {
-      preTokenGeneration: emailDomainValidator.function.functionArn,
-      postAuthentication: autoAssignViewer.function.functionArn,
-    };
-    
-    // Ensure lambdaConfig is set after permissions are created
-    cfnUserPool.node.addDependency(emailDomainValidator.function);
-    cfnUserPool.node.addDependency(autoAssignViewer.function);
+    // Only set lambda config for newly created pools, not imported ones
+    // (Imported pools should already have their lambda triggers configured)
+    if (!isExistingPool) {
+      const cfnUserPool = this.userPool.node.defaultChild as cognito.CfnUserPool;
+      if (cfnUserPool) {
+        cfnUserPool.lambdaConfig = {
+          preTokenGeneration: emailDomainValidator.function.functionArn,
+          postAuthentication: autoAssignViewer.function.functionArn,
+        };
+        
+        // Ensure lambdaConfig is set after permissions are created
+        cfnUserPool.node.addDependency(emailDomainValidator.function);
+        cfnUserPool.node.addDependency(autoAssignViewer.function);
+      }
+    } else {
+      console.log(`[BaseStack] Skipping lambda config for existing User Pool (triggers should already be configured)`);
+    }
 
     // Create Cognito Groups
     const viewerGroup = new cognito.CfnUserPoolGroup(this, 'ViewerGroup', {
@@ -234,43 +263,62 @@ export class BaseStack extends cdk.NestedStack {
         email_verified: 'email_verified',
         name: 'name',
         picture: 'picture',
+        username: 'sub',
+        given_name: 'given_name',
+        family_name: 'family_name',
       },
     });
 
     // Cognito User Pool Client
-    this.userPoolClient = new cognito.UserPoolClient(this, 'UserPoolClient', {
-      userPool: this.userPool,
-      userPoolClientName: 'enablement-portal-client',
-      generateSecret: false,
-      authFlows: {
-        userPassword: true,
-        userSrp: true,
-      },
-      oAuth: {
-        flows: {
-          authorizationCodeGrant: true,
-          implicitCodeGrant: false,
+    // When using EXISTING_USER_POOL_ID, if a client with this name already exists,
+    // CDK will create a new one. To use the existing client, set EXISTING_USER_POOL_CLIENT_ID.
+    // Otherwise, this will create/update the client as needed.
+    const existingClientId = process.env.EXISTING_USER_POOL_CLIENT_ID;
+    
+    if (existingClientId && existingUserPoolId) {
+      // Import existing client when using existing pool
+      console.log(`[BaseStack] Using existing User Pool Client: ${existingClientId}`);
+      this.userPoolClient = cognito.UserPoolClient.fromUserPoolClientId(
+        this,
+        'UserPoolClient',
+        existingClientId
+      );
+    } else {
+      // Create new client (will update existing one if name matches)
+      this.userPoolClient = new cognito.UserPoolClient(this, 'UserPoolClient', {
+        userPool: this.userPool,
+        userPoolClientName: 'enablement-portal-client',
+        generateSecret: false,
+        authFlows: {
+          userPassword: true,
+          userSrp: true,
         },
-        scopes: [
-          cognito.OAuthScope.EMAIL,
-          cognito.OAuthScope.OPENID,
-          cognito.OAuthScope.PROFILE,
-        ],
-        // Include both base origin (for Amplify OAuth redirect) and /auth/callback path
-        // Amplify's signInWithRedirect uses the base origin as redirect_uri
-        callbackUrls: [
-          ...props.allowedOrigins.map(origin => origin), // Base origin (e.g., https://main.xxx.amplifyapp.com)
-          ...props.allowedOrigins.map(origin => `${origin}/`), // Base origin with trailing slash
-          ...props.allowedOrigins.map(origin => `${origin}/auth/callback`), // Explicit callback path
-        ],
-        logoutUrls: [
-          ...props.allowedOrigins.map(origin => origin), // Base origin
-          ...props.allowedOrigins.map(origin => `${origin}/`), // Base origin with trailing slash
-          ...props.allowedOrigins.map(origin => `${origin}/auth/logout`), // Explicit logout path
-        ],
-      },
-      preventUserExistenceErrors: true,
-    });
+        oAuth: {
+          flows: {
+            authorizationCodeGrant: true,
+            implicitCodeGrant: false,
+          },
+          scopes: [
+            cognito.OAuthScope.EMAIL,
+            cognito.OAuthScope.OPENID,
+            cognito.OAuthScope.PROFILE,
+          ],
+          // Include both base origin (for Amplify OAuth redirect) and /auth/callback path
+          // Amplify's signInWithRedirect uses the base origin as redirect_uri
+          callbackUrls: [
+            ...props.allowedOrigins.map(origin => origin), // Base origin (e.g., https://main.xxx.amplifyapp.com)
+            ...props.allowedOrigins.map(origin => `${origin}/`), // Base origin with trailing slash
+            ...props.allowedOrigins.map(origin => `${origin}/auth/callback`), // Explicit callback path
+          ],
+          logoutUrls: [
+            ...props.allowedOrigins.map(origin => origin), // Base origin
+            ...props.allowedOrigins.map(origin => `${origin}/`), // Base origin with trailing slash
+            ...props.allowedOrigins.map(origin => `${origin}/auth/logout`), // Explicit logout path
+          ],
+        },
+        preventUserExistenceErrors: true,
+      });
+    }
 
     // Cognito Domain (for hosted UI)
     // IMPORTANT: Domain 'enablement-portal-75874255' already exists and is associated with the UserPool.

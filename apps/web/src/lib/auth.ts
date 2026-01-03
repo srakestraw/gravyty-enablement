@@ -141,6 +141,17 @@ if (userPoolId && userPoolClientId && userPoolDomain) {
     });
     isConfigured = true;
     
+    // Log configuration for debugging
+    if (import.meta.env.DEV) {
+      console.log('[Auth] Amplify configured:', {
+        userPoolId,
+        userPoolClientId,
+        userPoolDomain: validatedDomain,
+        redirectSignIn: redirectSignIn.slice(0, 3), // First 3 URLs
+        currentOrigin,
+      });
+    }
+    
     // Configuration successful
   } catch (error) {
     console.error('[Auth] Failed to configure Amplify:', error, {
@@ -397,6 +408,49 @@ export async function handleOAuthRedirect(): Promise<boolean> {
       console.error('Run this command to update Cognito:');
       console.error('  cd infra/scripts && ./update-cognito-callback-urls.sh');
       console.error('');
+    } else if (error === 'invalid_request' && errorDescription?.includes('invalid_client')) {
+      // Google OAuth invalid_client error - most common causes
+      console.error('');
+      console.error('🔴 GOOGLE OAUTH INVALID_CLIENT ERROR');
+      console.error('');
+      console.error('Google rejected the OAuth request. This usually means:');
+      console.error('');
+      console.error('1. ❌ Redirect URI not authorized in Google Cloud Console');
+      console.error('2. ❌ Client ID/Secret mismatch between Cognito and Google');
+      console.error('3. ❌ OAuth consent screen not configured');
+      console.error('');
+      console.error('Required Redirect URI in Google Cloud Console:');
+      const cognitoRedirectUri = `https://${userPoolDomain}/oauth2/idpresponse`;
+      console.error(`  ${cognitoRedirectUri}`);
+      console.error('');
+      console.error('Steps to fix:');
+      console.error('');
+      console.error('1. Go to Google Cloud Console:');
+      console.error('   https://console.cloud.google.com/apis/credentials?project=680059166048');
+      console.error('');
+      console.error('2. Find your OAuth 2.0 Client ID and click Edit');
+      console.error('');
+      console.error('3. In "Authorized redirect URIs", ensure this EXACT URI exists:');
+      console.error(`   ${cognitoRedirectUri}`);
+      console.error('');
+      console.error('4. Verify:');
+      console.error('   - Uses HTTPS (not HTTP)');
+      console.error('   - Includes /oauth2/idpresponse path');
+      console.error('   - No trailing slash');
+      console.error('   - Matches exactly (case-sensitive)');
+      console.error('');
+      console.error('5. Check OAuth Consent Screen is configured:');
+      console.error('   https://console.cloud.google.com/apis/credentials/consent?project=680059166048');
+      console.error('');
+      console.error('6. If app is in testing mode, add your email to test users');
+      console.error('');
+      console.error('7. Wait 1-2 minutes after saving, then try again');
+      console.error('');
+      console.error('To verify Cognito configuration, run:');
+      console.error(`  aws cognito-idp describe-identity-provider \\`);
+      console.error(`    --user-pool-id ${userPoolId} \\`);
+      console.error(`    --provider-name Google`);
+      console.error('');
     }
     
     // Clean up URL
@@ -407,6 +461,17 @@ export async function handleOAuthRedirect(): Promise<boolean> {
   }
 
   if (hasCode || hasState) {
+    // Check if we're on the error page (Cognito redirected to /error)
+    if (window.location.pathname === '/error' || window.location.href.includes('/error?')) {
+      console.error('[Auth] Cognito redirected to /error endpoint');
+      console.error('[Auth] This usually indicates a redirect URI mismatch or state validation failure');
+      console.error('[Auth] Current URL:', window.location.href);
+      console.error('[Auth] Current Origin:', currentOrigin);
+      console.error('[Auth] Expected redirect URIs:', redirectSignIn);
+      console.error('[Auth] Please verify your origin matches one of the callback URLs in Cognito');
+      return false;
+    }
+    
     try {
       // Processing OAuth redirect callback
       // Fetch auth session with forceRefresh to process the OAuth callback

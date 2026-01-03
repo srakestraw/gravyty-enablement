@@ -34,6 +34,7 @@ aws cognito-idp update-identity-provider \
   --user-pool-id "$USER_POOL_ID" \
   --provider-name Google \
   --provider-details "client_id=$GOOGLE_CLIENT_ID,client_secret=$GOOGLE_CLIENT_SECRET,authorize_scopes=openid email profile" \
+  --attribute-mapping email=email,email_verified=email_verified,name=name,picture=picture,username=sub,given_name=given_name,family_name=family_name \
   --query 'IdentityProvider.{ProviderName:ProviderName,Status:Status}' \
   --output json
 
@@ -45,6 +46,7 @@ echo "   https://console.cloud.google.com/apis/credentials?project=680059166048"
 echo ""
 echo "   Ensure Authorized redirect URIs includes:"
 echo "   https://enable.gravytylabs.com/oauth2/idpresponse"
+
 
 
 

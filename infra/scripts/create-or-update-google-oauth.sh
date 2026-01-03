@@ -43,7 +43,7 @@ if aws cognito-idp describe-identity-provider \
     --user-pool-id "$USER_POOL_ID" \
     --provider-name Google \
     --provider-details "client_id=$GOOGLE_CLIENT_ID,client_secret=$GOOGLE_CLIENT_SECRET,authorize_scopes=openid email profile" \
-    --attribute-mapping email=email,email_verified=email_verified,name=name,picture=picture \
+    --attribute-mapping email=email,email_verified=email_verified,name=name,picture=picture,username=sub,given_name=given_name,family_name=family_name \
     > /dev/null
   
   echo "✅ Google Identity Provider updated!"
@@ -55,7 +55,7 @@ else
     --provider-name Google \
     --provider-type Google \
     --provider-details "client_id=$GOOGLE_CLIENT_ID,client_secret=$GOOGLE_CLIENT_SECRET,authorize_scopes=openid email profile" \
-    --attribute-mapping email=email,email_verified=email_verified,name=name,picture=picture \
+    --attribute-mapping email=email,email_verified=email_verified,name=name,picture=picture,username=sub,given_name=given_name,family_name=family_name \
     > /dev/null
   
   echo "✅ Google Identity Provider created!"
@@ -88,4 +88,5 @@ echo "Ensure your OAuth client has this Authorized redirect URI:"
 echo "  https://enablement-portal-75874255.auth.us-east-1.amazoncognito.com/oauth2/idpresponse"
 echo ""
 echo "✅ Google OAuth configuration complete!"
+
 

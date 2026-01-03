@@ -5,13 +5,14 @@
  */
 
 import express from 'express';
-import { requireRole } from '../middleware/jwtAuth';
+import { requireRoleNew as requireRole } from '../middleware/jwtAuth.new';
 import * as contentHubHandlers from '../handlers/contentHub';
 import * as lifecycleHandlers from '../handlers/contentHubLifecycle';
 import * as commentHandlers from '../handlers/contentHubComments';
 import * as flagHandlers from '../handlers/contentHubFlags';
 import * as subscriptionHandlers from '../handlers/contentHubSubscriptions';
 import * as shareLinkHandlers from '../handlers/contentHubShareLinks';
+import * as downloadHandlers from '../handlers/contentHubDownloads';
 
 const router = express.Router();
 
@@ -21,6 +22,7 @@ router.use(requireRole('Viewer'));
 // Assets
 router.post('/assets', requireRole('Contributor'), contentHubHandlers.createAsset);
 router.get('/assets', contentHubHandlers.listAssets);
+router.get('/assets/keywords', contentHubHandlers.getAssetKeywords);
 router.get('/assets/:id', contentHubHandlers.getAsset);
 router.patch('/assets/:id', requireRole('Contributor'), contentHubHandlers.updateAsset);
 // Pin/unpin temporarily disabled - handlers not implemented
@@ -30,10 +32,13 @@ router.patch('/assets/:id', requireRole('Contributor'), contentHubHandlers.updat
 // Versions
 router.post('/assets/:id/versions/init-upload', requireRole('Contributor'), contentHubHandlers.initUpload);
 router.post('/assets/:id/versions/complete-upload', requireRole('Contributor'), contentHubHandlers.completeUpload);
+router.post('/assets/:id/versions/save-rich-text', requireRole('Contributor'), contentHubHandlers.saveRichTextContent);
 router.get('/assets/:id/versions', contentHubHandlers.listVersions);
 
 // Downloads
 router.get('/versions/:id/download-url', contentHubHandlers.getDownloadUrl);
+router.get('/assets/:assetId/attachments/:attachmentId/download', downloadHandlers.downloadAttachment);
+router.get('/assets/:assetId/download', downloadHandlers.downloadAllAttachments);
 
 // Lifecycle (Approver+)
 router.post('/versions/:id/publish', requireRole('Approver'), lifecycleHandlers.publishVersionHandler);
