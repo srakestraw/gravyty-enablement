@@ -6,7 +6,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   Box,
   Button,
@@ -42,10 +42,24 @@ import {
   Info as InfoIcon,
   Delete as DeleteIcon,
 } from '@mui/icons-material';
-import { createAsset, initUpload, completeUpload, publishVersion, scheduleVersion, setExpireAt, saveRichTextContent } from '../../api/contentHubClient';
+import { 
+  createAsset, 
+  initUpload, 
+  completeUpload, 
+  publishVersion, 
+  scheduleVersion, 
+  setExpireAt, 
+  saveRichTextContent,
+  getAsset,
+  getAssetVersion,
+  createAssetVersion,
+  updateAsset,
+  updateAssetVersion,
+  deleteAsset,
+} from '../../api/contentHubClient';
 import { RichTextEditor } from '../../components/common/RichTextEditor';
 import { isErrorResponse, usersApi, type AdminUser } from '../../lib/apiClient';
-import type { AssetType, AssetSourceType } from '@gravyty/domain';
+import type { AssetType, AssetSourceType, Asset, AssetVersion } from '@gravyty/domain';
 import { AttachmentsSection, type Attachment } from '../../components/content-hub/AttachmentsSection';
 import { useAuth } from '../../contexts/AuthContext';
 import { isContributorOrHigher, isApproverOrHigher, isAdmin } from '../../lib/roles';
@@ -58,6 +72,14 @@ import { useMetadataOptions } from '../../hooks/useMetadataOptions';
 import { KeywordsInput } from '../../components/content-hub/KeywordsInput';
 import { metadataApi } from '../../api/metadataClient';
 import type { MetadataOption, MediaRef } from '@gravyty/domain';
+import { canDeleteAsset } from '../../lib/content-hub/assetHelpers';
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  DialogContentText,
+} from '@mui/material';
 
 type PublishAction = 'draft' | 'publish-now' | 'schedule';
 
@@ -77,10 +99,21 @@ interface FieldErrors {
 
 export function CreateAssetPage() {
   const navigate = useNavigate();
+  const { assetId } = useParams<{ assetId?: string }>();
+  const [searchParams] = useSearchParams();
+  const versionIdFromQuery = searchParams.get('versionId');
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [existingAsset, setExistingAsset] = useState<Asset | null>(null);
+  const [existingVersion, setExistingVersion] = useState<AssetVersion | null>(null);
+  const [versionId, setVersionId] = useState<string | undefined>(versionIdFromQuery || undefined);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [loadingAsset, setLoadingAsset] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
+  const [deleting, setDeleting] = useState(false);
   
   // Content Details
   const [title, setTitle] = useState('');
@@ -105,6 +138,7 @@ export function CreateAssetPage() {
   const [expireAt, setExpireAt] = useState('');
   const [changeLog, setChangeLog] = useState('');
   const [showExpiration, setShowExpiration] = useState(false);
+  const [highlightAsNew, setHighlightAsNew] = useState(false);
   
   // User search for owner picker
   const [userSearchQuery, setUserSearchQuery] = useState('');
@@ -144,9 +178,201 @@ export function CreateAssetPage() {
   const canPublish = isApproverOrHigher(user?.role);
   const canSetOwner = isAdmin(user?.role) || isApproverOrHigher(user?.role);
   const isContributor = isContributorOrHigher(user?.role) && !canPublish;
+  const canDelete = existingAsset ? canDeleteAsset(user, existingAsset) : false;
   
   // Determine if content type is text_content
   const isTextContent = assetType === 'text_content' || assetType === 'document';
+  
+  // Load existing asset and version when editing
+  useEffect(() => {
+    const loadExistingData = async () => {
+      if (!assetId) {
+        setIsEditMode(false);
+        return;
+      }
+      
+      setIsEditMode(true);
+      setLoadingAsset(true);
+      
+      try {
+        // Load asset
+        const assetResponse = await getAsset(assetId);
+        if (isErrorResponse(assetResponse)) {
+          setError(assetResponse.error.message || 'Failed to load asset. Please check if the asset exists.');
+          setIsEditMode(false); // Reset edit mode if asset load fails
+          setLoadingAsset(false);
+          return;
+        }
+        
+        const asset = assetResponse.data.asset;
+        setExistingAsset(asset);
+        
+        // Populate form with asset data
+        setTitle(asset.title);
+        setSummary(asset.short_description || '');
+        setRichTextContent(asset.body_rich_text || asset.description_rich_text || '');
+        setCoverImage(asset.cover_image || null);
+        setAssetType(asset.asset_type);
+        setOwnerId(asset.owner_id);
+        setKeywords(asset.keywords || []);
+        setAudienceIds(asset.audience_ids || []);
+        
+        // Parse metadata node IDs
+        const metadataIds = asset.metadata_node_ids || [];
+        const productSuiteIdsFromAsset = metadataIds.filter(id => 
+          productSuiteOptions.some(opt => opt.option_id === id)
+        );
+        const productIdsFromAsset = metadataIds.filter(id => 
+          productOptions.some(opt => opt.option_id === id)
+        );
+        const tagIdsFromAsset = metadataIds.filter(id => 
+          !productSuiteIdsFromAsset.includes(id) && !productIdsFromAsset.includes(id)
+        );
+        setProductSuiteIds(productSuiteIdsFromAsset);
+        setProductIds(productIdsFromAsset);
+        setTagIds(tagIdsFromAsset);
+        
+        // Determine version to edit
+        let targetVersionId = versionIdFromQuery;
+        
+        if (!targetVersionId) {
+          // Check for existing draft version
+          const versions = assetResponse.data.versions || [];
+          const draftVersion = versions.find((v: any) => v.status === 'draft');
+          
+          if (draftVersion) {
+            targetVersionId = draftVersion.id;
+            setVersionId(draftVersion.id);
+          } else {
+            // Create a new draft version
+            // If there's a published version, clone from it; otherwise create empty draft
+            try {
+              const createVersionResponse = await createAssetVersion(assetId, {
+                ...(asset.current_published_version_id && { fromVersionId: asset.current_published_version_id }),
+              });
+              
+              if (!isErrorResponse(createVersionResponse)) {
+                targetVersionId = createVersionResponse.data.version.version_id;
+                setVersionId(targetVersionId);
+              }
+              // If version creation fails, continue anyway - we can still load links from source_ref
+            } catch (versionError) {
+              // If version creation fails, continue anyway - we can still load links from source_ref
+            }
+          }
+        }
+        
+        // Load attachments - check both version attachments and asset source_ref (for links)
+        const loadedAttachments: Attachment[] = [];
+        let attachmentIndex = 0;
+        
+        // Load version data if we have a version ID
+        if (targetVersionId) {
+          const versionResponse = await getAssetVersion(assetId, targetVersionId);
+          if (!isErrorResponse(versionResponse)) {
+            setExistingVersion(versionResponse.data.version);
+            
+            // Load attachments from version
+            const versionAttachments = versionResponse.data.attachments.map((att: Attachment) => ({
+              id: att.attachment_id,
+              type: att.type,
+              url: att.url,
+              fileName: att.file_name,
+              mimeType: att.mime_type,
+              fileSize: att.file_size,
+              isPrimary: att.is_primary,
+              status: (att.status || 'ready') as 'ready' | 'uploading' | 'failed',
+              sortOrder: att.sort_order || attachmentIndex++,
+            }));
+            loadedAttachments.push(...versionAttachments);
+            attachmentIndex = loadedAttachments.length;
+            
+            // Load rich text content if available
+            if (versionResponse.data.version.content_html) {
+              setRichTextContent(versionResponse.data.version.content_html);
+            }
+          }
+        }
+        
+        // For LINK type assets (check both source_type and asset_type), load links from source_ref
+        // This should happen regardless of whether we have a version ID or attachments
+        const isLinkAsset = asset.source_type === 'LINK' || asset.asset_type === 'link';
+        if (isLinkAsset && asset.source_ref) {
+          // Handle both single URL and multiple URLs formats
+          let urls: string[] = [];
+          if (Array.isArray(asset.source_ref.urls)) {
+            urls = asset.source_ref.urls.filter((url: any) => typeof url === 'string' && url.trim().length > 0);
+          } else if (typeof asset.source_ref.url === 'string' && asset.source_ref.url.trim().length > 0) {
+            urls = [asset.source_ref.url];
+          } else if (typeof asset.source_ref === 'object') {
+            // Try to find any URL-like values in the source_ref object
+            Object.values(asset.source_ref).forEach((value: any) => {
+              if (typeof value === 'string' && (value.startsWith('http://') || value.startsWith('https://'))) {
+                urls.push(value);
+              } else if (Array.isArray(value)) {
+                value.forEach((item: any) => {
+                  if (typeof item === 'string' && (item.startsWith('http://') || item.startsWith('https://'))) {
+                    urls.push(item);
+                  }
+                });
+              }
+            });
+          }
+          
+          if (urls.length > 0) {
+            urls.forEach((url: string, index: number) => {
+              // Check if this URL is already in attachments (from version)
+              const existingLink = loadedAttachments.find(a => a.type === 'LINK' && a.url === url);
+              if (!existingLink) {
+                // Add link from source_ref if not already loaded as attachment
+                loadedAttachments.push({
+                  id: `link_${Date.now()}_${index}`,
+                  type: 'LINK',
+                  url: url.trim(),
+                  status: 'ready',
+                  isPrimary: loadedAttachments.length === 0 && index === 0,
+                  sortOrder: attachmentIndex++,
+                });
+              }
+            });
+          }
+        }
+        
+        // For GOOGLE_DRIVE type assets, load drive link from source_ref if not already loaded
+        if (asset.source_type === 'GOOGLE_DRIVE' && asset.source_ref) {
+          const driveLink = asset.source_ref.drive_web_view_link || asset.source_ref.driveWebViewLink;
+          if (driveLink) {
+            const existingDrive = loadedAttachments.find(a => a.type === 'DRIVE');
+            if (!existingDrive) {
+              loadedAttachments.push({
+                id: 'drive_1',
+                type: 'DRIVE',
+                url: driveLink,
+                fileName: asset.source_ref.drive_file_name || asset.source_ref.driveFileName,
+                driveFileId: asset.source_ref.drive_file_id || asset.source_ref.driveFileId,
+                driveFileName: asset.source_ref.drive_file_name || asset.source_ref.driveFileName,
+                driveWebViewLink: driveLink,
+                status: 'ready',
+                isPrimary: loadedAttachments.length === 0,
+                sortOrder: attachmentIndex++,
+              });
+            }
+          }
+        }
+        
+        setAttachments(loadedAttachments);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load asset');
+        setIsEditMode(false); // Reset edit mode if asset load fails
+      } finally {
+        setLoadingAsset(false);
+      }
+    };
+    
+    if (assetId) {
+      loadExistingData();
+    }
+  }, [assetId, versionIdFromQuery, productSuiteOptions, productOptions]);
   
   // Initialize form defaults
   useEffect(() => {
@@ -328,6 +554,37 @@ export function CreateAssetPage() {
   const handleCancel = () => {
     navigate('/enablement/resources/library');
   };
+
+  const handleDeleteDialogClose = () => {
+    setDeleteDialogOpen(false);
+    setDeleteConfirmationText('');
+  };
+
+  const handleDelete = async () => {
+    if (!assetId || !existingAsset) return;
+    
+    const isDeleteConfirmed = deleteConfirmationText === existingAsset.title;
+    if (!isDeleteConfirmed) return;
+    
+    try {
+      setDeleting(true);
+      const response = await deleteAsset(assetId);
+      
+      if (isErrorResponse(response)) {
+        setError(response.error.message);
+        setDeleting(false);
+        return;
+      }
+      
+      // Navigate to library page after successful delete
+      navigate('/enablement/content-hub/library');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete asset');
+      setDeleting(false);
+    }
+  };
+
+  const isDeleteConfirmed = deleteConfirmationText === existingAsset?.title;
   
   // Attachment handlers - single source of truth
   const handleAttachmentsChange = (newAttachments: Attachment[]) => {
@@ -384,32 +641,105 @@ export function CreateAssetPage() {
       const bodyRichText = isTextContent ? richTextContent : undefined;
       const descriptionRichText = !isTextContent ? richTextContent : undefined;
       
-      // Create content
-      const createAssetResponse = await createAsset({
-        title: title.trim(),
-        short_description: summary.trim() || undefined,
-        description_rich_text: descriptionRichText || undefined,
-        body_rich_text: bodyRichText || undefined,
-        cover_image: coverImage || undefined,
-        asset_type: assetType,
-        owner_id: ownerId,
-        metadata_node_ids: taxonomyNodeIds,
-        audience_ids: audienceIds,
-        keywords: keywords.length > 0 ? keywords : undefined,
-        source_ref: sourceRef,
-      });
+      let createdAsset: Asset;
+      let currentVersionId: string | undefined = versionId;
       
-      if (isErrorResponse(createAssetResponse)) {
-        setError(createAssetResponse.error.message);
-        return;
+      if (isEditMode && existingAsset && assetId) {
+        // Edit mode: Update asset metadata and version content
+        // Fix source_type if asset_type is 'link' but source_type is wrong
+        let correctedSourceType = undefined;
+        if (assetType === 'link' && existingAsset.source_type !== 'LINK') {
+          // Check if we have links in attachments or source_ref
+          const hasLinks = attachments.some(a => a.type === 'LINK') || 
+                          (existingAsset.source_ref && (existingAsset.source_ref.url || existingAsset.source_ref.urls));
+          if (hasLinks) {
+            correctedSourceType = 'LINK';
+          }
+        }
+        
+        // Update asset metadata
+        const updateAssetResponse = await updateAsset(existingAsset.asset_id, {
+          title: title.trim(),
+          short_description: summary.trim() || undefined,
+          description_rich_text: descriptionRichText || undefined,
+          body_rich_text: bodyRichText || undefined,
+          cover_image: coverImage || undefined,
+          metadata_node_ids: taxonomyNodeIds,
+          audience_ids: audienceIds,
+          keywords: keywords.length > 0 ? keywords : undefined,
+          ...(correctedSourceType && { source_type: correctedSourceType }),
+        });
+        
+        if (isErrorResponse(updateAssetResponse)) {
+          setError(updateAssetResponse.error.message || 'Failed to update asset');
+          return;
+        }
+        
+        createdAsset = updateAssetResponse.data.asset;
+        
+        // Ensure we have a version ID - create one if missing
+        if (!currentVersionId) {
+          // Create a draft version if one doesn't exist
+          const createVersionResponse = await createAssetVersion(existingAsset.asset_id, {
+            ...(existingAsset.current_published_version_id && { fromVersionId: existingAsset.current_published_version_id }),
+          });
+          
+          if (isErrorResponse(createVersionResponse)) {
+            setError(createVersionResponse.error.message || 'Failed to create draft version');
+            return;
+          }
+          
+          currentVersionId = createVersionResponse.data.version.version_id;
+          setVersionId(currentVersionId);
+        }
+        
+        // Update version rich text content if changed
+        if (richTextContent && (bodyRichText || descriptionRichText)) {
+          await saveRichTextContent(existingAsset.asset_id, {
+            version_id: currentVersionId,
+            content_html: richTextContent,
+          });
+        }
+        
+        // Note: Attachments are handled separately via addAttachment/removeAttachment endpoints
+        // For now, we'll rely on the existing attachment management in the form
+      } else {
+        // Create mode: Create asset and v1 draft version
+        const createAssetResponse = await createAsset({
+          title: title.trim(),
+          short_description: summary.trim() || undefined,
+          description_rich_text: descriptionRichText || undefined,
+          body_rich_text: bodyRichText || undefined,
+          cover_image: coverImage || undefined,
+          asset_type: assetType,
+          owner_id: ownerId,
+          metadata_node_ids: taxonomyNodeIds,
+          audience_ids: audienceIds,
+          keywords: keywords.length > 0 ? keywords : undefined,
+          source_ref: sourceRef,
+        });
+        
+        if (isErrorResponse(createAssetResponse)) {
+          console.error('[CreateAssetPage] Error creating asset:', {
+            error: createAssetResponse.error,
+            request_id: createAssetResponse.request_id,
+          });
+          console.error('[CreateAssetPage] Error message:', createAssetResponse.error.message);
+          console.error('[CreateAssetPage] Error code:', createAssetResponse.error.code);
+          if (createAssetResponse.error.debug) {
+            console.error('[CreateAssetPage] Error debug info:', createAssetResponse.error.debug);
+          }
+          setError(createAssetResponse.error.message || 'Failed to create asset');
+          return;
+        }
+        
+        createdAsset = createAssetResponse.data.asset;
+        currentVersionId = createAssetResponse.data.version?.version_id;
       }
       
-      const createdAsset = createAssetResponse.data.asset;
-      let versionId: string | undefined = createAssetResponse.data.version?.version_id;
-      
-      // Handle file attachments uploads
+      // Handle file attachments uploads (for both create and edit modes)
       const fileAttachments = attachments.filter(a => a.type === 'FILE_UPLOAD' && a.file);
-      if (fileAttachments.length > 0 && !versionId) {
+      if (fileAttachments.length > 0 && !currentVersionId) {
         // Initialize upload for multiple files
         const initResponse = await initUpload(createdAsset.asset_id, {
           files: fileAttachments.map(att => ({
@@ -424,7 +754,7 @@ export function CreateAssetPage() {
           return;
         }
         
-        versionId = initResponse.data.version_id;
+        currentVersionId = initResponse.data.version_id;
         
         // Upload all files to S3
         if (initResponse.data.uploads) {
@@ -455,7 +785,7 @@ export function CreateAssetPage() {
           
           // Complete upload
           const completeResponse = await completeUpload(createdAsset.asset_id, {
-            version_id: versionId,
+            version_id: currentVersionId,
             files: uploadedFiles,
           });
           
@@ -464,7 +794,7 @@ export function CreateAssetPage() {
             return;
           }
           
-          versionId = completeResponse.data.version.version_id;
+          currentVersionId = completeResponse.data.version.version_id;
         } else if (initResponse.data.upload_url) {
           // Single file (backward compatible)
           const attachment = fileAttachments[0];
@@ -483,7 +813,7 @@ export function CreateAssetPage() {
           
           // Complete upload
           const completeResponse = await completeUpload(createdAsset.asset_id, {
-            version_id: versionId,
+            version_id: currentVersionId,
             storage_key: initResponse.data.s3_key!,
             size_bytes: file.size,
           });
@@ -493,27 +823,29 @@ export function CreateAssetPage() {
             return;
           }
           
-          versionId = completeResponse.data.version.version_id;
+          currentVersionId = completeResponse.data.version.version_id;
         }
       }
       
       // For text_content or if version was created automatically, use it
-      if (!versionId && createAssetResponse.data.version) {
-        versionId = createAssetResponse.data.version.version_id;
+      if (!currentVersionId && !isEditMode && createAssetResponse.data.version) {
+        currentVersionId = createAssetResponse.data.version.version_id;
       }
       
       // Handle publish action
-      if (versionId && publishAction === 'publish-now') {
-        const publishResponse = await publishVersion(versionId, {
-          change_log: changeLog.trim(),
+      if (currentVersionId && publishAction === 'publish-now') {
+        const publishResponse = await publishVersion(currentVersionId, {
+          ...(changeLog.trim() && { change_log: changeLog.trim() }),
+          highlight_as_new: highlightAsNew,
+          notify_followers: highlightAsNew,
         });
         
         if (isErrorResponse(publishResponse)) {
           setError(publishResponse.error.message);
           return;
         }
-      } else if (versionId && publishAction === 'schedule') {
-        const scheduleResponse = await scheduleVersion(versionId, {
+      } else if (currentVersionId && publishAction === 'schedule') {
+        const scheduleResponse = await scheduleVersion(currentVersionId, {
           publish_at: new Date(publishAt).toISOString(),
         });
         
@@ -523,24 +855,28 @@ export function CreateAssetPage() {
         }
         
         // Set expiration date if provided
-        if (expireAt && versionId) {
-          const expireResponse = await setExpireAt(versionId, new Date(expireAt).toISOString());
+        if (expireAt && currentVersionId) {
+          const expireResponse = await setExpireAt(currentVersionId, new Date(expireAt).toISOString());
           if (isErrorResponse(expireResponse)) {
             setError(expireResponse.error.message);
             return;
           }
         }
-      } else if (versionId && expireAt) {
+      } else if (currentVersionId && expireAt) {
         // Set expiration date for draft versions too
-        const expireResponse = await setExpireAt(versionId, new Date(expireAt).toISOString());
+        const expireResponse = await setExpireAt(currentVersionId, new Date(expireAt).toISOString());
         if (isErrorResponse(expireResponse)) {
           setError(expireResponse.error.message);
           return;
         }
       }
       
-      // Success! Navigate back to library
-      navigate('/enablement/resources/library');
+      // Success! Navigate to asset detail page
+      if (isEditMode) {
+        navigate(`/enablement/content-hub/assets/${createdAsset.asset_id}`);
+      } else {
+        navigate('/enablement/resources/library');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create content');
     } finally {
@@ -573,8 +909,19 @@ export function CreateAssetPage() {
     return null;
   };
   
+  // Show loading state while loading asset data
+  if (loadingAsset) {
+    return (
+      <PlaceholderPage title={isEditMode ? "Edit content" : "Create content"} description={isEditMode ? "Edit an enablement item" : "Create a new enablement item"}>
+        <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+          <CircularProgress />
+        </Box>
+      </PlaceholderPage>
+    );
+  }
+
   return (
-    <PlaceholderPage title="Create content" description="Create a new enablement item">
+    <PlaceholderPage title={isEditMode ? "Edit content" : "Create content"} description={isEditMode ? "Edit an enablement item" : "Create a new enablement item"}>
       <Box sx={{ mb: 3 }}>
         <Breadcrumbs aria-label="breadcrumb">
           <Link
@@ -585,7 +932,7 @@ export function CreateAssetPage() {
           >
             Content Hub
           </Link>
-          <Typography color="text.primary">Create content</Typography>
+          <Typography color="text.primary">{isEditMode ? "Edit content" : "Create content"}</Typography>
         </Breadcrumbs>
       </Box>
       
@@ -899,26 +1246,6 @@ export function CreateAssetPage() {
                       />
                     )}
                   </Box>
-                  
-                  {/* What Changed - Optional */}
-                  {(publishAction === 'publish-now' || publishAction === 'schedule') && (
-                    <TextField
-                      fullWidth
-                      multiline
-                      rows={2}
-                      label="What changed (optional)"
-                      value={changeLog}
-                      onChange={(e) => {
-                        setChangeLog(e.target.value);
-                        handleFieldChange('changeLog');
-                      }}
-                      onBlur={() => handleFieldChange('changeLog')}
-                      placeholder="Describe what changed in this version..."
-                      error={!!fieldErrors.changeLog}
-                      helperText={fieldErrors.changeLog || 'Optional: Included in notifications if provided'}
-                      size="small"
-                    />
-                  )}
                 </Stack>
               )}
             </Paper>
@@ -943,12 +1270,23 @@ export function CreateAssetPage() {
         }}
       >
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2 }}>
-          <Button onClick={handleCancel} disabled={loading}>
-            Cancel
-          </Button>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button onClick={handleCancel} disabled={loading}>
+              Cancel
+            </Button>
+            {isEditMode && canDelete && (
+              <Button
+                onClick={() => setDeleteDialogOpen(true)}
+                color="error"
+                disabled={loading || deleting}
+              >
+                Delete
+              </Button>
+            )}
+          </Box>
           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1 }}>
             <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-              {canPublish && (
+              {canPublish && !isEditMode && (
                 <Button
                   onClick={() => {
                     setPublishAction('draft');
@@ -960,6 +1298,22 @@ export function CreateAssetPage() {
                   {loading ? <CircularProgress size={20} /> : 'Save draft'}
                 </Button>
               )}
+              {isEditMode && publishAction === 'publish-now' && (
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={highlightAsNew}
+                      onChange={(e) => setHighlightAsNew(e.target.checked)}
+                      size="small"
+                    />
+                  }
+                  label={
+                    <Typography variant="body2" sx={{ fontSize: '0.875rem' }}>
+                      Publish as a new update (shows in New and notifies followers)
+                    </Typography>
+                  }
+                />
+              )}
               <Button
                 onClick={handleSubmit}
                 variant="contained"
@@ -968,7 +1322,9 @@ export function CreateAssetPage() {
                 {loading ? (
                   <CircularProgress size={20} />
                 ) : (
-                  publishAction === 'draft' ? 'Create draft' : publishAction === 'schedule' ? 'Schedule' : 'Publish'
+                  isEditMode 
+                    ? (publishAction === 'draft' ? 'Save draft' : publishAction === 'schedule' ? 'Schedule' : 'Update')
+                    : (publishAction === 'draft' ? 'Create draft' : publishAction === 'schedule' ? 'Schedule' : 'Publish')
                 )}
               </Button>
             </Box>
@@ -980,6 +1336,48 @@ export function CreateAssetPage() {
           </Box>
         </Box>
       </Box>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onClose={handleDeleteDialogClose}>
+        <DialogTitle>Delete Content Asset</DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ mb: 2 }}>
+            Are you sure you want to delete "{existingAsset?.title || 'this asset'}"? This action cannot be undone.
+          </DialogContentText>
+          <DialogContentText sx={{ mb: 2 }}>
+            To confirm, please type the asset title: <strong>{existingAsset?.title || ''}</strong>
+          </DialogContentText>
+          <TextField
+            autoFocus
+            fullWidth
+            label="Asset Title"
+            value={deleteConfirmationText}
+            onChange={(e) => setDeleteConfirmationText(e.target.value)}
+            error={deleteConfirmationText !== '' && !isDeleteConfirmed}
+            helperText={
+              deleteConfirmationText !== '' && !isDeleteConfirmed
+                ? 'Title does not match'
+                : ''
+            }
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && isDeleteConfirmed && !deleting) {
+                handleDelete();
+              }
+            }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleDeleteDialogClose}>Cancel</Button>
+          <Button
+            onClick={handleDelete}
+            color="error"
+            variant="contained"
+            disabled={!isDeleteConfirmed || deleting}
+          >
+            {deleting ? 'Deleting...' : 'Delete'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </PlaceholderPage>
   );
 }
